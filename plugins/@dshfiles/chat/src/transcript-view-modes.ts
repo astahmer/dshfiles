@@ -35,7 +35,7 @@ export const TRANSCRIPT_VIEW_MODE_DESCRIPTIONS = {
   compact: 'every turn folds its tool work under one "Worked for" row; failures and questions stay visible',
   standard: 'finished turns fold; live turns show their current step in grouped rows',
   detailed: 'finished turns fold under "Worked for"; tool calls show as rows while a turn runs',
-  verbose: 'every tool call stays open as its own row',
+  verbose: 'every tool call stays open as its own row, and the context loaded at the start of each turn is listed',
 } as const satisfies Readonly<Record<TranscriptViewMode, string>>
 
 /** Saved values from older generations of this setting, read as `detailed`. */

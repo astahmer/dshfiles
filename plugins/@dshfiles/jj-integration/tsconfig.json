@@ -8,7 +8,10 @@
     "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node", "react", "@dshfiles/dshx/client/env"]
+    "types": ["node", "react", "@dshfiles/dshx/client/env"],
+    "paths": {
+      "@testing-library/react": ["../plugin-ui/node_modules/@testing-library/react"]
+    }
   },
   "include": ["src"]
 }

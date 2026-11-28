@@ -2,7 +2,9 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  width: 100%;
+  /* dshfiles (unslop R4): as wide as its label, so its hover and focus cover the words, not the column. */
+  width: fit-content;
+  max-width: var(--dsh-chat-prose-measure, 100%);
   min-width: 0;
   /* dshfiles (visual refresh T2.1): no rule under the row; turns separate by spacing. */
   height: calc(24px + var(--dsh-content-font-delta, 0px));
@@ -11,7 +13,9 @@
   background: none;
   color: var(--dsw-alias-label-tertiary);
   font: inherit;
-  font-size: var(--dsh-content-font-size, 14px);
+  /* dshfiles (unslop C16): the tool rows' size (the kit density's UI step: 13px, 15px on a phone), so one turn's rows
+     share one size; never below the Settings font-size preference. */
+  font-size: max(var(--dsh-content-font-size-secondary, 13px), var(--dshx-density-text-ui, 13px));
   cursor: pointer;
   text-align: left;
   transition: color 100ms ease;
@@ -19,6 +23,33 @@
 
 .root:disabled {
   cursor: default;
+}
+
+/* dshfiles (unslop R5): a row whose Turn just closed fades in on the collapse token while the scroll offset keeps the
+   text below it still (TurnProcessNodeView). Opacity only, so reduced motion keeps it. */
+.root[data-entering] {
+  animation: turn-process-enters var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;
+}
+
+@keyframes turn-process-enters {
+  from {
+    opacity: 0;
+  }
+}
+
+/* dshfiles (unslop, phone #20): on a touch screen the row that opens a turn's work was a 24px target. Round five C2
+   (council round 4): it draws at 24px, so "Worked for" sits 12px above "New", and its tap area reaches 10px past each
+   edge (44px) without taking room. */
+@media (pointer: coarse) {
+  .root:not(:disabled) {
+    position: relative;
+  }
+
+  .root:not(:disabled)::after {
+    content: '';
+    position: absolute;
+    inset: -10px 0;
+  }
 }
 
 @media (hover: hover) {

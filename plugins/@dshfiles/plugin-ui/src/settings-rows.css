@@ -1,0 +1,59 @@
+/*
+ * The Settings row grammar (council round 8 A5; DESIGN.md › Components › Settings rows). Settings rows stay on the
+ * 880 frame; so the eye follows a label to its value across that width:
+ *
+ * - `settings-row` on each row: a 1px hairline at its bottom in the kit border, inset to the text edges, and a full-row
+ *   wash (the ghost hover fill) on hover and while a control inside has keyboard focus. The row bleeds 8px past its
+ *   text on each side (a negative margin paid back as padding), so the wash has room around the label without moving
+ *   it. The hairline is a background stripe, so a native row's own border is dropped; the last row drops its hairline
+ *   with `dshx:bg-none`. Hover only where a pointer hovers, so a phone never keeps a stale wash.
+ * - `settings-heading` (section heading, 18/24 at 600, 40px above and 12px below since council round 10 A6, so a group
+ *   reads as a section and not one more row; drop the top margin on the first one with `first:mt-0`),
+ *   `settings-label` (row label, 14/20 at 500, ink) and `settings-description` (13/18 at 400, secondary ink).
+ *
+ * Pixel sizes, as `text-title`: the Host's root font is about 12.5px. Ink and secondary ink hold AA on the wash
+ * (tests/settings-row.test.ts).
+ */
+@utility settings-row {
+  --dshx-row-bleed: 8px;
+  margin-inline: calc(-1 * var(--dshx-row-bleed));
+  padding-inline: var(--dshx-row-bleed);
+  border-radius: var(--dsw-radius-md, 8px);
+  border-bottom-width: 0;
+  background-image: linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2));
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: calc(100% - 2 * var(--dshx-row-bleed)) 1px;
+  transition: background-color var(--dshx-duration-hover) ease-out;
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--dsw-alias-interactive-bg-hover);
+    }
+  }
+  &:has(:focus-visible) {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+@utility settings-heading {
+  margin-block-start: 40px;
+  margin-block-end: 12px;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+@utility settings-label {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+@utility settings-description {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--dsw-alias-label-secondary);
+}

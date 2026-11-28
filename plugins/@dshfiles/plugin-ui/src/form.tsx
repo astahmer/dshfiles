@@ -48,7 +48,7 @@ const LabelledField = (
       <FieldLabel htmlFor={id}>
         {props.label}
         {props.required === true && (
-          <span aria-hidden className="dshx:text-destructive">
+          <span aria-hidden className="dshx:text-muted-foreground">
             *
           </span>
         )}

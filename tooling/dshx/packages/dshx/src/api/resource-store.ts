@@ -39,7 +39,12 @@ export interface ResourceConnection {
 export interface ResourceInvalidationSource {
   readonly id: string
   readonly tags: readonly string[]
-  readonly subscribe: (handlers: { readonly onInvalidate: () => void; readonly onLive: (live: boolean) => void }) => () => void
+  readonly subscribe: (handlers: {
+    readonly onInvalidate: () => void
+    readonly onLive: (live: boolean) => void
+    /** The source will not connect (no event stream, or the Host does not publish it): a first read stops waiting. */
+    readonly onUnavailable: () => void
+  }) => () => void
 }
 
 export interface ResourceDefinition<T = unknown> {
@@ -114,11 +119,23 @@ interface ConnectionState {
 interface SourceState {
   readonly keys: Set<string>
   live: boolean
+  /** Until it goes live or reports it never will; a first read waits on a connecting source. */
+  connecting: boolean
+  /** When the store subscribed to the source: a first read waits at most {@link SOURCE_CONNECT_WAIT_MS} after. */
+  readonly subscribedAt: number
   unsubscribe: () => void
 }
 
 const IDLE: ResourceSnapshot<never> = Object.freeze({ status: 'idle', data: undefined, error: undefined, updatedAt: 0, fetching: false })
 const MAX_IDLE_ENTRIES = 500
+
+/**
+ * How long a key's first read waits for a push source that is still connecting. A source turning live re-reads every
+ * key read before it (missed pushes are not replayed), so a page-load read sent just before its event stream connected
+ * went out twice: `attention/list` both views twice on the live Host. Waiting for the connection reads it once; a source
+ * that has not connected by then (an older Host without the event) holds nothing.
+ */
+const SOURCE_CONNECT_WAIT_MS = 1_000
 
 interface DocumentLike {
   readonly visibilityState?: string
@@ -145,6 +162,19 @@ const createResourceStore = (): ResourceStore => {
   const active = (entry: Entry): boolean => hasVisibleSubscriber(entry) && connectionUp(entry) && (entry.definition.pollWhileHidden === true || documentShown())
 
   const allSourcesLive = (entry: Entry): boolean => entry.attachedSources.size > 0 && [...entry.attachedSources].every(id => sources.get(id)?.live === true)
+
+  /** When a never-read key may read: once no attached source is still connecting; `undefined` when it may now. */
+  const firstReadAt = (entry: Entry, now: number): number | undefined => {
+    if (entry.snapshot.status !== 'idle' || entry.inflight !== undefined) return undefined
+    let at: number | undefined
+    for (const id of entry.attachedSources) {
+      const source = sources.get(id)
+      if (source === undefined || source.live || !source.connecting) continue
+      const connected = source.subscribedAt + SOURCE_CONNECT_WAIT_MS
+      if (connected > now) at = Math.max(at ?? 0, connected)
+    }
+    return at
+  }
 
   const pollInterval = (entry: Entry): number | undefined => {
     if (allSourcesLive(entry)) return entry.definition.livePollInterval
@@ -182,6 +212,11 @@ const createResourceStore = (): ResourceStore => {
   }
 
   const schedule = (entry: Entry): void => {
+    // A never-read key is due now or held for its connecting source; `reconcile` decides which, and keeps the hold.
+    if (entry.snapshot.status === 'idle' && entry.inflight === undefined && active(entry)) {
+      reconcile(entry)
+      return
+    }
     clearTimer(entry)
     if (entry.inflight !== undefined || !active(entry)) return
     const interval = pollInterval(entry)
@@ -240,7 +275,18 @@ const createResourceStore = (): ResourceStore => {
 
   /** A key became (or stayed) required: read it when stale, else keep its poll on time. */
   const reconcile = (entry: Entry): void => {
-    if (active(entry) && stale(entry, Date.now())) {
+    const now = Date.now()
+    if (active(entry) && stale(entry, now)) {
+      const at = firstReadAt(entry, now)
+      if (at !== undefined) {
+        // Its source going live reads it; the timer covers a source that never connects.
+        clearTimer(entry)
+        entry.timer = setTimeout(() => {
+          entry.timer = undefined
+          reconcile(entry)
+        }, at - now)
+        return
+      }
       void run(entry).catch(() => undefined)
       return
     }
@@ -313,18 +359,29 @@ const createResourceStore = (): ResourceStore => {
         existing.keys.add(key)
         continue
       }
-      const state: SourceState = { keys: new Set([key]), live: false, unsubscribe: () => undefined }
+      const state: SourceState = { keys: new Set([key]), live: false, connecting: true, subscribedAt: Date.now(), unsubscribe: () => undefined }
       sources.set(source.id, state)
       state.unsubscribe = source.subscribe({
         onInvalidate: () => invalidate({ tags: source.tags }),
+        onUnavailable: () => {
+          if (!state.connecting) return
+          state.connecting = false
+          for (const attached of state.keys) {
+            const target = entries.get(attached)
+            if (target !== undefined && target.snapshot.status === 'idle') reconcile(target)
+          }
+        },
         onLive: live => {
+          if (live) state.connecting = false
           if (state.live === live) return
           state.live = live
           for (const attached of state.keys) {
             const target = entries.get(attached)
             if (target === undefined) continue
             if (!live) {
-              schedule(target)
+              // A first read still held keeps its timer; anything else polls at the disconnected interval.
+              if (target.snapshot.status === 'idle') reconcile(target)
+              else schedule(target)
               continue
             }
             target.invalidated = true

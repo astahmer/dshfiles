@@ -1,3 +1,4 @@
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import type { EditedFile } from './turn-activity.js'
 
 /** Chips shown before the rest fold into "+N more"; a turn that touched more files shows them in its walkthrough. */
@@ -21,28 +22,24 @@ export const TurnFileChips = (props: {
   const shown = props.files.slice(0, MAX_FILE_CHIPS)
   const hidden = props.files.length - shown.length
   return (
-    <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1" data-dshfiles-turn-file-chips="">
+    <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1" data-dshfiles-turn-file-chips={hidden > 0 ? 'some' : 'all'}>
       {shown.map(file => (
         <button
           aria-label={`${props.opensChanges ? 'Review' : 'Open'} ${file.path}${props.opensChanges ? ' in Changes' : ''}, ${String(file.added)} added, ${String(file.removed)} removed`}
-          className="dshx:flex dshx:h-5 dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-foreground dshx:hover:bg-accent"
+          className="dshx:flex dshx:h-5 dshx:min-w-0 dshx:max-w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:font-mono dshx:text-foreground dshx:hover:bg-accent dshx:pointer-coarse:h-11 dshx:pointer-coarse:px-3"
           data-dshfiles-turn-file-chip={file.path}
           key={file.path}
           onClick={() => props.onOpen(file)}
           type="button"
         >
           <span className="dshx:min-w-0 dshx:truncate">{baseName(file.path)}</span>
-          {file.added + file.removed > 0 && (
-            <span className="dshx:shrink-0 dshx:tabular-nums">
-              <span className="dshx:text-success">+{file.added}</span> <span className="dshx:text-destructive">−{file.removed}</span>
-            </span>
-          )}
+          {file.added + file.removed > 0 && <DiffStat added={file.added} removed={file.removed} className="dshx:shrink-0" />}
         </button>
       ))}
       {hidden > 0 && (
         <button
           aria-expanded={props.moreOpen}
-          className="dshx:flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground"
+          className="dshx:flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:px-3"
           onClick={props.onMore}
           type="button"
         >

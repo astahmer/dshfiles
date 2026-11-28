@@ -86,6 +86,7 @@ describe('backlog tool exposure', () => {
       'backlog_revert',
       'backlog_schedule_rule',
       'backlog_set_project_guidance',
+      'backlog_set_tag_color',
       'backlog_shipped',
       'backlog_start_thread',
       'backlog_summarize_shipped',

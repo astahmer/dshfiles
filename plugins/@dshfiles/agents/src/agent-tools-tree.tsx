@@ -2,6 +2,7 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ChevronRightIcon, PinIcon, RotateCcwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -193,7 +194,7 @@ export const AgentToolsTree = (props: AgentToolsTreeProps): JSX.Element => {
 
       {tree.groups.length === 0 ? (
         <p className="dshx:rounded-md dshx:border dshx:border-dashed dshx:border-border dshx:px-3 dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">
-          {searching ? `No tool matches “${query.trim()}”. Clear the filter to see every group.` : 'This Host lists no tools yet.'}
+          {searching ? `No tool matches “${query.trim()}”. Clear the filter to see every group.` : 'DSH lists no tools yet. Tools appear here once a plugin or an MCP server registers them.'}
         </p>
       ) : (
         <div role="tree" aria-label="Tools" className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border">
@@ -273,7 +274,7 @@ export const AgentToolsTree = (props: AgentToolsTreeProps): JSX.Element => {
                   <span
                     aria-hidden
                     className={cn(
-                      'dshx:shrink-0 dshx:text-[11px] dshx:@max-pane-narrow:hidden',
+                      'dshx:shrink-0 dshx:text-2xs dshx:@max-pane-narrow:hidden',
                       row.tool.entry === undefined ? 'dshx:text-muted-foreground' : 'dshx:font-medium dshx:text-foreground',
                     )}
                   >
@@ -310,7 +311,7 @@ export const AgentToolsTree = (props: AgentToolsTreeProps): JSX.Element => {
 
 const ChangedDot = (): JSX.Element => (
   <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center">
-    <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-warning" />
+    <StatusDot size="sm" tone="warning" />
     <span className="dshx:sr-only">unsaved</span>
   </span>
 )

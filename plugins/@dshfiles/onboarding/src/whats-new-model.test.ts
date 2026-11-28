@@ -152,4 +152,27 @@ describe('What’s new windows', () => {
       'change 1',
     ])
   })
+
+  it('says when a change landed the way a person does, never as an ISO date', () => {
+    const now = new Date(2026, 10, 16, 15, 0, 0)
+    const at = (day: number, hour = 9): string => new Date(2026, 10, day, hour).toISOString()
+    expect(WhatsNewModel.dateLabel(at(16, 1), now)).toBe('Today')
+    expect(WhatsNewModel.dateLabel(at(15, 23), now)).toBe('Yesterday')
+    expect(WhatsNewModel.dateLabel(at(13), now)).toBe('3 days ago')
+    expect(WhatsNewModel.dateLabel(at(2), now, 'en-GB')).toBe('2 Nov')
+    expect(WhatsNewModel.dateLabel(new Date(2025, 11, 24, 9).toISOString(), now, 'en-GB')).toBe('24 Dec 2025')
+  })
+
+  it('features what was added, five at most, and leaves fixes to the full list', () => {
+    const line = (index: number, kind: 'feat' | 'fix', breaking = false) => ({
+      commit: `c${String(index).padStart(11, '0')}`,
+      plugin: 'onboarding',
+      kind,
+      breaking,
+      summary: `change ${String(index)}`,
+      date: new Date(2026, 10, 20 - index).toISOString(),
+    })
+    const entries = [line(1, 'fix'), line(2, 'feat'), line(3, 'fix', true), ...[4, 5, 6, 7, 8].map(index => line(index, 'feat'))]
+    expect(WhatsNewModel.featured(entries).map(entry => entry.summary)).toEqual(['change 2', 'change 3', 'change 4', 'change 5', 'change 6'])
+  })
 })

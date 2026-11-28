@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "group-exit-backoff",
-      "title": "Wait for detached process groups without probing every 15 ms",
-      "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once, and the terminal readiness probe no longer forks the whole process table on every 50 ms poll.",
+      "title": "Wait for background processes cheaply",
+      "summary": "Waiting for background processes to exit costs far less CPU.",
+      "details": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once, and the terminal readiness probe no longer forks the whole process table on every 50 ms poll.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

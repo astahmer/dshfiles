@@ -11,6 +11,20 @@ import type { CloseButtonPosition } from '@dshfiles/workbench/tabs'
 import { SETTLE_THREAD_EVENT } from './settle-request.js'
 import type { TabsEvent } from './tabs-machine.js'
 
+// Round nine B2: the pages that name themselves on their tab (settings-shell provides them through TabPlaceGlyphs).
+const registry = vi.hoisted(() => {
+  const places: Array<{ readonly panelId: string; readonly glyph: () => JSX.Element; readonly tone: string }> = []
+  return { places }
+})
+vi.mock('@dshfiles/dshx/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@dshfiles/dshx/client')>()
+  return {
+    ...actual,
+    useRegistry: (token: Parameters<typeof actual.useRegistry>[0]) =>
+      token.id === '@dshfiles/workbench.tab-place-glyph' ? registry.places : actual.useRegistry(token),
+  }
+})
+
 const labels = {
   mentionThread: '@Mention thread',
   settleThread: 'Settle thread',
@@ -146,6 +160,164 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('makes room for a folded sidebar header drawn over its start, and says it is mounted (round five B1)', () => {
+    // thread-sidebar draws the folded column's open header row over the start of this strip: the strip pads by the
+    // overhang it publishes, after any frame leading clearance, and marks <html> so the row is drawn only over a strip.
+    const { unmount } = mount()
+    const strip = screen.getByRole('tablist').parentElement
+    expect(strip?.style.paddingInlineStart).toBe('calc(var(--dsh-frame-leading-clearance, 0px) + var(--dshfiles-sidebar-overhang, 0px) + 10px)')
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(true)
+    unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(false)
+  })
+
+  it('keeps the mounted mark while a re-registered strip replaces the old one', () => {
+    // The new strip mounts before the old one unmounts: the old cleanup must not clear the new strip's mark.
+    const old = mount()
+    const next = mount()
+    old.unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(true)
+    next.unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(false)
+  })
+
+  it('keeps a 16 px status seat on a thread tab whether or not it has a status, so the title never moves', () => {
+    // The glyph mounted only with a status, and the title moved 24 px each time a thread started or stopped (F13).
+    const idle = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))
+    const { unmount } = mount(undefined, undefined, idle)
+    const seat = (): Element | null => document.querySelector('[data-tab-status-slot]')
+    expect(seat()?.className).toContain('dshx:size-4')
+    // A thread with no status and no project yet (a new thread) draws the compose glyph there, in the Threads tone
+    // (council round 6 B6), rather than an empty seat.
+    expect(seat()?.querySelector('[data-tab-status]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-compose]')?.className).toContain('dshx:nav-tone-threads')
+    // The strip is on the nav surface; only the selected tab is on the canvas.
+    expect(document.querySelector('[role="tablist"]')?.parentElement?.className).toContain('dshx:surface-nav')
+    unmount()
+    mount()
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(1)
+    expect(document.querySelectorAll('[data-tab-status-slot]')).toHaveLength(1)
+  })
+
+  it('draws the list\'s Idle ring in the seat of a thread tab with a project and no status (council round 34, B4)', () => {
+    const projectNames = new Map([['workspace-1', 'dshfiles']])
+    const shape = (): readonly string[] => {
+      const seat = document.querySelector('[data-tab-status-slot]')
+      // Seat, then project tile, then title: the title keeps its place whether or not a turn runs (F13).
+      const parts = Array.from(seat?.parentElement?.children ?? []).map(child => (child === seat ? 'seat' : child.hasAttribute('data-tab-project') ? 'project' : child.tagName))
+      return parts.slice(0, 2)
+    }
+    const idle = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))
+    const { rerender } = render(<TabStrip tabs={idle} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={projectNames} />)
+    const seat = (): Element | null => document.querySelector('[data-tab-status-slot]')
+    // Never an empty 16px gap before the tile: the Idle ring the thread row draws, in its ink.
+    expect(seat()?.childElementCount).toBe(1)
+    const ring = seat()?.querySelector('[data-tab-idle]')
+    expect(ring?.getAttribute('data-slot')).toBe('status-glyph')
+    expect(ring?.getAttribute('data-status')).toBe('idle')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat()?.querySelector('[data-tab-compose]')).toBeNull()
+    expect(seat()?.className).toContain('dshx:size-4')
+    const idleShape = shape()
+    rerender(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={projectNames} />)
+    // Working: the same seat, one glyph, the same order, so the title's x does not change.
+    expect(seat()?.querySelector('[data-tab-idle]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-status="running"]')).not.toBeNull()
+    expect(seat()?.childElementCount).toBe(1)
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(shape()).toEqual(idleShape)
+    expect(idleShape).toEqual(['seat', 'project'])
+  })
+
+  it('draws a page tab\'s destination glyph, in its nav tone only on the active tab (round five B4)', () => {
+    const pages = tabs.map(tab =>
+      tab.kind === 'panel' ? { ...tab, destination: { id: 'work', icon: 'list-todo' } as const } : { ...tab, active: false },
+    )
+    const { unmount } = mount(undefined, undefined, pages)
+    const glyph = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph()?.className).toContain('dshx:nav-tone-work')
+    expect(glyph()?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(glyph()?.className).not.toContain('dshx:text-nav-tone')
+    unmount()
+    mount(undefined, undefined, pages.map(tab => (tab.kind === 'panel' ? { ...tab, active: true } : tab)))
+    expect(glyph()?.className).toContain('dshx:text-nav-tone')
+    // Round nine B2: the active tab's glyph sits on its tone's 14% tile, a 20px seat on the 16px footprint.
+    expect(glyph()?.className).toContain('dshx:bg-nav-tile')
+    expect(glyph()?.className).toContain('dshx:size-5 dshx:-m-0.5')
+    // The title stays ink; the thread tab keeps no destination glyph.
+    expect(screen.getByText('Workbench').className).not.toContain('nav-tone')
+    expect(document.querySelectorAll('[data-tab-destination]')).toHaveLength(1)
+  })
+
+  it('shows a page\'s own place glyph in its tone, on its tile while active, instead of its destination\'s (round nine B2)', () => {
+    registry.places = [{ panelId: 'ai-accounts', glyph: () => <svg data-testid="leaf" />, tone: 'var(--dshx-identity-2)' }]
+    const leaf = (panelId: string, active: boolean) =>
+      tabs.map(tab =>
+        tab.kind === 'panel' ? { ...tab, panelId, active, destination: { id: 'settings', icon: 'settings' } as const } : { ...tab, active: !active },
+      )
+    const { unmount } = mount(undefined, undefined, leaf('ai-accounts', true))
+    const mark = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(mark()?.getAttribute('data-tab-place')).toBe('ai-accounts')
+    expect(mark()?.querySelector('[data-testid="leaf"]')).not.toBeNull()
+    expect(mark()?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-2)')
+    expect(mark()?.className).not.toContain('dshx:nav-tone-settings')
+    expect(mark()?.className).toContain('dshx:bg-nav-tile')
+    unmount()
+    // A page without one keeps its destination's glyph.
+    mount(undefined, undefined, leaf('dshfiles-settings', false))
+    expect(mark()?.getAttribute('data-tab-place')).toBeNull()
+    expect(mark()?.className).toContain('dshx:nav-tone-settings')
+    expect(mark()?.className).not.toContain('dshx:bg-nav-tile')
+    registry.places = []
+  })
+
+  it('draws a preview tab in the one inactive ink, not a muted ink of its own (council round 18 B2.1)', () => {
+    mount(
+      undefined,
+      undefined,
+      tabs.map(tab => (tab.kind === 'panel' ? { ...tab, preview: true } : tab)),
+    )
+    const title = screen.getByText('Workbench')
+    expect(title.closest('[role="tab"]')?.getAttribute('data-preview')).toBe('true')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(title.closest('[role="tab"]')?.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('draws the active tab label in ink at 500, even when that tab is a preview', () => {
+    mount(
+      undefined,
+      undefined,
+      tabs.map(tab => ({ ...tab, preview: true })),
+    )
+    const active = screen.getByText('Thread')
+    expect(active.className).toContain('dshx:font-medium')
+    expect(active.className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(screen.getByText('Workbench').className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(screen.getByText('Workbench').className).not.toContain('dshx:font-medium')
+  })
+
+  it('draws the shared status glyph on a thread tab and never a coloured dot of its own', () => {
+    const withStatus = (status: TabView['status']): readonly TabView[] => tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status } : tab))
+    const view = mount()
+    const glyph = () => view.container.querySelector('[role="tab"] [data-slot="status-glyph"]')
+    expect(glyph()?.getAttribute('data-status')).toBe('working')
+    expect(view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    const draw = (status: TabView['status']): void =>
+      view.rerender(<TabStrip tabs={withStatus(status)} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} />)
+    draw('needsYou')
+    expect(glyph()?.getAttribute('data-status')).toBe('needs-you')
+    expect(view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    draw('failed')
+    expect(glyph()?.getAttribute('data-status')).toBe('failed')
+    expect(screen.getByRole('tab', { name: 'Thread, failed' })).toBeDefined()
+    draw('unread')
+    expect(glyph()?.getAttribute('data-status')).toBe('ready')
+    draw(null)
+    expect(glyph()).toBeNull()
+  })
+
   it('places the close button on either side of the title and preserves close behavior', () => {
     const send = vi.fn()
     mount(send, async () => {}, tabs, 'left')
@@ -205,6 +377,14 @@ describe('TabStrip layout', () => {
     expect(tab.querySelector('[data-tab-project]')).toBeNull()
   })
 
+  it('answers a tap or click on a tab with the accent fill within the hover duration (80ms)', () => {
+    mount()
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab.className).toContain('dshx:active:bg-accent')
+      expect(tab.className).toContain('dshx:duration-(--dshx-duration-hover)')
+    }
+  })
+
   it('gives every tab the same width when fixed width is on', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} fixedWidth />)
     for (const tab of screen.getAllByRole('tab')) {
@@ -213,11 +393,53 @@ describe('TabStrip layout', () => {
     }
   })
 
-  it('shows the project name as a chip before thread titles only', () => {
+  it('shows the project as a ProjectMark tile before thread titles only (round five T5)', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={new Map([['workspace-1', 'dshfiles']])} />)
     const thread = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })
-    expect(within(thread).getByText('dshfiles')).toBeTruthy()
+    const mark = thread.querySelector<HTMLElement>('[data-tab-project]')
+    expect(mark?.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark?.getAttribute('data-size')).toBe('dense')
+    expect(mark?.textContent).toBe('DS')
+    // No tinted pill with the name: the tab's spoken name and tooltip carry it.
+    expect(within(thread).queryByText('dshfiles')).toBeNull()
     expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
+  })
+
+  it('paints the tile in the chosen tone, and clamps a custom colour per scheme', () => {
+    render(
+      <TabStrip
+        tabs={tabs}
+        send={() => {}}
+        t={t}
+        newTabKeys=""
+        renameThread={async () => {}}
+        projectNames={new Map([['workspace-1', 'dshfiles']])}
+        projectChips={{ 'workspace-1': { className: 'project-tone-balanced-4', tone: 4 } }}
+      />,
+    )
+    expect(screen.getByRole('tab', { name: 'dshfiles / Thread, Working' }).querySelector('[data-tab-project]')?.className).toContain('project-tone-balanced-4')
+    cleanup()
+    render(
+      <TabStrip
+        tabs={tabs}
+        send={() => {}}
+        t={t}
+        newTabKeys=""
+        renameThread={async () => {}}
+        projectNames={new Map([['workspace-1', 'dshfiles']])}
+        projectChips={{ 'workspace-1': { color: '#ffd400' } }}
+      />,
+    )
+    const mark = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' }).querySelector<HTMLElement>('[data-tab-project]')
+    expect(mark?.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(mark?.style.color).toBe('var(--chip-clamped)')
+    expect(mark?.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
+    expect(mark?.className).toContain('dshx:dark:[--chip-clamped:var(--chip-dark)]')
+  })
+
+  it('starts every tab 12px in', () => {
+    mount()
+    for (const tab of screen.getAllByRole('tab')) expect(tab.className).toContain('dshx:pl-3')
   })
 })
 

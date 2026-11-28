@@ -331,6 +331,10 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           interactionIds: ctx.uiConversation.interactions,
           imageGalleryScope: imageGalleryScope.scope,
           unreadLanding: unreadLanding.landing,
+          pendingInteraction: {
+            getSnapshot: () => ctx.uiSession.sessionStatus.getSnapshot().get(sessionId)?.pendingInteraction?.key ?? null,
+            subscribe: (listener: () => void) => ctx.uiSession.sessionStatus.subscribe(listener),
+          },
           annotationMarks: annotationMarks.marks,
           annotationQuickComment: annotationQuickComment.quickComment,
         }

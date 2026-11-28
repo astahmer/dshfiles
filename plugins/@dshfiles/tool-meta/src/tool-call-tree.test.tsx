@@ -3,7 +3,16 @@ import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { ComponentType, ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installToolCallTreeWrapper, isToolCallTreeWrapped, RESERVE_PROPERTY, RESERVED_ROW_ATTRIBUTE, type ToolMetaComponent } from './tool-call-tree.js'
+import {
+  ANCHORED_ATTRIBUTE,
+  DISCLOSURE_ANCHOR_ATTRIBUTE,
+  FIT_ATTRIBUTE,
+  installToolCallTreeWrapper,
+  isToolCallTreeWrapped,
+  RESERVE_PROPERTY,
+  RESERVED_ROW_ATTRIBUTE,
+  type ToolMetaComponent,
+} from './tool-call-tree.js'
 
 afterEach(cleanup)
 
@@ -165,12 +174,136 @@ describe('installToolCallTreeWrapper', () => {
       expect(screen.getByTestId('body-child').hasAttribute(RESERVED_ROW_ATTRIBUTE)).toBe(false)
       const frames = document.querySelectorAll<HTMLElement>('[data-dshfiles-tool-meta-frame]')
       expect([...frames].map(frame => frame.style.getPropertyValue(RESERVE_PROPERTY))).toEqual(['93px', '93px'])
-      expect(frames[0]?.className).toContain('dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.25rem)]!')
+      expect(frames[0]?.className).toContain('dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.5rem)]!')
     })
 
     it('reserves nothing while the label is hidden', () => {
       labelWidth = 0
       renderNesting()
+      expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
+    })
+
+    const renderCard = (card: ReactNode): HTMLElement => {
+      const entry: StoredEntry = { component: NestingTree, options: { key: 'tool-call' } }
+      installToolCallTreeWrapper({ slots: ledger([entry]), Meta })
+      // SAFETY: the wrapper stored its component in the entry; NestingTree reads only renderSlot.
+      const Wrapped = entry.component as ComponentType<{ readonly renderSlot: () => ReactNode }>
+      render(<Wrapped renderSlot={() => card} />)
+      const label = document.querySelector<HTMLElement>('[data-dshfiles-tool-meta-label]')
+      if (label === null) throw new Error('no timing label rendered')
+      return label
+    }
+
+    it('shows the label only over a row that makes room for it', () => {
+      renderNesting()
+      const labels = [...document.querySelectorAll<HTMLElement>('[data-dshfiles-tool-meta-label]')]
+      expect(labels.map(label => label.hasAttribute(ANCHORED_ATTRIBUTE))).toEqual([true, true])
+      // Hidden until anchored: the class pair is what keeps an unanchored label off a card's own header.
+      expect(labels[0]?.className).toContain('dshx:invisible')
+      expect(labels[0]?.className).toContain('dshx:data-[dshfiles-tool-meta-anchored]:visible')
+    })
+
+    it('takes the 24 px height of a disclosure header, so the time sits on its centre line (council round 22, item 9)', () => {
+      renderNesting()
+      const labels = [...document.querySelectorAll<HTMLElement>('[data-dshfiles-tool-meta-label]')]
+      // The 28 px box centred a 16 px time 2 px under a 24 px row.
+      expect(labels.map(label => label.hasAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE))).toEqual([true, true])
+      expect(labels[0]?.className).toContain('dshx:h-7')
+      expect(labels[0]?.className).toContain('dshx:data-[dshfiles-tool-meta-disclosure]:h-6')
+    })
+
+    it('keeps the label hidden on a card that draws its own header', () => {
+      const label = renderCard(
+        <section>
+          <header>
+            Sales dashboard <button type="button">Copy HTML</button>
+          </header>
+        </section>,
+      )
+      expect(label.hasAttribute(ANCHORED_ATTRIBUTE)).toBe(false)
+      expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
+    })
+
+    /** The bash and file rows' shape: a card holding one disclosure header, and nothing under it while collapsed. */
+    const loneRow = (expanded: boolean): ReactNode => (
+      <div data-slot="tool.call.toolview" style={{ display: 'contents' }}>
+        <div>
+          <div data-disclosure-header="">
+            <div aria-expanded={expanded} data-disclosure-row="" data-expandable="" role="button">
+              Bash · Wait three seconds
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+    const frameOf = (label: HTMLElement): HTMLElement => {
+      const frame = label.closest<HTMLElement>('[data-dshfiles-tool-meta-frame]')
+      if (frame === null) throw new Error('the label has no frame')
+      return frame
+    }
+
+    it('fits a lone collapsed row to its content, capped at the prose measure, so the timing follows its label', () => {
+      const frame = frameOf(renderCard(loneRow(false)))
+      expect(frame.hasAttribute(FIT_ATTRIBUTE)).toBe(true)
+      expect(frame.className).toContain('dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:w-fit')
+      expect(frame.className).toContain(
+        'dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:max-w-[min(100%,var(--dsh-chat-prose-measure,100%))]',
+      )
+      // A size container takes no width from its content, so a fitted frame must not be one.
+      expect(frame.className).toContain('dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:[container-type:normal]')
+      // The label hides in a narrow pane only on a full-width card: it asks for its own frame by name, which a fitted
+      // frame no longer answers, so a fitted row keeps its duration beside its label in a split or on a phone.
+      expect(frame.className).toContain('dshx:@container/tool-frame')
+      expect(frame.querySelector('[data-dshfiles-tool-meta-label]')?.className).toContain('dshx:@max-pane-narrow/tool-frame:hidden')
+    })
+
+    it('keeps the message column for an expanded row, a card with a body and a card with its own header', () => {
+      expect(frameOf(renderCard(loneRow(true))).hasAttribute(FIT_ATTRIBUTE)).toBe(false)
+      cleanup()
+      renderNesting()
+      expect([...document.querySelectorAll('[data-dshfiles-tool-meta-frame]')].map(frame => frame.hasAttribute(FIT_ATTRIBUTE))).toEqual([false, false])
+      cleanup()
+      const page = renderCard(
+        <section>
+          <header>Sales dashboard</header>
+          <div data-html-render-viewport="">page</div>
+        </section>,
+      )
+      expect(frameOf(page).hasAttribute(FIT_ATTRIBUTE)).toBe(false)
+    })
+
+    it('keeps the message column for a card that prints its own duration or measures itself', () => {
+      const ownTiming = renderCard(
+        <div data-disclosure-header="">
+          <div data-disclosure-row="" role="button">
+            Ran tests · 2 passed <span data-tool-card-timing="own">3.1s</span>
+          </div>
+        </div>,
+      )
+      expect(frameOf(ownTiming).hasAttribute(FIT_ATTRIBUTE)).toBe(false)
+      cleanup()
+      // A size container's width cannot come from its content: fitted, it would draw at 0px.
+      const container = renderCard(
+        <div className="dshx:@container">
+          <div data-disclosure-header="">
+            <div data-disclosure-row="" role="button">
+              Background job
+            </div>
+          </div>
+        </div>,
+      )
+      expect(frameOf(container).hasAttribute(FIT_ATTRIBUTE)).toBe(false)
+    })
+
+    it('keeps the label hidden on a card that prints its own duration', () => {
+      const label = renderCard(
+        <div data-tool-card-timing="own">
+          <div data-disclosure-row="" data-expandable="" role="button">
+            Ran tests · 1.2s
+          </div>
+        </div>,
+      )
+      expect(label.hasAttribute(ANCHORED_ATTRIBUTE)).toBe(false)
       expect(document.querySelectorAll(`[${RESERVED_ROW_ATTRIBUTE}]`)).toHaveLength(0)
     })
   })

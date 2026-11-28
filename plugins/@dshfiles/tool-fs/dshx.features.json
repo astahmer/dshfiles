@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "file-tools",
-      "title": "read, write, edit and read_image tools",
-      "summary": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts; read also reads from the end with a negative offset, answers an offset past the end with the last lines and the line count, suggests close names for a missing file, and never splits a character when it shortens a long line.",
+      "title": "Read, write and edit files",
+      "summary": "The agent's file tools read from the end of a file and suggest close names for a missing one.",
+      "details": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts; read also reads from the end with a negative offset, answers an offset past the end with the last lines and the line count, suggests close names for a missing file, and never splits a character when it shortens a long line.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["read", "written", "edited"],

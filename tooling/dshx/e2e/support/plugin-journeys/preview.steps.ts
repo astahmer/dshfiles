@@ -100,10 +100,11 @@ Then('the preview page is listed beside the server and its snapshot holds the pa
       .getByRole('button', { name: /^(Worked for|Completed in) / })
       .last()
       .click()
-    await page.getByRole('button', { name: 'Called tools', exact: true }).last().click()
     const pageText = page.getByText(PAGE_TEXT).last()
+    const calledTools = page.getByRole('button', { name: 'Called tools', exact: true }).last()
     await expect(async () => {
       if (await pageText.isVisible()) return
+      if ((await calledTools.isVisible()) && (await calledTools.getAttribute('aria-expanded')) === 'false') await calledTools.click()
       await page
         .getByRole('button', { name: /snapshot/i })
         .last()

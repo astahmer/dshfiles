@@ -12,12 +12,15 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useCallback, useSyncExternalStore } from 'react'
 
-import { MemoryPanel } from './memory-panel.tsx'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { MemoryFocusModel } from './memory-focus.ts'
 import { MemoryInlineReference } from './memory-reference-links.tsx'
 import { MemoryReferenceModel } from './memory-reference.ts'
 import { MemoryReferencePreview } from './memory-reference-preview.tsx'
 import './client.css'
+
+/** The Memory page loads when it first opens, not at page boot. */
+const MemoryPanel = lazyView(() => import('./memory-panel.tsx').then(module => module.MemoryPanel), { label: 'Memory' })
 
 const PANEL_ID = 'dshfiles-memory-panel'
 

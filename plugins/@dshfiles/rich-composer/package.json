@@ -32,6 +32,10 @@
       "types": "./src/composer-send.ts",
       "default": "./dist/composer-send.js"
     },
+    "./agent-mention-tones": {
+      "types": "./src/agent-mention-tones.ts",
+      "default": "./dist/agent-mention-tones.js"
+    },
     "./composer-more": {
       "types": "./src/composer-more.ts",
       "default": "./dist/composer-more.js"

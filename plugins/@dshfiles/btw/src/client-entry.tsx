@@ -338,7 +338,7 @@ export default defineClient({
       // The composer's More menu holds the side question while the bar is unpinned; the phone tool follows the bar.
       const pinned = useSyncExternalStore(subscribePinned, pinnedNow, pinnedNow)
       const label = t('composerChip')
-      const phoneTool = usePhoneThreadTool({ id: '@dshfiles/btw/ask', label, open: () => askAbout(props.sessionId), available: available && pinned })
+      const phoneTool = usePhoneThreadTool({ id: '@dshfiles/btw/ask', label, icon: <MessageCircleQuestionIcon />, opens: true, open: () => askAbout(props.sessionId), available: available && pinned })
       if (!available || !pinned) return null
       return (
         <TooltipProvider delayDuration={500}>

@@ -9,6 +9,9 @@ import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
+import { DraftsSection } from './drafts-section.js'
+import { ListFade } from './list-fade.js'
+import { ApprovalDetail } from './approval-detail.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -25,9 +28,10 @@ import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-
 import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { ThreadGroupHeader } from './thread-group-header.js'
+import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, useRemoteThreadArchive, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -35,8 +39,10 @@ import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
-import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
-import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
+import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type RowInlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
+import { RowVerb } from './row-verb.js'
+import { AttentionSubtitleModel } from './attention-subtitle.js'
+import { plural, useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
@@ -49,8 +55,17 @@ import { activeQuestionSessionIds } from './pending-questions.js'
 import { IconPinFillRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
+import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
+import { WORK_COUNT_SEPARATOR, workCountLabel, workCountParts } from '@dshfiles/plugin-ui/lib/work-count'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP } from '@dshfiles/plugin-ui/components/selection'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
+import { subagentCountWords } from './subagent-provenance/subagent-count.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
@@ -71,18 +86,18 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
+import { HoverStripFit } from './hover-strip-fit.js'
+import { filterPanelInitialFocus, ListFilterPanel, type ListFilterAction } from './list-filter-panel.js'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
 import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
 import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
@@ -92,41 +107,40 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
-  ActivityIcon,
+  AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   BellIcon,
   BellOffIcon,
-  BookmarkPlusIcon,
+  BellRingIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
+  ChevronRightIcon,
   CircleCheckIcon,
-  CirclePauseIcon,
-  EllipsisIcon,
-  GripVerticalIcon,
+  CircleDashedIcon,
   FolderIcon,
   GitBranchIcon,
   LayersIcon,
   LinkIcon,
   ListFilterIcon,
+  MailIcon,
   MonitorIcon,
   PanelRightOpenIcon,
-  PauseIcon,
-  PencilIcon,
   PinIcon,
+  PinOffIcon,
   PlayIcon,
   RefreshCwIcon,
   RotateCcwIcon,
-  SaveIcon,
   Settings2Icon,
   SlidersHorizontalIcon,
-  UsersIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PhoneLayout } from './phone-layout.js'
+import { ThreadMenu, type ThreadMenuEntries, type ThreadMenuKit } from './thread-menu.js'
+import { ThreadMenuModel } from './thread-menu-model.js'
 import {
   createContext,
-  Fragment,
   memo,
   useCallback,
   useContext,
@@ -140,8 +154,9 @@ import {
   useSyncExternalStore,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
-  type ReactNode,
+  type CSSProperties,
 } from 'react'
+import { createPortal } from 'react-dom'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import {
@@ -151,6 +166,7 @@ import {
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
+  type ProjectColorPalette,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowAction,
@@ -159,6 +175,7 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
+import { ApprovalRows } from './approval-rows.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
@@ -166,8 +183,9 @@ import { useStageCovered } from './stage-cover.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
-import { projectTextTone } from './project-tone.js'
 import { useSavedProjectChip } from './project-colors.js'
+import { PaletteProjectColorsModel } from './palette-project-colors.js'
+import { RowArrivalTintModel } from './row-arrival-tint.js'
 import { useThreadDirectories } from './use-thread-directories.js'
 import {
   failedResumeNotice,
@@ -188,7 +206,7 @@ import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from 
 import { ResumeAttentionModel } from './resume-attention.js'
 import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
-import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
+import { groupThreadChildren, launchOrdered, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
 import { PHONE_HISTORY_SELF_POP_EVENT } from '@dshfiles/workbench/phone-history'
 import { ScreenWakeLock, useScreenWakeLock } from './wake-lock.js'
@@ -202,7 +220,15 @@ import {
   type ThreadSelectionState,
 } from './thread-selection.js'
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
-import { workingThreadIds } from './working-threads.js'
+import { ThreadSelectionBar } from './thread-selection-bar.js'
+import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
+import { HeldUpdatesPill } from './held-updates-pill.js'
+import { RunningJobsModel } from './running-jobs.js'
+import type { ThreadWorkStatus } from './thread-status-client.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { filterTriggerTipAdds, textTruncated, useFilterTriggerTip } from './list-filter-trigger.js'
+import { markShownCounts } from './mark-shown.js'
+import { PresetOptionsMenu } from './preset-options-menu.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -212,7 +238,6 @@ import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.
 import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
 import { useAutoSettle, type AutoSettleClient } from './auto-settle-machine.js'
 import {
-  THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_GROUPS,
   THREAD_STATUS_FILTER_OPTIONS,
@@ -247,6 +272,7 @@ import { ViewedThreadModel } from './viewed-thread.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
+import { useFailedTurns } from './failed-turns-client.js'
 import { useRowAgentHandles } from './use-row-agent-handles.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import { SinceYouLeftModel } from '@dshfiles/chat/thread-tools'
@@ -304,6 +330,11 @@ type InjectedActions = {
   /** Open the thread a page-load link names without closing a panel the user opened while the list was loading. */
   openLinkedSession?: (sessionId: SessionSummary['id']) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  /**
+   * Opens the thread header's Land confirmation for this thread (jj-integration's `ThreadHeaderLand.confirm`); false
+   * when nothing can confirm, and then nothing lands. A row's Land never lands on its own.
+   */
+  confirmLand?: (sessionId: string) => boolean
   startProjectSession: (projectId: string) => void
   drafts?: SessionDrafts['list'] | undefined
   /** Root uiSession selection; scoped or retained sidebar occurrences do not select the main conversation. */
@@ -459,15 +490,6 @@ const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
 // The list sits on the sidebar fill, so its sticky headers do too (no lighter band over a recessive surface).
 const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-(--dsw-specific-sidebar-fill)'
 
-const sectionIcons = {
-  pinned: <PinIcon strokeWidth={1.5} size={14} />,
-  active: <ActivityIcon className="dshx:size-3.5" />,
-  parked: <PauseIcon strokeWidth={1.5} size={14} />,
-  settled: <CircleCheckIcon strokeWidth={1.5} size={14} />,
-  inactive: <CirclePauseIcon className="dshx:size-3.5" />,
-  archived: <ArchiveIcon strokeWidth={1.5} size={14} />,
-} satisfies Record<SidebarSection, ReactNode>
-
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
 
 const toggleSetMember = (values: ReadonlySet<string>, value: string): ReadonlySet<string> => {
@@ -523,7 +545,7 @@ interface BatchSelectionSnapshot {
   readonly anyMuted: boolean
 }
 
-interface RowActions {
+export interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
   readonly selection: () => ThreadSelectionState
   /** Rows read their own multi-selected state here, so a toggle re-renders only the rows it changes. */
@@ -594,7 +616,7 @@ export interface ThreadNotifyTarget {
   readonly choice: ThreadNotifyChoice
 }
 
-interface ThreadRowProps {
+export interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
   readonly autoSettleOverride: AutoSettleOverride
@@ -613,8 +635,8 @@ interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
   readonly workspacePath: string | undefined
-  /** Saved project colour overrides (primitives so memoized rows keep prop equality). */
-  readonly projectChipClassName: string | undefined
+  /** Saved project colour overrides: a palette tone or a custom colour (primitives so memoized rows keep prop equality). */
+  readonly projectChipTone: number | undefined
   readonly projectChipColor: string | undefined
   /**
    * Set when the thread runs in its own jj workspace rather than in the project checkout (b:212a): the row shows a quiet
@@ -642,6 +664,8 @@ interface ThreadRowProps {
   readonly childThreads: readonly SessionSummary[]
   /** Finished subagents folded behind the "N finished" line; empty unless the setting collapses them. */
   readonly finishedChildThreads: readonly SessionSummary[]
+  /** The parent's subagent catalog ids in launch order (council round 22, item 12); undefined until it loads. */
+  readonly childLaunchOrder?: readonly string[] | undefined
   readonly childrenOpen: boolean
   readonly allChildrenShown: boolean
   /** Set only when the open thread is one of this row's children, so other rows skip re-rendering. */
@@ -659,6 +683,8 @@ interface ThreadRowProps {
   readonly projectMark?: boolean | undefined
   /** A running turn's start and current step, for the live activity line; undefined while the thread does not run. */
   readonly liveTurn?: LiveTurnView | undefined
+  /** Background jobs this thread runs now: a muted "1 job" chip, never Working (DESIGN.md R2). */
+  readonly runningJobs?: number | undefined
   /** Each child's own status, for the nested subagent rows under a status-grouped parent. */
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
   /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
@@ -668,6 +694,12 @@ interface ThreadRowProps {
   /** How many threads are notified when this one finishes; 0 or undefined hides the badge. */
   readonly subscriberCount?: number | undefined
 }
+
+/**
+ * A row's clock in whole units (round five B3): "1m 41s" reads "1m", "1h 04m" reads "1h", like the ages beside it. The
+ * thread header keeps the precise clock.
+ */
+const wholeUnit = (elapsed: string): string => elapsed.split(' ')[0] ?? elapsed
 
 const workStatusLabelKeys = {
   working: 'threadSidebarStateWorking',
@@ -684,6 +716,7 @@ const statusGroupLabelKeys = {
   working: 'threadSidebarStateWorking',
   ready: 'threadSidebarStateReady',
   idle: 'threadSidebarStateIdle',
+  draft: 'threadSidebarStateDrafts',
   done: 'threadSidebarStateDone',
 } as const satisfies Record<ThreadStatusGroup, Parameters<ThreadSidebarTranslate>[0]>
 
@@ -693,7 +726,9 @@ const inlineVerbLabelKeys = {
   Retry: 'threadSidebarVerbRetry',
   Resume: 'threadSidebarVerbResume',
   Land: 'threadSidebarVerbLand',
-} as const satisfies Record<InlineVerb, Parameters<ThreadSidebarTranslate>[0]>
+  // The approval verb already reads Review in every locale.
+  Review: 'threadSidebarVerbApprove',
+} as const satisfies Record<RowInlineVerb, Parameters<ThreadSidebarTranslate>[0]>
 
 const NO_CHILDREN: readonly SessionSummary[] = []
 
@@ -711,11 +746,25 @@ const agentPresetOf = (session: SessionSummary): string | undefined => {
   return typeof preset === 'string' && preset.length > 0 && !BUILT_IN_PRESETS.has(preset) ? preset : undefined
 }
 
+/**
+ * A subagent's row title: the name its parent gave it (the `description` of the subagent call, kept as the child's
+ * creation label), which is what its card and the mention list call it. Its Session title is the prompt it was sent.
+ */
+const subagentRowTitle = (session: SessionSummary): string => {
+  const label = session.projectionValues?.subagent?.label?.trim()
+  return label === undefined || label === '' ? session.displayTitle : label
+}
+
 const finishedSubagentsLabels = {
   show: 'threadSidebarFinishedSubagentsShow',
   collapse: 'threadSidebarFinishedSubagentsCollapse',
   hide: 'threadSidebarFinishedSubagentsHide',
 } as const
+
+/** The Filter panel's distance from the window's edges, and the least height it keeps when its trigger sits low. */
+const FILTER_PANEL_COLLISION_PADDING = 8
+const FILTER_PANEL_MIN_ROOM = 240
+type FilterPanelRoomStyle = CSSProperties & { readonly '--filter-panel-room': string }
 
 const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   <Tooltip>
@@ -767,6 +816,8 @@ const ChildThreadList = (props: {
   readonly parentId: string
   readonly childThreads: readonly SessionSummary[]
   readonly finishedChildThreads: readonly SessionSummary[]
+  /** The parent's catalog ids in launch order: the list reads launch order, failed last (council round 22, item 12). */
+  readonly launchOrder?: readonly string[] | undefined
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly allShown: boolean
   readonly selectedChildId: SessionSummary['id'] | undefined
@@ -778,8 +829,18 @@ const ChildThreadList = (props: {
 }): JSX.Element => {
   const t = props.actions.translate
   const [finishedShown, setFinishedShown] = useState(false)
+  // One child order on every subagent surface (council round 22, item 12): launch order, failed last.
+  const { childStatuses, launchOrder } = props
+  const childThreads = useMemo(
+    () => launchOrdered({ children: props.childThreads, launchOrder, isFailed: child => childStatuses?.get(child.id)?.status === 'failed' }),
+    [props.childThreads, launchOrder, childStatuses],
+  )
+  const finishedChildThreads = useMemo(
+    () => launchOrdered({ children: props.finishedChildThreads, launchOrder, isFailed: child => childStatuses?.get(child.id)?.status === 'failed' }),
+    [props.finishedChildThreads, launchOrder, childStatuses],
+  )
   const { shown, hiddenCount } = visibleChildren({
-    children: props.childThreads,
+    children: childThreads,
     limit: props.rowStyle.maxChildren,
     showAll: props.allShown,
     selectedId: props.selectedChildId,
@@ -790,12 +851,29 @@ const ChildThreadList = (props: {
     [...props.childThreads, ...props.finishedChildThreads].map(child => child.id),
   )
   const lineClass = cn(
+    // Touch: line 1 ends where the parent rows' time column does, clear of their menu button's (council round 4 B4).
+    'dshx:pointer-coarse:pr-11',
     'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
   )
   const renderChild = (child: SessionSummary): JSX.Element => {
     const childStatus = props.childStatuses?.get(child.id)
     const attentionLabel = childStatus === undefined ? props.attentionLabels.get(child.id) : undefined
+    // Line 2 names the model the subagent runs on (council round 17 B1.1), `[mark] gpt-6-luna` (a Needs-you or Failed child adds `· Needs you`), in the
+    // attention meta's 12/16 secondary ink; its state word moves there from line 1. An unknown model draws no line 2.
+    // Council round 18 B1.1: the word stays only where the glyph cannot say it (Needs you, Failed); a Working, Idle, Ready
+    // or Done glyph already names its state, so line 2 gives the model the room.
+    const route = SubagentRouteLabelModel.subagentRoute({
+      route: child.projectionValues?.threadSidebarModelRoute,
+      identity: child.projectionValues?.subagent,
+    })
+    // A Failed or Needs-you child says its state. A Failed child says "Failed", not the attention meta's "Turn failed": the
+    // ✕ and the failed ink carry the rest, and the longer word cut the model to "claude-sonnet…" (council round 24, item 3).
+    const stateWord =
+      childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? undefined : t(workStatusLabelKeys[childStatus.status])
+    const lineOneWord = route === undefined && stateWord !== undefined
+    // "Turn failed" reads in the failed ink, as the parent's failed count does (council round 23, item 2).
+    const stateInk = childStatus?.status === 'failed' ? 'dshx:text-destructive' : undefined
     return (
       <li key={child.id}>
         <button
@@ -803,8 +881,13 @@ const ChildThreadList = (props: {
           draggable
           className={cn(
             lineClass,
-            'dshx:data-[selected=true]:bg-accent',
+            // One look for "selected" in the list (council round 24, item 5): the root row's wash and its 1 px selected edge;
+            // the phone list keeps its no-edge rule (round 17 B1.2).
+            'dshx:data-[selected=true]:bg-selected-wash dshx:data-[selected=true]:selected-edge dshx:phone:data-[selected=true]:shadow-none',
             'dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+            // Two lines: line 1 keeps the row's height, line 2 its 16px, 2px apart from the row's edges.
+            // Touch: 1px between them puts line 2 on the parent rows' 23pt title-to-meta pitch (council round 18 B1.3).
+            route !== undefined && 'dshx:h-auto dshx:flex-col dshx:items-stretch dshx:gap-0 dshx:py-0.5 dshx:pointer-coarse:gap-px',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -815,6 +898,12 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
+          <span
+            // Touch: 28px whatever the density, so line 2 lands on the parent rows' 23pt pitch (council round 18 B1.3).
+            className={cn('dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2', compact ? 'dshx:h-6' : 'dshx:h-7', 'dshx:pointer-coarse:h-7')}
+            data-thread-child-head=""
+          >
+          <span className="dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center" data-thread-child-lead="">
           {childStatus === undefined ? (
             <SessionStatusDot
               session={child}
@@ -831,6 +920,7 @@ const ChildThreadList = (props: {
               }
             />
           )}
+          </span>
           <span
             className={cn(
               'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
@@ -838,10 +928,12 @@ const ChildThreadList = (props: {
               childStatus?.status === 'done' && 'dshx:text-muted-foreground',
             )}
           >
-            {child.displayTitle}
+            {subagentRowTitle(child)}
           </span>
-          {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
-            <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
+          {!lineOneWord ? null : (
+            <span className={cn('dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground', stateInk)} data-thread-child-state="">
+              {stateWord}
+            </span>
           )}
           {attentionLabel === undefined ? null : (
             <span
@@ -853,41 +945,62 @@ const ChildThreadList = (props: {
               {t(attentionLabel)}
             </span>
           )}
-          {props.rowStyle.time ? (
-            <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
-          ) : null}
+          {/* No age: a child's equals its parent's, and the title and the model need the room (council round 23, item 6). */}
+          </span>
+          {route === undefined ? null : (
+            // Under the title: the glyph's 16px seat and line 1's 8px gap, then the model whole or truncated, then the word.
+            <span className="dshx:flex dshx:h-4 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:pl-6 dshx:text-xs/4 dshx:text-muted-foreground" data-thread-child-meta="">
+              <RouteModel provider={route.provider} model={route.model} seat className="dshx:shrink" />
+              {stateWord === undefined ? null : (
+                <>
+                  <span aria-hidden="true" className="dshx:shrink-0">
+                    ·
+                  </span>
+                  {/* A line still too narrow truncates the word first, then the model (round 24, item 3). */}
+                  <span className={cn('dshx:min-w-0 dshx:shrink-[100] dshx:truncate', stateInk)} data-thread-child-state="">
+                    {stateWord}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
         </button>
       </li>
     )
   }
+  const moreToggle = hiddenCount > 0 || props.allShown
+  const finishedToggle = finishedChildThreads.length > 0
+  // The list's controls share one muted 12 px footer line after every child (council round 22, item 11): "Show less ·
+  // Hide finished", never two full rows between the working children and the failed ones.
+  const footerButton = cn(
+    // The kit sheet draws the focus ring.
+    'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground',
+    'dshx:pointer-coarse:h-11',
+  )
   return (
     <ul className="dshx:mb-1 dshx:ml-3.5 dshx:flex dshx:flex-col dshx:border-l dshx:pl-1.5" aria-label={t('threadSidebarChildThreads')}>
       {shown.map(renderChild)}
-      {hiddenCount > 0 || props.allShown ? (
-        <li>
-          <button
-            type="button"
-            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
-            aria-expanded={props.allShown}
-            onClick={() => props.actions.toggleAllChildren(props.parentId)}
-          >
-            {props.allShown ? t('threadSidebarFewerChildren') : `${hiddenCount} ${t('threadSidebarMoreChildren')}`}
-          </button>
+      {finishedShown ? finishedChildThreads.map(renderChild) : null}
+      {moreToggle || finishedToggle ? (
+        <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-0.5 dshx:px-1 dshx:text-xs dshx:text-muted-foreground" data-thread-child-footer="">
+          {moreToggle ? (
+            <button
+              type="button"
+              className={footerButton}
+              aria-expanded={props.allShown}
+              onClick={() => props.actions.toggleAllChildren(props.parentId)}
+            >
+              {props.allShown ? t('threadSidebarFewerChildren') : `${hiddenCount} ${t('threadSidebarMoreChildren')}`}
+            </button>
+          ) : null}
+          {moreToggle && finishedToggle ? <span aria-hidden="true">·</span> : null}
+          {finishedToggle ? (
+            <button type="button" className={footerButton} aria-expanded={finishedShown} onClick={() => setFinishedShown(current => !current)}>
+              {finishedShown ? t('threadSidebarHideFinishedChildren') : `${finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
+            </button>
+          ) : null}
         </li>
       ) : null}
-      {props.finishedChildThreads.length > 0 ? (
-        <li>
-          <button
-            type="button"
-            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
-            aria-expanded={finishedShown}
-            onClick={() => setFinishedShown(current => !current)}
-          >
-            {finishedShown ? t('threadSidebarHideFinishedChildren') : `${props.finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
-          </button>
-        </li>
-      ) : null}
-      {finishedShown ? props.finishedChildThreads.map(renderChild) : null}
     </ul>
   )
 }
@@ -944,7 +1057,12 @@ const NotifyChoiceMenu = (props: {
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => (
   <ContextMenuSub>
-    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish')}</ContextMenuSubTrigger>
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">
+      <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <BellRingIcon aria-hidden="true" />
+        {props.t('threadSidebarNotifyOnFinish')}
+      </span>
+    </ContextMenuSubTrigger>
     <ContextMenuSubContent className="dshx-root dshx:min-w-44 dshx:max-w-72">
       <ContextMenuLabel className="dshx:font-normal dshx:text-muted-foreground">
         {props.t('threadSidebarNotifyOnFinishFor', { title: props.subscriberTitle })}
@@ -962,6 +1080,12 @@ const NotifyChoiceMenu = (props: {
   </ContextMenuSub>
 )
 
+/** A list key hint for a batch row, on a device that has the key. */
+const batchKeys = (keys: string): { readonly keys?: string } => {
+  const hint = ThreadMenuModel.keyHint(keys, coarsePointer())
+  return hint === undefined ? {} : { keys: hint }
+}
+
 const BatchThreadMenuItems = (props: {
   readonly snapshot: BatchSelectionSnapshot
   readonly actions: RowActions
@@ -974,24 +1098,52 @@ const BatchThreadMenuItems = (props: {
       <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
       <ContextMenuSeparator />
       {snapshot.anyUnpinned ? (
-        <ContextMenuItem keys="P" onSelect={() => props.actions.batchMutate('pin')}>
+        <ContextMenuItem {...batchKeys('P')} onSelect={() => props.actions.batchMutate('pin')}>
+          <PinIcon aria-hidden="true" />
           {props.t('threadSidebarPin')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anyPinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>{props.t('threadSidebarUnpin')}</ContextMenuItem> : null}
-      {snapshot.anyUnparked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>{props.t('threadSidebarPark')}</ContextMenuItem> : null}
-      {snapshot.anyParked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>{props.t('threadSidebarUnpark')}</ContextMenuItem> : null}
+      {snapshot.anyPinned ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>
+          <PinOffIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpin')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyUnsettled ? (
-        <ContextMenuItem keys="E" onSelect={() => props.actions.batchSetSettled(true)}>
+        <ContextMenuItem {...batchKeys('E')} onSelect={() => props.actions.batchSetSettled(true)}>
+          <CircleCheckIcon aria-hidden="true" />
           {props.t('threadSidebarSettle')}
         </ContextMenuItem>
       ) : null}
-      {snapshot.anySettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>{props.t('threadSidebarUnsettle')}</ContextMenuItem> : null}
-      <ContextMenuItem keys="U" onSelect={() => props.actions.batchMarkUnread()}>
+      {snapshot.anySettled ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>
+          <RotateCcwIcon aria-hidden="true" />
+          {props.t('threadSidebarUnsettle')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyUnparked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>
+          <AlarmClockIcon aria-hidden="true" />
+          {props.t('threadSidebarPark')}
+        </ContextMenuItem>
+      ) : null}
+      {snapshot.anyParked ? (
+        <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>
+          <PlayIcon aria-hidden="true" />
+          {props.t('threadSidebarUnpark')}
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuItem {...batchKeys('U')} onSelect={() => props.actions.batchMarkUnread()}>
+        <MailIcon aria-hidden="true" />
         {props.t('threadSidebarMarkUnread')}
       </ContextMenuItem>
       <ContextMenuSub>
-        <ContextMenuSubTrigger>{props.t('threadSidebarMute')}</ContextMenuSubTrigger>
+        <ContextMenuSubTrigger>
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <BellIcon aria-hidden="true" />
+            {props.t('threadSidebarMute')}
+          </span>
+        </ContextMenuSubTrigger>
         <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.batchMute(option)}>
@@ -1004,7 +1156,10 @@ const BatchThreadMenuItems = (props: {
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
-      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>
+        <LinkIcon aria-hidden="true" />
+        {props.t('threadSidebarCopyLinks')}
+      </ContextMenuItem>
       {notifySubscriber === undefined ? null : (
         <NotifyChoiceMenu
           subscriberTitle={notifySubscriber.title}
@@ -1015,12 +1170,24 @@ const BatchThreadMenuItems = (props: {
         />
       )}
       <ContextMenuSeparator />
-      {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
+      {snapshot.anyLive ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>
+          <ArchiveIcon aria-hidden="true" />
+          {props.t('threadSidebarArchive')}
+        </ContextMenuItem>
+      ) : null}
       {snapshot.anyArchived ? (
-        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>{props.t('threadSidebarRestore')}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>
+          <ArchiveRestoreIcon aria-hidden="true" />
+          {/* Two kinds of Restore can meet in one selection; this one says which it is. */}
+          {props.t(snapshot.anySettled ? 'threadSidebarRestoreArchived' : 'threadSidebarRestore')}
+        </ContextMenuItem>
       ) : null}
       <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>{props.t('threadSidebarClearSelection')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>
+        <XIcon aria-hidden="true" />
+        {props.t('threadSidebarClearSelection')}
+      </ContextMenuItem>
     </>
   )
 }
@@ -1041,11 +1208,19 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
     <>
       {shown.map(action => (
         <ContextMenuItem key={action.id} data-thread-row-action={action.id} onSelect={() => action.run(props.target)}>
+          {action.icon === undefined ? <CircleDashedIcon aria-hidden /> : <action.icon aria-hidden />}
           {typeof action.label === 'string' ? action.label : action.label()}
         </ContextMenuItem>
       ))}
     </>
   )
+}
+
+/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
+let coarsePointerMatch: boolean | undefined
+const coarsePointer = (): boolean => {
+  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
+  return coarsePointerMatch
 }
 
 /** A scratch thread's own folder is its Session cwd, or its project folder when the summary carries none. */
@@ -1057,6 +1232,7 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const t = props.actions.translate
   const openAside = useAsideOpen()
   const wakeLockOn = useScreenWakeLock()
+  const keepAwakeLabel = ThreadMenuModel.keepAwakeLabel({ coarsePointer: coarsePointer(), available: ScreenWakeLock.available, on: wakeLockOn })
   const registry = workbenchPanels()
   useSyncExternalStore(registry.subscribe, registry.list, registry.list)
   const sidePanelDefinitions = registry.listContextMenuPanels()
@@ -1064,31 +1240,91 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
     return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
   }
-  // Lifecycle verbs lead (productivity pass E8): on a phone this menu is the row's action sheet, and Pin, Settle (the
-  // swipe's Done), Park, Archive and Mute are what a supervisor reaches for; the thread's other verbs follow.
-  return (
-    <>
-      {archived ? (
-        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
-      ) : (
+  const copy = (value: string, done: ThreadSidebarLabelKey): void => void props.actions.copy(value, t(done))
+  const autoDone = (override: AutoSettleOverride, label: ThreadSidebarLabelKey): JSX.Element => (
+    <ContextMenuRadioItem
+      value={override}
+      onSelect={event => {
+        event.preventDefault()
+        props.actions.setAutoSettleOverride(session.id, override)
+      }}
+    >
+      {t(label)}
+    </ContextMenuRadioItem>
+  )
+  // One menu for a thread (`thread-menu-model.ts`): the header's `⋯` renders the same layout, so this body only says
+  // what each entry does for a row. On a phone it is the row's action sheet.
+  const entries: ThreadMenuEntries = {
+    pin: {
+      kind: 'item',
+      label: t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+      keys: 'P',
+      ...(pinned ? { icon: <PinOffIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin'),
+    },
+    done: {
+      kind: 'item',
+      label: t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+      keys: 'E',
+      disabled: session.running,
+      ...(settled ? { icon: <RotateCcwIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleSettled(session.id),
+    },
+    snooze: {
+      kind: 'item',
+      label: t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+      keys: 'H',
+      disabled: session.running,
+      ...(parked ? { icon: <PlayIcon aria-hidden="true" /> } : undefined),
+      onSelect: () => props.actions.toggleParked(session.id),
+    },
+    restore: { kind: 'item', label: t('threadSidebarRestore'), onSelect: () => void props.actions.mutate(session.id, 'unarchive') },
+    rename: { kind: 'item', label: t('threadSidebarRenameThread'), onSelect: () => props.actions.beginRename(session.id) },
+    ...(openAside === null ? undefined : { 'side-panel': { kind: 'item', label: t('threadSidebarOpenInSidePanel'), onSelect: () => openAside(session.id) } }),
+    // A draft nothing was sent in is not a thread to link to yet.
+    ...(session.blank
+      ? undefined
+      : {
+          'copy-link': {
+            kind: 'item',
+            label: t('threadSidebarCopyLink'),
+            onSelect: () => copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), 'threadSidebarLinkCopied'),
+          },
+        }),
+    ...(sidePanelDefinitions.length === 0
+      ? undefined
+      : {
+          'side-panel-views': {
+            kind: 'sub',
+            label: t('threadSidebarOpenPluginInSidePanel'),
+            content: sidePanelDefinitions.map(definition => (
+              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
+                {definition.title}
+              </ContextMenuItem>
+            )),
+          },
+        }),
+    'continue-in': {
+      kind: 'sub',
+      label: t('threadSidebarContinueIn'),
+      disabled: session.running,
+      content: <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />,
+    },
+    'copy-id': { kind: 'item', label: t('threadSidebarCopyId'), onSelect: () => copy(session.id, 'threadSidebarIdCopied') },
+    mention: { kind: 'item', label: t('threadSidebarInsertMention'), onSelect: () => requestThreadMentionInsertion(session.id) },
+    'follow-up': {
+      kind: 'item',
+      label: t('threadSidebarFollowUp'),
+      disabled: props.workspaceId === undefined,
+      onSelect: () => props.actions.followUp(session.id, props.workspaceId),
+    },
+    mute: {
+      kind: 'sub',
+      label: t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted'),
+      ...(props.mute === undefined ? undefined : { icon: <BellOffIcon aria-hidden="true" /> }),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
         <>
-          <ContextMenuItem keys="P" onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="E" onSelect={() => props.actions.toggleSettled(session.id)}>
-            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} keys="H" onSelect={() => props.actions.toggleParked(session.id)}>
-            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-          </ContextMenuItem>
-          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-            {t('threadSidebarArchive')}
-          </ContextMenuItem>
-        </>
-      )}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
           {THREAD_MUTE_OPTIONS.map(option => (
             <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
               {t(muteOptionLabelKeys[option])}
@@ -1098,126 +1334,102 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
             {t('threadSidebarUnmute')}
           </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      {coarsePointer() && ScreenWakeLock.available ? (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => void ScreenWakeLock.toggle()}>
-            {t(wakeLockOn ? 'threadSidebarAllowScreenSleep' : 'threadSidebarKeepScreenOn')}
-          </ContextMenuItem>
         </>
+      ),
+    },
+    'mark-unread': { kind: 'item', label: t('threadSidebarMarkUnread'), keys: 'U', disabled: unread, onSelect: () => props.actions.markUnread(session.id) },
+    // Keep screen on (plan phone P27): one page-level Screen Wake Lock, offered only on a touch device that has it.
+    ...(keepAwakeLabel === undefined
+      ? undefined
+      : { 'keep-awake': { kind: 'item', label: t(keepAwakeLabel), onSelect: () => void ScreenWakeLock.toggle() } }),
+    ...(notifyTarget === undefined
+      ? undefined
+      : {
+          notify: {
+            kind: 'rows',
+            rows: (
+              <NotifyChoiceMenu
+                subscriberTitle={notifyTarget.subscriberTitle}
+                choice={notifyTarget.choice}
+                defaultLevel={props.actions.notifyDefaultLevel()}
+                onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
+                t={t}
+              />
+            ),
+          },
+        }),
+    'auto-done': {
+      kind: 'sub',
+      label: t('threadSidebarAutoSettleBehavior'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: (
+        <ContextMenuRadioGroup value={props.autoSettleOverride}>
+          {autoDone('inherit', 'threadSidebarAutoSettleInherit')}
+          {autoDone('enabled', 'threadSidebarAutoSettleEnabled')}
+          {autoDone('disabled', 'threadSidebarAutoSettleDisabled')}
+        </ContextMenuRadioGroup>
+      ),
+    },
+    'move-to-group': {
+      kind: 'sub',
+      label: t('threadSidebarMoveToSection'),
+      contentClassName: 'dshx-root dshx:min-w-44',
+      content: SIDEBAR_SECTIONS.map(section => (
+        <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
+          {t(sectionLabels[section])}
+        </ContextMenuItem>
+      )),
+    },
+    'referenced-by': {
+      kind: 'sub',
+      label: t('threadSidebarReferencedBy'),
+      contentClassName: 'dshx-root dshx:min-w-56 dshx:max-w-72',
+      content: <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />,
+    },
+    ...(scratchThread(session, props.workspacePath, props.workspaceTitle)
+      ? {
+          'turn-into-project': {
+            kind: 'item',
+            label: t('threadSidebarTurnIntoProject'),
+            onSelect: () => props.actions.turnIntoProject(session, props.workspacePath),
+          },
+        }
+      : undefined),
+    'row-actions': {
+      kind: 'rows',
+      rows: <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />,
+    },
+    archive: { kind: 'item', label: t('threadSidebarArchive'), disabled: session.running, onSelect: () => void props.actions.mutate(session.id, 'archive') },
+  }
+  const phone = PhoneLayout.matches()
+  return (
+    <>
+      {phone ? (
+        // The phone's sheet covers the row it acts on, so it names its thread (council round 34, B9, Astra): a quiet 14px
+        // semibold title at the items' text edge, up to two lines, not an item.
+        <ContextMenuLabel className="dshx:line-clamp-2 dshx:pt-1 dshx:pb-2 dshx:font-semibold dshx:break-words" data-thread-menu-title="">
+          {session.displayTitle}
+        </ContextMenuLabel>
       ) : null}
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
-      <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
-        {t('threadSidebarFollowUp')}
-      </ContextMenuItem>
-      {archived ? null : (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={session.running}>{t('threadSidebarContinueIn')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-48 dshx:max-w-72" aria-label={t('threadSidebarContinueIn')}>
-            <ContinueInProjectItems t={t} continueIn={projectId => props.actions.continueIn(session.id, projectId)} Item={ContextMenuItem} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      )}
-      {scratchThread(session, props.workspacePath, props.workspaceTitle) ? (
-        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session, props.workspacePath)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
-      ) : null}
-      <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarCopy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
-          <ContextMenuItem
-            onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
-          >
-            {t('threadSidebarCopyLink')}
-          </ContextMenuItem>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
-      {!archived && sidePanelDefinitions.length > 0 ? (
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarOpenPluginInSidePanel')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            {sidePanelDefinitions.map(definition => (
-              <ContextMenuItem key={definition.id} onSelect={() => openRegisteredPanelAside(definition.id)}>
-                {definition.title}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      ) : null}
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
-          <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
-      <ContextMenuSeparator />
-      {notifyTarget === undefined ? null : (
-        <NotifyChoiceMenu
-          subscriberTitle={notifyTarget.subscriberTitle}
-          choice={notifyTarget.choice}
-          defaultLevel={props.actions.notifyDefaultLevel()}
-          onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
-          t={t}
-        />
-      )}
-      <ContextMenuItem disabled={unread} keys="U" onSelect={() => props.actions.markUnread(session.id)}>
-        {t('threadSidebarMarkUnread')}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-          <ContextMenuRadioGroup value={props.autoSettleOverride}>
-            <ContextMenuRadioItem
-              value="inherit"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'inherit')
-              }}
-            >
-              {t('threadSidebarAutoSettleInherit')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="enabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'enabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleEnabled')}
-            </ContextMenuRadioItem>
-            <ContextMenuRadioItem
-              value="disabled"
-              onSelect={event => {
-                event.preventDefault()
-                props.actions.setAutoSettleOverride(session.id, 'disabled')
-              }}
-            >
-              {t('threadSidebarAutoSettleDisabled')}
-            </ContextMenuRadioItem>
-          </ContextMenuRadioGroup>
-        </ContextMenuSubContent>
-      </ContextMenuSub>
-      <ContextMenuSeparator />
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{t('threadSidebarMoveToSection')}</ContextMenuSubTrigger>
-        <ContextMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMoveToSection')}>
-          {SIDEBAR_SECTIONS.map(section => (
-            <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
-              {t(sectionLabels[section])}
-            </ContextMenuItem>
-          ))}
-        </ContextMenuSubContent>
-      </ContextMenuSub>
+      <ThreadMenu
+        kit={CONTEXT_MENU_KIT}
+        entries={entries}
+        archived={archived}
+        phone={phone}
+        coarsePointer={coarsePointer()}
+        labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
+      />
     </>
   )
+}
+
+/** The list's menu parts, for the shared thread menu. */
+const CONTEXT_MENU_KIT: ThreadMenuKit = {
+  Item: ContextMenuItem,
+  Sub: ContextMenuSub,
+  SubTrigger: ContextMenuSubTrigger,
+  SubContent: ContextMenuSubContent,
+  Separator: ContextMenuSeparator,
 }
 
 /** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
@@ -1248,27 +1460,39 @@ const ThreadRowMenu = {
   },
 } as const
 
-/** A touch-first device (the phone rules apply under `pointer: coarse`); read once, it does not change mid-session. */
-let coarsePointerMatch: boolean | undefined
-const coarsePointer = (): boolean => {
-  coarsePointerMatch ??= typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
-  return coarsePointerMatch
-}
-
 /**
  * The 16px project mark that leads a thread row: the project's own icon (favicon, `dsh.project.json` icon) or its
  * neutral monogram, from the Host's cached project-icon resolver. A thread outside any project keeps an empty box of the
  * same size so every title starts on one line. Never a status colour: the status glyph beside it is the only signal.
  */
-/** The project's 14px mark on a row's second line (b:212a): where the thread runs, beside the project name. */
-const RowProjectMark = memo((props: { readonly path: string | undefined; readonly label: string | undefined }): JSX.Element =>
-  props.path === undefined ? (
-    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark="none" />
-  ) : (
-    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark={props.label ?? ''}>
-      <ProjectIcon path={props.path} label={props.label} className="dshx:size-3.5" />
-    </span>
-  ),
+/**
+ * The project's identity tile on a row's second line (b:212a, round five T1): the kit's 16px `ProjectMark`, in the
+ * colour picked for the project or its name's tone, so the colour sits on the tile and the name stays muted. With the
+ * project colour preference off the tile takes the line's muted ink. It names the project itself when the name beside
+ * it gave way to a reason.
+ */
+const RowProjectMark = memo(
+  (props: {
+    readonly name: string | undefined
+    readonly tone: number | undefined
+    readonly color: string | undefined
+    readonly palette: ProjectColorPalette
+    readonly coloured: boolean
+    readonly labelled: boolean
+  }): JSX.Element =>
+    props.name === undefined ? (
+      <span aria-hidden="true" className="dshx:inline-flex dshx:size-4 dshx:shrink-0" data-thread-project-mark="none" />
+    ) : (
+      <ProjectMark
+        name={props.name}
+        size="dense"
+        tone={props.tone}
+        color={props.coloured ? props.color : 'currentColor'}
+        palette={props.palette}
+        decorative={!props.labelled}
+        data-thread-project-mark={props.name}
+      />
+    ),
 )
 
 /**
@@ -1312,8 +1536,8 @@ const OwnWorkspaceIndicator = (props: {
   )
 }
 
-/** Memoized so a session update re-renders only its own row, not the whole list. */
-const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
+/** Memoized so a session update re-renders only its own row, not the whole list. Exported for its render test. */
+export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
   const rowRef = useRef<HTMLElement | null>(null)
   const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
@@ -1353,21 +1577,69 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const workStatus = props.workStatus
+  // A row that just became Needs you, Failed or Ready on screen holds that colour's tint for a moment (round two, item 15).
+  const arrival = RowArrivalTintModel.useTint(session.id, workStatus?.status)
   // The status glyph keeps its own 16px seat on line 1; line 2's seat holds the project mark under it.
   const leadSeat = workStatus !== undefined || rowStyle.statusDot
-  const inlineVerb = workStatus?.verb
+  // The row's verb is an attention verb (round five B3): only a row that needs you or failed carries one. A Ready row's
+  // Land lives in the thread header and the row menu, so the list's colour is left to the rows that need you.
+  const inlineVerb = workStatus?.status === 'needs-you' || workStatus?.status === 'failed' ? workStatus.verb : undefined
   const showAgent = workStatus !== undefined && props.agent !== undefined
+  // "Waiting on 1 subagent" already says what keeps the thread busy; a job chip beside it read as a second count of it.
+  const waitingOnSubagents = workStatus?.status === 'working' && !session.running && props.childThreads.length > 0
+  const jobCount = waitingOnSubagents ? 0 : (props.runningJobs ?? 0)
+  // The same line also names how many it waits on, so the toggle keeps only its chevron (round five B1).
+  const childCounterShown = !(waitingOnSubagents && workStatus?.detail !== undefined)
+  // The disclosure says what it counts, "1 subagent" (council round 34, A7): a bare "1" after a dot cluster beside a "1 job"
+  // chip read as three counting forms on one line.
+  const childCountWords = plural(t, 'subagentCount', childCount)
   // Why it needs you leads the second line, so the title keeps the first line to itself.
   const statusDetail =
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
+  // The kind of ask a Needs-you row answers (Question or Approval), never its description: an approval's description
+  // often restated the title (round five B2), and a question's excerpt is cut on one line.
+  const ask = workStatus?.status === 'needs-you' ? AttentionSubtitleModel.askOf(workStatus.verb) : undefined
+  const askKind = ask === undefined ? undefined : t(ask === 'question' ? 'threadSidebarAskQuestion' : 'threadSidebarAskApproval')
   // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
-  // rollup, with the working shimmer, then the elapsed time. Done, idle and attention rows keep the meta line.
+  // rollup, with the working shimmer. Under a status glyph the spinner and the group already say Working, so a turn
+  // with no known step keeps the meta line (where it runs) instead of naming the state again; the dot-only groupings
+  // keep the word. The elapsed time takes the first line's time slot, so the row shows one clock, not an age and a clock.
   const live = session.running && (workStatus === undefined || workStatus.status === 'working')
-  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? t('threadSidebarWorking')) : undefined
+  const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? (workStatus === undefined ? t('threadSidebarWorking') : undefined)) : undefined
+  // An attention row's one line names the kind and then the project as its identity, `Question · [BA] billing-api`
+  // (council round 13 B3): the kind of ask on a Needs-you row, the reason on a Failed one, on a desktop and a phone alike,
+  // never a cut excerpt (round 12 B4). The project mark moves from the seat under the glyph into the line, before the name.
+  const attentionKind = liveStep !== undefined || statusDetail === undefined ? undefined : workStatus?.status === 'failed' ? statusDetail : askKind
+  const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
+  // The project name only when line 2 has nothing else to say: beside a reason or a step it was cut to "b…" (T1).
+  const showProjectName = showProject && liveStep === undefined && statusDetail === undefined
+  // A line that names a kind (the ask, the failure, a working reason) reads through the kit's AttentionMeta (council
+  // round 14 B1): `[mark] project · kind`, the mark on the rail under the status glyph, the name whole or dropped,
+  // never cut to a stub. Without the project preference the mark keeps its own seat and the line names only the kind.
+  const metaKind = liveStep === undefined ? (attentionKind ?? statusDetail) : undefined
+  // A children count draws its failed clause with the cross and the failed ink, as every surface does (council round
+  // 23, item 2): `[BA] billing-api · 6 working · ✕ 1 failed`.
+  const countParts = workStatus?.childCounts === undefined ? undefined : workCountParts(workStatus.childCounts, subagentCountWords(t))
+  const metaCount = metaKind !== undefined && metaKind === workStatus?.detail && countParts !== undefined ? <WorkCountText parts={countParts} /> : undefined
+  // A running parent's count keeps the shimmer on its routine clauses; the failed clause follows in its own ink.
+  const liveCount = liveStep !== undefined && liveStep === workStatus?.detail ? countParts : undefined
+  const liveProblems = liveCount?.filter(part => part.tone !== 'plain') ?? []
+  const liveStepText =
+    liveCount === undefined || liveProblems.length === 0
+      ? liveStep
+      : liveCount
+          .filter(part => part.tone === 'plain')
+          .map(part => part.text)
+          .join(WORK_COUNT_SEPARATOR)
+  const metaRail = metaKind !== undefined && showProject
+  // A desktop attention row keeps the project's name before the kind: its status glyph and its verb already say the
+  // kind, and the sidebar is too narrow for both beside the verb. The phone list has room for both, and a working
+  // reason is the line's news, so those keep the kind.
+  const metaKeep = attentionKind !== undefined && !coarsePointer() ? 'name' : 'kind'
   const metaLine =
-    live ||
+    liveStep !== undefined ||
     (showMark && props.workspacePath !== undefined) ||
     showProject ||
     ownWorkspace !== undefined ||
@@ -1376,8 +1648,37 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     showPath ||
     childCount > 0 ||
     showAgent ||
+    jobCount > 0 ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
+  // Line 1 is the title at full width and the time; the verb takes line 2's trailing edge (round five T1), beside the
+  // subagent counter when there is one, at its own reserved width so the question keeps the rest of the line (C14).
+  // A row with no second line keeps the verb at the first line's end.
+  const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
+  // One layer of colour (council round 8 B3): the row keeps its Needs-you or Failed wash, so its verb is text in the
+  // attention or danger foreground on a transparent fill, tinted only on hover and press. A Ready row's Land stays an
+  // outline, so the ink primary is left to the page.
+  const verbVariant = workStatus?.status === 'needs-you' ? 'attention-text' : workStatus?.status === 'failed' ? 'danger-text' : 'outline'
+  // A Needs-you or Failed title may take two lines (13/18, 550): it is the row you act on, so it reads whole.
+  const wrapTitle = workStatus?.status === 'needs-you' || workStatus?.status === 'failed'
+  // Colour in the list (round five T2): Needs you and Failed hold a soft wash of their hue after the arrival tint fades.
+  const rowWash = workStatus?.status === 'needs-you' || workStatus?.status === 'failed' ? workStatus.status : undefined
+  const verbButton =
+    inlineVerb === undefined || workStatus === undefined ? null : (
+      <Button
+        type="button"
+        size="xs"
+        variant={verbVariant}
+        // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it. On touch it is
+        // 28px, the height of the row it sits in (round five B1).
+        className="dshx:z-10 dshx:h-6 dshx:px-2 dshx:pointer-coarse:h-7"
+        data-testid="thread-row-verb"
+        data-verb={inlineVerb}
+        onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+      >
+        {t(inlineVerbLabelKeys[inlineVerb])}
+      </Button>
+    )
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1445,7 +1746,8 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
           onClick={() => props.actions.toggleParked(session.id)}
         >
-          {parked ? <PlayIcon strokeWidth={1.5} size={14} /> : <PauseIcon strokeWidth={1.5} size={14} />}
+          {/* Snooze is a clock, not a pause (council round 29, item 12). */}
+          {parked ? <PlayIcon strokeWidth={1.5} size={14} /> : <AlarmClockIcon strokeWidth={1.5} size={14} />}
         </Button>,
       )
     }
@@ -1495,6 +1797,21 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     )
   }
 
+  // The hover actions sit in the first line's time slot, over the time (kept in place, invisible), so line 1 never
+  // reflows. `⋯` always shows there; each further action shows only once the row is measured and its button starts
+  // clear of the resting title's last glyph (`HoverStripFit`, round 29 item 1), so a click on the title opens the
+  // thread. The strip fades in on enter only (round 28, item 11): on mouse-out it goes at once, as the time comes back.
+  const hoverActions = nearViewport
+    ? props.rowActions.flatMap(action => {
+        const element = renderRowAction(action)
+        return element === null ? [] : [{ action, element }]
+      })
+    : []
+  const stripSeats = nearViewport ? hoverActions.length + 1 : 0
+  const fitStrip = (): void => {
+    if (rowRef.current !== null && stripSeats > 1) HoverStripFit.apply(rowRef.current)
+  }
+
   return (
     <ThreadContextMenu
       session={session}
@@ -1522,6 +1839,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         data-thread-section-row={props.section === undefined ? undefined : ''}
         onContextMenu={captureThreadMentionInsertion}
         data-row-gestures=""
+        // The strip's seats are measured as the pointer enters the row, or focus moves into it (round 29, item 1).
+        onMouseEnter={fitStrip}
+        onFocusCapture={fitStrip}
         {...swipe.handlers}
       >
         {swipeReveal === undefined ? null : (
@@ -1538,11 +1858,35 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         )}
         <div
           className={cn(
-            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent dshx:pointer-coarse:touch-pan-y',
+            'dshx:relative dshx:rounded-md dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            // Hover deepens an attention row's wash (council round 28, item 10: ink at 3%, 8% in dark, AA held) instead
+            // of trading it for the grey fill; a plain row takes the grey fill. Runtime tokens: the kit's `--color-*`
+            // names are `@theme inline` and do not exist in the page.
+            rowWash === undefined && 'dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60',
+            rowWash === 'needs-you' &&
+              'dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)] dshx:focus-within:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)] dshx:dark:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_8%)] dshx:dark:focus-within:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_8%)]',
+            rowWash === 'failed' &&
+              'dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-failed),var(--dsw-alias-label-primary)_3%)] dshx:focus-within:bg-[color-mix(in_oklab,var(--dshx-wash-failed),var(--dsw-alias-label-primary)_3%)] dshx:dark:hover:bg-[color-mix(in_oklab,var(--dshx-wash-failed),var(--dsw-alias-label-primary)_8%)] dshx:dark:focus-within:bg-[color-mix(in_oklab,var(--dshx-wash-failed),var(--dsw-alias-label-primary)_8%)]',
+            // Selection is the quieter cue (round five B3): its low-chroma wash plus the leading accent bar. A Needs-you or
+            // Failed row keeps its stronger attention wash when selected and takes only the bar.
+            'dshx:group-data-[selected=true]/row:selected-marker',
+            // A row led by its status glyph draws no pill, so the kit's selected edge (a neutral 1px inset, 3:1 on the
+            // wash) outlines the wash (council round 12 B1): the wash alone measured 1.10:1 off the dark list.
+            rowWash === undefined && 'dshx:group-data-[selected=true]/row:bg-selected-wash dshx:group-data-[selected=true]/row:selected-edge',
+            // The phone list is a list you leave for the thread (council round 17 B1.2): its current row keeps the wash and
+            // the 550 title, not the outline, which read as a focus ring on a phone.
+            rowWash === undefined && 'dshx:phone:group-data-[selected=true]/row:shadow-none',
             swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
+            swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-wash-needs-you',
+            swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-wash-failed',
           )}
+          data-row-wash={rowWash}
+          // A selected Needs-you or Failed row keeps its attention wash, not the selected wash, so it keeps the pill as its
+          // selection cue although it leads with a status glyph (council round 11 B3, kit A1).
+          {...(rowWash === undefined ? {} : MARKER_KEEP)}
           style={swipe.offset === 0 ? undefined : { transform: `translateX(${String(swipe.offset)}px)` }}
         >
+          {arrival.tint === undefined ? null : <RowArrivalTintModel.Tint key={arrival.tint.key} tint={arrival.tint} onEnd={arrival.end} />}
           {props.renaming ? (
             <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center', compact ? 'dshx:px-2 dshx:py-1.5' : 'dshx:px-2.5 dshx:py-2.5')}>
               <InlineTitleEditor
@@ -1560,11 +1904,19 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               data-work-status={workStatus?.status}
               className={cn(
                 'dshx:@container/row dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
+                'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
-                // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
-                'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
-                // Touch: the row's actions menu button takes the top-right corner, so the inline verb moves left of it.
-                inlineVerb !== undefined ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
+                // The phone gutter (round nine B4): the row fills from 12px, its glyph starts at 24px (the leading side
+                // only: the trailing side keeps the row menu's 44px column).
+                'dshx:phone:pl-3',
+                // Phone rows are a two-row grid (round five B1): [title | time ⋯] over [subtitle | verb], 6px apart, at
+                // least 52pt tall, whatever the density preference, so the first Ready row shows above the tab bar.
+                // Council round 18 B1.3: one pitch on every row, an 18px title line, 6px and a 16px line 2 (23pt centre to
+                // centre); 6px padding fills the 52pt exactly, so line 2's centre is 14px above every row's bottom.
+                'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1.5',
+                // Touch: the row's actions menu button takes the top-right corner's column.
+                'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1576,7 +1928,19 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               onDoubleClick={() => keepThreadTab(session.id)}
             >
               {headLine ? (
-                <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                <span
+                  className={cn(
+                    'dshx:flex dshx:min-w-0 dshx:gap-2',
+                    // A two-line title keeps the glyph and the time on its first line.
+                    wrapTitle ? 'dshx:items-start' : 'dshx:items-center',
+                    // A row without a second line keeps the verb on this one; on touch the verb also sits left of the
+                    // row menu button.
+                    verbSeat === 'head' && 'dshx:pr-17.5 dshx:pointer-coarse:pr-19',
+                    // Without a time column, line 1 keeps one seat free for `⋯` (round 29, item 1).
+                    stripSeats > 0 && !rowStyle.time && verbSeat !== 'head' && 'dshx:not-pointer-coarse:pr-6',
+                  )}
+                  data-thread-head=""
+                >
                   {(() => {
                     const status =
                       workStatus !== undefined ? (
@@ -1594,21 +1958,36 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           attentionColors={rowStyle.attentionColors}
                         />
                       ) : null
-                    // The glyph has its own 16px seat (b:212a), where the project mark used to carry it as a corner badge:
-                    // the mark moved to line 2, so line 1 keeps main's widths and the mute marker its place by the strip.
+                    // The glyph has its own seat (b:212a), where the project mark used to carry it as a corner badge: the
+                    // mark moved to line 2. The seat is the kit's 20px rail seat, the glyph centred in it (council round
+                    // 15 B1), so the status glyph and the project mark under it share one centre axis and the name
+                    // starts under the title; the 16px glyph box sits inside it.
                     return status === null ? null : (
-                      <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" data-thread-lead="">
+                      <span
+                        className={cn(
+                          'dshx:inline-flex dshx:h-4 dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:shrink-0 dshx:items-center dshx:justify-center',
+                          wrapTitle && 'dshx:mt-px',
+                        )}
+                        data-thread-lead=""
+                        // A row led by its status glyph draws no marker pill beside it (council round 11 B3, kit A1): the
+                        // selected wash and the 550 title carry the selection. An attention row keeps the pill through
+                        // `MARKER_KEEP` on its fill.
+                        {...LEADING_GLYPH_ATTRIBUTE}
+                      >
                         {status}
                       </span>
                     )
                   })()}
                   {props.mute === undefined ? null : <MutedMarker mute={props.mute} t={t} />}
                   <span
+                    data-thread-title=""
                     className={cn(
-                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
-                      compact ? 'dshx:text-sm' : 'dshx:text-base',
+                      'dshx:min-w-0 dshx:flex-1 dshx:text-foreground',
+                      wrapTitle
+                        ? 'dshx:line-clamp-2 dshx:text-sm/[18px] dshx:font-[550] dshx:break-words'
+                        : cn('dshx:truncate dshx:pointer-coarse:leading-[18px]', compact ? 'dshx:text-sm' : 'dshx:text-base'),
                       // Dark cockpit: in the status list only Ready rows are bold and Done rows are muted.
-                      (workStatus === undefined ? unread : workStatus.status === 'ready') && 'dshx:font-semibold',
+                      (workStatus === undefined ? unread : workStatus.status === 'ready') ? 'dshx:font-semibold' : 'dshx:group-data-[selected=true]/row:font-selected',
                       workStatus?.status === 'done' && 'dshx:text-muted-foreground',
                     )}
                   >
@@ -1644,14 +2023,21 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
                         </Badge>,
                       )}
-                  {rowStyle.time && inlineVerb === undefined ? (
+                  {rowStyle.time && verbSeat !== 'head' ? (
+                    // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
-                        // The spinner and the live activity line say Working; the time stays colourless (DESIGN.md).
+                        wrapTitle && 'dshx:mt-px',
+                        // At least one seat wide, right-aligned, so the strip's `⋯` lies over the time, never the title.
+                        stripSeats > 0 && 'dshx:not-pointer-coarse:min-w-6 dshx:not-pointer-coarse:text-right',
+                        stripSeats > 0 &&
+                          // Kept in place, so line 1 never reflows; the strip covers its slot (round 28, item 11).
+                          'dshx:not-pointer-coarse:group-hover/row:invisible dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:invisible',
                       )}
+                      data-thread-time=""
                     >
-                      {props.age}
+                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} since={liveStartedAt} format={wholeUnit} />}
                     </span>
                   ) : null}
                 </span>
@@ -1660,49 +2046,81 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    childCount > 0 && 'dshx:pr-16',
+                    // Room for the subagent counter at this line's end; the verb beside it holds its own width through
+                    // the invisible copy at the line's end (council round 14 B1).
+                    // Touch: the chevron alone is a 44pt toggle in the time column (council round 18 B1.3).
+                    // A counter's words take their own width through the invisible copy at the line's end (council round 34, A7).
+                    childCount > 0 && !childCounterShown && 'dshx:pr-8 dshx:pointer-coarse:pr-11',
+                    // Touch: line 2 is 16px on every row (council round 18 B1.3), so every row keeps one title-to-meta
+                    // pitch; the 28px verb centres on it from outside instead of stretching it to 28px.
+                    'dshx:pointer-coarse:h-4 dshx:pointer-coarse:text-xs/4',
                   )}
                   data-thread-where=""
                 >
                   {/* Line 2 is where the thread runs (b:212a): the project mark sits in the seat under the status glyph,
                       so the project name lines up with the title. Its 8px gap matches line 1's. */}
-                  {leadSeat || showMark ? (
-                    <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
-                      {showMark ? <RowProjectMark path={props.workspacePath} label={props.workspaceTitle} /> : null}
+                  {!metaRail && (leadSeat || showMark) ? (
+                    <span
+                      data-thread-mark-seat=""
+                      className="dshx:mr-0.5 dshx:inline-flex dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:shrink-0 dshx:justify-center"
+                    >
+                      {showMark ? (
+                        <RowProjectMark
+                          name={props.workspaceTitle}
+                          tone={props.projectChipTone}
+                          color={props.projectChipColor}
+                          palette={rowStyle.projectPalette}
+                          coloured={rowStyle.projectColor}
+                          labelled={!showProjectName}
+                        />
+                      ) : null}
                     </span>
                   ) : null}
-                  {liveStep === undefined ? null : (
-                    <LiveActivityLine active={nearViewport} startedAt={props.liveTurn?.startedAt} step={liveStep} className="dshx:min-w-0 dshx:flex-1" />
+                  {metaKind === undefined ? null : (
+                    // The kind stays whole; the name beside the rail's mark is whole or gone (the kit measures it), so a
+                    // narrow column never shows "billing…". 12/16 in the secondary ink, the title being the row's ink.
+                    // The rail's 20px seat and 8px gap match line 1's glyph seat and gap, so the name starts under the title.
+                    <AttentionMeta
+                      data-testid="thread-row-status-kind"
+                      markSeat={metaRail ? 'rail' : 'inline'}
+                      project={metaRail ? props.workspaceTitle : undefined}
+                      kind={metaKind}
+                      kindContent={metaCount}
+                      keep={metaKeep}
+                      data-keep={metaKeep}
+                      mark={{
+                        tone: props.projectChipTone,
+                        color: rowStyle.projectColor ? props.projectChipColor : 'currentColor',
+                        palette: rowStyle.projectPalette,
+                        'data-thread-project-mark': props.workspaceTitle,
+                      }}
+                    />
                   )}
-                  {liveStep !== undefined || statusDetail === undefined ? null : (
-                    <span
-                      className={cn(
-                        'dshx:min-w-0 dshx:max-w-[60%] dshx:shrink dshx:truncate',
-                        (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
-                      )}
-                      data-testid="thread-row-status-detail"
-                    >
-                      {statusDetail}
-                    </span>
+                  {liveStepText === undefined ? null : (
+                    <LiveActivityLine
+                      active={nearViewport}
+                      // With the time column off, the clock stays beside the step.
+                      startedAt={rowStyle.time ? undefined : liveStartedAt}
+                      step={liveStepText}
+                      after={liveProblems.length === 0 ? undefined : <WorkCountText leadingSeparator parts={liveProblems} className="dshx:-ml-1 dshx:shrink-0" />}
+                      className="dshx:min-w-0 dshx:flex-1"
+                    />
                   )}
-                  {showProject && liveStep === undefined ? (
-                    <span
-                      className={cn(
-                        // The first text to give way on a short row: it truncates, then hides, before the mark does.
-                        'dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden',
-                        rowStyle.projectColor &&
-                          props.workspaceTitle !== undefined &&
-                          props.projectChipColor === undefined &&
-                          // A colour chosen at import wins; without one the name keeps its palette tint.
-                          (props.projectChipClassName ?? projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette)),
-                      )}
-                      data-testid="thread-row-project"
-                      style={rowStyle.projectColor && props.projectChipColor !== undefined ? { color: props.projectChipColor } : undefined}
-                    >
+                  {showProjectName ? (
+                    // Muted: the tile carries the project's colour (round five T1). The first text to give way on a
+                    // short row: it truncates, then hides, before the mark does.
+                    <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden" data-testid="thread-row-project">
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
                   ) : null}
                   {ownWorkspace === undefined ? null : <OwnWorkspaceIndicator workspace={ownWorkspace} showState={liveStep === undefined} t={t} />}
+                  {jobCount === 0 ? null : (
+                    // Text like the rest of line 2, "billing-api · 1 job" (council round 34, A7): the muted chip was a second form.
+                    <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5" data-thread-jobs="">
+                      {showProjectName || ownWorkspace !== undefined || metaKind !== undefined || liveStepText !== undefined ? <span aria-hidden="true">·</span> : null}
+                      {plural(t, 'threadSidebarRunningJobs', jobCount)}
+                    </span>
+                  )}
                   {showAgent ? (
                     <span className="dshx:shrink-0 dshx:truncate dshx:max-w-[35%]" data-testid="thread-row-agent">
                       @{props.agent}
@@ -1724,81 +2142,151 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {session.cwd}
                     </span>
                   ) : null}
+                  {verbSeat === 'meta' && inlineVerb !== undefined ? (
+                    // The verb's seat, sized to the verb (council round 14 B1): an invisible copy of its label in the
+                    // button's xs metrics. The verb itself sits outside this button (a button cannot hold one); its
+                    // corner is 8px further out than this line's end (its label ends where the age does, council round
+                    // 17 B1.2; touch: beside a counter 4px), so the copy gives that back. Only its width counts: it keeps
+                    // the line's 16px, so line 2 never grows.
+                    <span
+                      aria-hidden="true"
+                      data-verb-reserve=""
+                      className={cn(
+                        'dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:px-2 dshx:text-xs/4 dshx:font-medium dshx:whitespace-nowrap',
+                        childCount > 0 && childCounterShown ? undefined : childCount > 0 ? 'dshx:-mr-2 dshx:pointer-coarse:-mr-1' : 'dshx:-mr-2',
+                      )}
+                    >
+                      {t(inlineVerbLabelKeys[inlineVerb])}
+                    </span>
+                  ) : null}
+                  {childCount > 0 && childCounterShown ? (
+                    // The counter's seat, sized to its words: the toggle's own parts, invisible. It lies 8px past this line's
+                    // end on a mouse (the toggle stands in the row's padding), and its chevron seat reaches 8px into the menu
+                    // column on touch; the copy gives both back, so the line keeps exactly what the toggle leaves it.
+                    <span
+                      aria-hidden="true"
+                      data-children-reserve=""
+                      className="dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:pl-1.5 dshx:text-xs/4 dshx:whitespace-nowrap dshx:-mr-2 dshx:pointer-coarse:mr-0"
+                    >
+                      {childCountWords}
+                      <span className="dshx:inline-block dshx:w-6 dshx:shrink-0 dshx:pointer-coarse:-mr-2" />
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
             </button>
           )}
-          {childCount > 0 ? (
+          {childCount > 0 || (verbSeat === 'meta' && !props.renaming) ? (
+            // Line 2's trailing edge: the verb, then the subagent counter. The 24px verb centres on line 2 (6px under a
+            // comfortable row, 2px under a compact one); touch moves it left of the row menu button's column. The verb's
+            // label and the chevron's glyph both sit 8px inside this box, so it stands 8px outside the row's padding:
+            // the age, the verb and the chevron end on one edge (council round 17 B1.2).
+            <div
+              data-thread-row-end=""
+              data-verb-seat={verbSeat === 'meta' ? 'meta' : undefined}
+              className={cn(
+                'dshx:absolute dshx:flex dshx:items-center dshx:gap-1',
+                compact ? 'dshx:right-0' : 'dshx:right-0.5',
+                verbSeat !== 'meta' || props.renaming
+                  ? // Touch: a chevron alone leaves the row menu's column (council round 18 B1.3: the two stacked in one
+                    // 44pt square); it ends the time column on line 2, where a verb sits, centred on that line.
+                    'dshx:bottom-1 dshx:pointer-coarse:right-11 dshx:pointer-coarse:bottom-0'
+                  : // Touch: the verb's label ends where the time above it does (round nine B5: its 8px padding reaches into
+                    // the row menu's column), and its 28px centres on line 2 (14px above the row's bottom, council round
+                    // 18 B1.3), so it never meets the time (round five B1). Beside a subagent counter the counter ends the
+                    // line, left of that column.
+                    cn(
+                      compact ? 'dshx:bottom-0.5' : 'dshx:bottom-1.5',
+                      'dshx:pointer-coarse:bottom-0',
+                      childCount > 0 ? 'dshx:pointer-coarse:right-11' : 'dshx:pointer-coarse:right-9',
+                    ),
+              )}
+            >
+              {verbSeat === 'meta' && !props.renaming ? verbButton : null}
+              {childCount > 0 ? (
             <button
               type="button"
               data-thread-children-toggle=""
-              className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              // 24 px tall, the chevron in its own 24 px seat; the kit gives a raw button its 44 px hit area on touch.
+              // Touch (council round 18 B1.3): 28px like the verb and at least 44pt wide, so its hit area ends where the
+              // row menu's column starts instead of reaching into it.
+              className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:pointer-coarse:h-7 dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:justify-end"
               aria-expanded={props.childrenOpen}
-              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
+              // The visible words lead the spoken name (WCAG 2.5.3): "Hide child threads: 1 subagent".
+              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')}: ${childCountWords}`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
             >
-              <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
-                {props.childThreads.slice(0, 3).map(child => {
-                  const attentionLabel = props.childAttentionLabels.get(child.id)
-                  return (
-                    <StatusDot
-                      key={child.id}
-                      className={cn(
-                        'dshx:ring-1 dshx:ring-background',
-                        ThreadAttentionPresentationModel.attentionDotClass({
-                          attentionLabel,
-                          attentionColors: rowStyle.attentionColors,
-                          unread: props.unreadSessionIds.has(child.id),
-                          running: child.running,
-                        }),
-                      )}
-                    />
-                  )
-                })}
+              {/* One form (council round 34, A7): "1 subagent ⌄" in line 2's words and ink, no dots and bare number. */}
+              {childCounterShown ? <span className="dshx:whitespace-nowrap" data-children-count="">{childCountWords}</span> : null}
+              {/* A real chevron in a 24 px seat (round five B3), not a 12 px caret: it turns over when the sub-rows open. */}
+              {/* Touch: the seat reaches 8px past the toggle so the glyph (4px seat inset, 4px of its own) ends on the time's
+                  edge; drawn only, so the overhang takes no taps from the row menu beside it. */}
+              <span
+                className="dshx:pointer-events-none dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center dshx:pointer-coarse:-mr-2"
+                data-children-chevron=""
+                aria-hidden="true"
+              >
+                <ChevronDownIcon
+                  className={cn('dshx:size-4 dshx:transition-transform dshx:duration-(--dshx-duration-hover)', props.childrenOpen && 'dshx:rotate-180')}
+                  strokeWidth={1.5}
+                />
               </span>
-              <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
-              {props.childrenOpen ? (
-                <ChevronUpIcon className="dshx:size-3" aria-hidden="true" />
-              ) : (
-                <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
-              )}
             </button>
+              ) : null}
+            </div>
           ) : null}
-          {props.renaming || (inlineVerb === undefined && !nearViewport) ? null : (
-            // The inline verb and the hover strip share one corner: the strip opens to the left of the verb, so
-            // neither ever covers the other (the verb is the row's visible action, not a hover affordance).
+          {props.renaming || (verbSeat !== 'head' && !nearViewport) ? null : (
+            // The first line's corner: the hover actions in the time slot. A verb on a one-line row shares it, and the
+            // actions then open to its left, so neither ever covers the other.
             <div
               data-testid="thread-row-overlay"
+              data-verb-seat={verbSeat === 'head' ? 'head' : undefined}
               className={cn(
                 'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
                 // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
-                inlineVerb !== undefined && 'dshx:pointer-coarse:right-10',
+                verbSeat === 'head' && 'dshx:pointer-coarse:right-11',
               )}
             >
-              {inlineVerb === undefined || workStatus === undefined ? null : (
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-                  className="dshx:h-6 dshx:px-2"
-                  data-testid="thread-row-verb"
-                  data-verb={inlineVerb}
-                  onClick={() => props.actions.actOnStatus(session.id, workStatus)}
-                >
-                  {t(inlineVerbLabelKeys[inlineVerb])}
-                </Button>
-              )}
+              {verbSeat === 'head' ? verbButton : null}
               {nearViewport ? (
                 <div
                   data-testid="thread-row-actions"
+                  data-row-strip=""
                   className={cn(
-                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
-                    inlineVerb === undefined ? 'dshx:top-0 dshx:right-0' : 'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-none dshx:group-hover/row:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    verbSeat !== 'head'
+                      ? 'dshx:-top-0.5 dshx:right-0'
+                      : // Beside a first-line verb the strip takes the seat line 1 gives it left of the verb, as every row's
+                        // strip does in the time slot: nothing floats over the title.
+                        'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
                   )}
                 >
-                  {props.rowActions.map(action => (
-                    <Fragment key={action}>{renderRowAction(action)}</Fragment>
+                  {hoverActions.map(({ action, element }) => (
+                    // Hidden until `HoverStripFit` measures the row and finds the seat clear of the title; `⋯` keeps it.
+                    <span
+                      key={action}
+                      data-strip-seat=""
+                      // Every verb but Open in side panel changes the thread: it keeps a seat's distance from the title.
+                      data-strip-changes={action === 'aside' ? undefined : ''}
+                      className="dshx:hidden dshx:data-[strip-on]:contents"
+                    >
+                      {element}
+                    </span>
                   ))}
+                  {/* Every other verb of the row: the same menu a right-click opens. */}
+                  {withTooltip(
+                    t('threadSidebarContextMenu'),
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarContextMenu')}
+                      aria-haspopup="menu"
+                      onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
+                    >
+                      <OverflowGlyph />
+                    </Button>,
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1813,10 +2301,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               data-testid="thread-row-menu"
               aria-label={t('threadSidebarContextMenu')}
               aria-haspopup="menu"
-              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-muted-foreground dshx:pointer-coarse:inline-flex"
+              // The row's only menu on a phone, so it stays; in the tertiary ink it no longer reads as row content
+              // beside the age (council round 17 B1.2). Council round 18 B1.3: a 44pt seat flush with the row's edge (its
+              // hit area no longer overflows the row), its glyph on one axis down the list, centred on line 1.
+              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-(--dsw-alias-label-tertiary) dshx:pointer-coarse:inline-flex dshx:pointer-coarse:top-px dshx:pointer-coarse:right-0 dshx:pointer-coarse:w-11"
               onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
             >
-              <EllipsisIcon className="dshx:size-4" aria-hidden="true" />
+              <OverflowGlyph />
             </Button>
           ) : null}
         </div>
@@ -1825,6 +2316,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             parentId={session.id}
             childThreads={props.childThreads}
             finishedChildThreads={props.finishedChildThreads}
+            launchOrder={props.childLaunchOrder}
             unreadSessionIds={props.unreadSessionIds}
             allShown={props.allChildrenShown}
             selectedChildId={props.selectedChildId}
@@ -1920,6 +2412,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   preferencesRef.current = preferences
   const stageShowsPage = useStageCovered()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
+  const failedTurns = useFailedTurns({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
@@ -2036,6 +2529,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
+  // The thread list's Filter panel; closed by the footer's places and by the prompts it opens.
+  const [filterOpen, setFilterOpen] = useState(false)
+  // The room below the Filter trigger (council round 30, item 7): the desktop panel is capped at it, so a taller state
+  // (More open) scrolls inside instead of Radix shifting the panel up off its trigger; measured on open and on resize.
+  const filterTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const filterTriggerNameRef = useRef<HTMLSpanElement | null>(null)
+  const [filterPanelRoom, setFilterPanelRoom] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    if (!filterOpen) return
+    const measure = (): void => {
+      const trigger = filterTriggerRef.current
+      if (trigger === null) return
+      // To the status strip's top, not the window's bottom (council round 32, item 3: at 700px the panel covered it).
+      const strip = document.querySelector('[data-status-strip]')
+      const floor = strip === null || strip.getClientRects().length === 0 ? window.innerHeight : strip.getBoundingClientRect().top
+      setFilterPanelRoom(Math.max(FILTER_PANEL_MIN_ROOM, floor - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [filterOpen])
   const [presetPrompt, setPresetPrompt] = useState<PresetNamePrompt | null>(null)
   const [presetToDelete, setPresetToDelete] = useState<{ readonly id: string; readonly label: string } | null>(null)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
@@ -2050,7 +2564,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   // Filter presets (b:xpvk): the list shows the active preset's filters, or the draft once the user changed one.
   const listThreadFilters = useMemo(() => ThreadViewPreferencesModel.currentThreadViewFilters(threadViewSettings), [threadViewSettings])
-  const threadView = isBoard ? boardViewSettings : listThreadFilters
+  const threadView = isBoard ? ThreadBoardViewModel.columnsOf(boardViewSettings) : listThreadFilters
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const localProjectsForRemoteThreads = useMemo(
     () =>
@@ -2388,8 +2902,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [archivedSessionIds, pinnedSessionIds, selectedSessionId, sessions, unsentDrafts],
   )
   const draftSessionIds = useMemo(() => new Set(draftSessions.map(draft => draft.id)), [draftSessions])
+  // Read at confirm time: the dialog's list is a snapshot, the archive acts on what still qualifies.
+  const draftSessionsRef = useRef(draftSessions)
+  draftSessionsRef.current = draftSessions
   const [draftsOpen, setDraftsOpen] = useState(false)
   const [draftsCleaning, setDraftsCleaning] = useState(false)
+  const hostConnection = useHostConnection()
+  // A cleanup verb runs only on loaded, current data: never while the list is pending or DSH is away.
+  const draftsCleanable = sessionState.phase === 'ready' && hostConnection === 'online'
   const [detachedBranchBusy, setDetachedBranchBusy] = useState<ReadonlySet<string>>(() => new Set())
   const attentionSessions = useMemo(
     () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
@@ -3059,26 +3579,63 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
-   * Archive every empty draft and forget the thread workspaces that hold nothing but drafts. Archiving is reversible
-   * from the archive section; jj-integration still refuses a workspace with unlanded revisions or uncommitted edits, so
-   * a folder that turns out to hold work stays.
+   * Archive the confirmed empty drafts that still qualify and forget the thread workspaces that hold nothing but
+   * drafts. Each id is re-checked at confirm time (a draft prompted since the dialog opened is skipped), the toast
+   * offers Undo (unarchive), and jj-integration still refuses a workspace with unlanded revisions or uncommitted
+   * edits, so a folder that turns out to hold work stays.
+   * @param confirmed - the drafts the confirmation named.
    */
-  const cleanUpDrafts = async (): Promise<void> => {
-    if (draftsCleaning) return
+  const cleanUpDrafts = async (confirmed: readonly SessionSummary['id'][]): Promise<void> => {
+    if (draftsCleaning || !draftsCleanable) return
     setDraftsCleaning(true)
     try {
-      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceItems, threadDirectories })
-      let archived = 0
+      const current = draftSessionsRef.current
+      const stillDrafts = new Set(DraftThreadsModel.stillDraftIds({ confirmed, sessions: current }))
+      const drafts = current.filter(draft => stillDrafts.has(draft.id))
+      if (drafts.length === 0) {
+        setNotice({ tone: 'success', message: props.tSidebar('threadSidebarDraftsNoneLeft') })
+        return
+      }
+      const plan = DraftThreadsModel.planCleanup({ drafts, workspaces: workspaceItems, threadDirectories })
+      const archivedIds: SessionSummary['id'][] = []
       for (const sessionId of plan.sessionIds) {
         try {
           await props.archiveSession(sessionId)
-          archived += 1
+          archivedIds.push(sessionId)
         } catch {
           // One refused archive must not stop the rest of the cleanup.
         }
       }
       for (const path of plan.workspacePaths) await jjThreads.discard({ path, force: false }).catch(() => undefined)
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarDraftsCleaned', { count: archived }) })
+      const cleaned = { tone: 'success' as const, message: plural(props.tSidebar, 'threadSidebarDraftsCleaned', archivedIds.length) }
+      if (archivedIds.length === 0) {
+        setNotice(cleaned)
+      } else {
+        let undoInFlight = false
+        setNotice({
+          ...cleaned,
+          actionLabel: props.tSidebar('threadSidebarUndo'),
+          durationMs: preferences.archiveUndoDurationSeconds * 1_000,
+          onAction: () => {
+            if (undoInFlight) return
+            undoInFlight = true
+            void (async () => {
+              let undoFailed = false
+              for (const archivedId of archivedIds) {
+                try {
+                  await props.unarchiveSession(archivedId)
+                } catch {
+                  undoFailed = true
+                }
+              }
+              setNotice({
+                tone: undoFailed ? 'danger' : 'success',
+                message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarUndone'),
+              })
+            })()
+          },
+        })
+      }
       setDraftsOpen(false)
       void refetchJjRepositories()
     } catch {
@@ -3492,6 +4049,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return groupThreadChildren({ threads: listed })
   }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession, selectedSessionId, unsentDrafts])
 
+  // The selected row is never drawn under the list's bottom fade (round nine B6): a New thread lands in Drafts, at the
+  // list's end. When the selected row reaches into the fade zone the fade turns off for it; nothing scrolls, so no row
+  // slides under a sticky group head. The user's next scroll brings the fade back.
+  useEffect(() => {
+    const area = scrollAreaRef.current
+    if (area === null) return
+    const frame = requestAnimationFrame(() => ListFade.sync(area, selectedSessionId, ListFade.height(window.matchMedia('(pointer: coarse)').matches)))
+    return () => cancelAnimationFrame(frame)
+  }, [selectedSessionId])
+
   useEffect(() => {
     if (!isPrimarySurface || threadToScrollTo === null) return
     const scrollArea = document.querySelector<HTMLElement>('[data-testid="thread-sidebar-scroll"]')
@@ -3553,13 +4120,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ),
     [finishedAtBySession, mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
-  const sourceFilteredThreadEntries = useMemo(() => {
-    if (threadView.sourceFilter === 'subagents') {
-      return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
-    }
-    if (threadView.sourceFilter === 'main') return sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'main'))
-    return sectionEntries
-  }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
+  /** The rows a source shows: the list's and each Filter preset's count share it (round 29, item 2). */
+  const threadEntriesForSource = useCallback(
+    (sourceFilter: ThreadSourceFilter) => {
+      if (sourceFilter === 'subagents') {
+        return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
+      }
+      if (sourceFilter === 'main') return sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'main'))
+      return sectionEntries
+    },
+    [childThreadEntries, sectionEntries],
+  )
+  const sourceFilteredThreadEntries = useMemo(() => threadEntriesForSource(threadView.sourceFilter), [threadEntriesForSource, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
   const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries), [sectionEntries])
   const inactiveThreadIds = useMemo(
@@ -3591,18 +4163,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       sectionEntries,
       settledSessionIds,
     ],
-  )
-  const workingThreadCountsBySource = useMemo(
-    () => ({
-      all: currentWorkingThreadIds.size + detachedThreadEntries.filter(entry => entry.session.running).length,
-      main: sectionEntries.filter(entry => currentWorkingThreadIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
-      subagents: [
-        ...childThreadEntries,
-        ...detachedThreadEntries,
-        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
-      ].filter(entry => entry.session.running).length,
-    }),
-    [childThreadEntries, currentWorkingThreadIds, detachedThreadEntries, sectionEntries],
   )
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
@@ -3704,34 +4264,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows]),
     StableValueModel.sameSet,
   )
+  // The open thread included: an approval it waits on is Needs you on every surface (unslop round four, D3).
   const approvalNeededRows = useMemo(
     () =>
-      attentionSessions
-        .filter(session => {
-          const kind = sessionStatus.get(session.id)?.pendingInteraction?.kind
-          return (
-            !session.blank &&
-            session.id !== selectedSession?.id &&
-            (kind === 'approval' || kind === 'plan-review') &&
-            !mutedSessionIds.has(session.id) &&
-            !archivedSessionIds.has(session.id) &&
-            !settledSessionIds.has(session.id) &&
-            (activeWorkspaceFilter === null ||
-              (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === activeWorkspaceFilter)
-          )
-        })
-        .sort((left, right) => right.updatedAt - left.updatedAt),
-    [
-      archivedSessionIds,
-      settledSessionIds,
-      attentionSessions,
-      mutedSessionIds,
-      activeWorkspaceFilter,
-      selectedSession?.id,
-      sessionState.byId,
-      sessionStatus,
-      workspaceBySession,
-    ],
+      ApprovalRows.select({
+        sessions: attentionSessions,
+        pendingInteractionKindFor: sessionId => sessionStatus.get(sessionId)?.pendingInteraction?.kind,
+        mutedSessionIds,
+        archivedSessionIds,
+        settledSessionIds,
+        matchesWorkspace: session =>
+          activeWorkspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === activeWorkspaceFilter,
+      }),
+    [archivedSessionIds, settledSessionIds, attentionSessions, mutedSessionIds, activeWorkspaceFilter, sessionState.byId, sessionStatus, workspaceBySession],
   )
   const approvalNeededIds = useStableValue(
     useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows]),
@@ -3801,7 +4347,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const stateGrouping = threadView.groupBy === 'state'
   // Rows keep the status glyphs (and their detail line) when grouped by project, so a project section still says what
   // needs you; only the status grouping sorts and sections by them.
-  const statusGlyphs = stateGrouping || threadView.groupBy === 'project'
+  // The Custom grouping too (council round 34, B10): it drew a second status vocabulary (dots and an inline status word
+  // that cut the title), where every other list draws the glyph and the kind on line 2.
+  const statusGlyphs = stateGrouping || threadView.groupBy === 'project' || threadView.groupBy === 'status'
   const inbox = useInboxThreadSignals({ enabled: statusGlyphs && sessionState.phase === 'ready' })
   /**
    * Resume one row however it stopped: its inbox verb (quota, another provider), its stored quota continuation when the
@@ -3824,33 +4372,63 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       operations: rows.map(row => ({ key: row.id, run: ({ signal }) => resumeAttentionSession(row.id, signal) })),
     })
   }
-  const childStatusById = useMemo(() => {
-    const statuses = new Map<SessionSummary['id'], ThreadStatus>()
-    if (!statusGlyphs) return statuses
-    for (const entry of [...childThreadEntries, ...detachedThreadEntries]) {
-      statuses.set(
-        entry.session.id,
-        ThreadStatusModel.statusOf({
-          running: entry.session.running,
-          pinned: false,
-          archived: archivedSessionIds.has(entry.session.id),
-          settled: settledSessionIds.has(entry.session.id),
-          unread: attention.records.has(entry.session.id),
-          labels: attentionLabelsBySession.get(entry.session.id) ?? [],
-          inbox: inbox.signals.get(entry.session.id),
-          activityAt: entry.activity.updatedAt,
-          settledAt: preferences.settledAt[entry.session.id],
-          now,
-        }),
+  // The roll-up's detail lines in this plugin's words, one dictionary per line (C5).
+  const rollupCopy = useMemo(
+    (): ThreadStatusCopy => ({
+      subagentsNeedYou: count => plural(tSidebar, 'threadSidebarSubagentsNeedYou', count),
+      subagentsFailed: count => plural(tSidebar, 'threadSidebarSubagentsFailed', count),
+      childrenWorking: counts => workCountLabel(counts, subagentCountWords(tSidebar)),
+    }),
+    [tSidebar],
+  )
+  // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
+  const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
+  const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
+  // What an approval asks, for the row's detail line: the command its live step names (`git push --force…`); the glyph and
+  // the Review verb say it waits for an approval (round five B4).
+  const waitingDetailById = useMemo(() => {
+    const details = new Map<SessionSummary['id'], string>()
+    for (const session of approvalNeededRows) {
+      const interaction = sessionStatus.get(session.id)?.pendingInteraction
+      const detail = ApprovalDetail.of(
+        { kind: interaction?.kind, step: liveTurns.get(session.id)?.step, reason: ApprovalDetail.reasonOf(interaction) },
+        subject => subject,
       )
+      if (detail !== undefined) details.set(session.id, detail)
     }
-    return statuses
+    return details
+  }, [approvalNeededRows, liveTurns, sessionStatus])
+  // Each subagent's own status (its row, tab, header and palette) and the one its parent rolls up (round 21 D4).
+  const { childStatusById, childRollupStatusById } = useMemo(() => {
+    const statuses = new Map<SessionSummary['id'], ThreadStatus>()
+    const rollups = new Map<SessionSummary['id'], ThreadStatus>()
+    if (!statusGlyphs) return { childStatusById: statuses, childRollupStatusById: rollups }
+    for (const entry of [...childThreadEntries, ...detachedThreadEntries]) {
+      const failedTurn = failedTurns.get(entry.session.id)
+      const { row, rollup } = ThreadStatusModel.childStatusOf({
+        running: entry.session.running,
+        pinned: false,
+        archived: archivedSessionIds.has(entry.session.id),
+        settled: settledSessionIds.has(entry.session.id),
+        unread: attention.records.has(entry.session.id),
+        labels: attentionLabelsBySession.get(entry.session.id) ?? [],
+        inbox: inbox.signals.get(entry.session.id),
+        failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
+        activityAt: entry.activity.updatedAt,
+        settledAt: preferences.settledAt[entry.session.id],
+        now,
+      })
+      statuses.set(entry.session.id, row)
+      rollups.set(entry.session.id, rollup)
+    }
+    return { childStatusById: statuses, childRollupStatusById: rollups }
   }, [
     archivedSessionIds,
     attention.records,
     attentionLabelsBySession,
     childThreadEntries,
     detachedThreadEntries,
+    failedTurns,
     inbox.signals,
     now,
     preferences.settledAt,
@@ -3861,26 +4439,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!statusGlyphs) return statuses
     for (const entry of sectionEntries) {
-      const children = (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => {
-        const status = childStatusById.get(child.id)
+      const childRows = threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN
+      const children = childRows.flatMap(child => {
+        const status = childRollupStatusById.get(child.id)
         return status === undefined ? [] : [status]
       })
+      // The detail line names the children whose own turn failed (`6 working · 1 failed`); the status leaves them out.
+      const failedChildren = childRows.filter(child => childStatusById.get(child.id)?.status === 'failed').length
+      // Top-level rows only: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
+      const failedTurn = failedTurns.get(entry.session.id)
       statuses.set(
         entry.session.id,
         ThreadStatusModel.statusOf(
           {
             running: entry.session.running,
             pinned: pinnedSessionIds.has(entry.session.id),
+            // Nothing sent yet: the row is listed (the journey of a saved draft finds it), under Drafts, not Idle.
+            draft: entry.session.blank,
             archived: archivedSessionIds.has(entry.session.id),
             settled: settledSessionIds.has(entry.session.id),
             unread: attention.records.has(entry.session.id),
             labels: attentionLabelsBySession.get(entry.session.id) ?? [],
             inbox: inbox.signals.get(entry.session.id),
+            waitingDetail: waitingDetailById.get(entry.session.id),
+            failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
+            stoppedTurn: ThreadStatusModel.stoppedTurnOf(attention.records.get(entry.session.id)),
+            unlanded: jjThreadBySession.get(entry.session.id)?.unlanded.length,
             activityAt: entry.activity.updatedAt,
             settledAt: preferences.settledAt[entry.session.id],
             now,
           },
           children,
+          rollupCopy,
+          failedChildren,
         ),
       )
     }
@@ -3889,20 +4480,81 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     archivedSessionIds,
     attention.records,
     attentionLabelsBySession,
+    childRollupStatusById,
     childStatusById,
+    rollupCopy,
+    failedTurns,
     inbox.signals,
+    jjThreadBySession,
     now,
     pinnedSessionIds,
+    waitingDetailById,
     preferences.settledAt,
     sectionEntries,
     settledSessionIds,
     statusGlyphs,
     threadTree,
   ])
-  // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
-  const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
-  const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
+  // The one Working count (unslop S3): the rows whose status is Working, subagents rolled up into their parent. The
+  // "Working (N)" group lists exactly these rows, and the status strip, the tab title and the Working preset read the
+  // same set, so a thread that waits for an answer (Needs you, though its turn still runs) is counted nowhere.
+  const projectedWorkingIds = useMemo(() => {
+    const statuses = new Map<string, WorkStatus>()
+    if (statusGlyphs) {
+      for (const [sessionId, status] of childStatusById) statuses.set(sessionId, status.status)
+      for (const [sessionId, status] of threadStatusById) statuses.set(sessionId, status.status)
+    }
+    return WorkingThreadsProjection.ids([...sectionEntries, ...detachedThreadEntries], {
+      statusOf: sessionId => statuses.get(sessionId),
+      waiting: waitingSessionIds,
+    })
+  }, [childStatusById, detachedThreadEntries, sectionEntries, statusGlyphs, threadStatusById, waitingSessionIds])
+  const projectedWorkingCount = projectedWorkingIds.size
+  useEffect(() => {
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    WorkingThreadsProjection.publish(projectedWorkingCount)
+  }, [isPrimarySurface, projectedWorkingCount, sessionState.phase])
+  // The strip falls back to its own count once no list publishes.
+  useEffect(() => (isPrimarySurface ? () => WorkingThreadsProjection.publish(null) : undefined), [isPrimarySurface])
+  // The one status per thread, rolled up (DESIGN.md R2): the tab, the header and the palette read what this row shows.
+  useEffect(() => {
+    if (!isPrimarySurface || sessionState.phase !== 'ready') return
+    if (!statusGlyphs) {
+      threadWorkStatusStore.publish(null)
+      return
+    }
+    // An attention row's kind travels with its status, so the palette says Approval, Question or Turn failed as the row
+    // does (council round 15 B3).
+    const words = {
+      question: tSidebar('threadSidebarAskQuestion'),
+      approval: tSidebar('threadSidebarAskApproval'),
+      failed: tSidebar(workStatusLabelKeys.failed),
+    }
+    const projected = new Map<string, ThreadWorkStatus>()
+    for (const statuses of [childStatusById, threadStatusById]) {
+      for (const [sessionId, status] of statuses) {
+        projected.set(sessionId, { status: status.status, detail: status.detail, kind: AttentionSubtitleModel.kindOf(status, words) })
+      }
+    }
+    threadWorkStatusStore.publish(projected)
+  }, [childStatusById, isPrimarySurface, sessionState.phase, statusGlyphs, threadStatusById, tSidebar])
+  useEffect(() => (isPrimarySurface ? () => threadWorkStatusStore.publish(null) : undefined), [isPrimarySurface])
+  const workingThreadCountsBySource = useMemo(
+    () => ({
+      all: projectedWorkingCount,
+      main: sectionEntries.filter(entry => projectedWorkingIds.has(entry.session.id) && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
+      subagents: [
+        ...childThreadEntries,
+        ...detachedThreadEntries,
+        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
+      ].filter(entry => entry.session.running).length,
+    }),
+    [childThreadEntries, detachedThreadEntries, projectedWorkingCount, projectedWorkingIds, sectionEntries],
+  )
+  // Background jobs per thread for the rows' muted chip; a job never makes its thread Working.
+  const runningJobs = RunningJobsModel.useCounts(sessionState.phase === 'ready')
   const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
+  const groupSettler = useRef(ThreadStatusModel.createGroupSettler())
   const threadViewAttentionEntries = useMemo(() => {
     // A tab's dot follows the dots its rows draw, and a row's dot shows only its own state: a child's label lights
     // the tab only in views that list that child.
@@ -3957,35 +4609,37 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         visibleCount: view.showCount === false ? null : (workingCount ?? (unreadCount > 0 ? unreadCount : null)),
       }
     })
-  const visibleThreadEntries = useMemo(
-    () =>
-      sourceFilteredThreadEntries.filter(entry =>
-        ThreadViewModel.matchesStatusFilter({
-          filters: threadView.statusFilters,
-          // A subagent row reports its own state; a root row reports its children's, so a finished child keeps its
-          // parent in the view that names that label.
-          labels: attentionLabelsByRow.get(entry.session.id) ?? [],
-          unread: attention.records.has(entry.session.id),
-          running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
-          inactive: inactiveThreadIds.has(entry.session.id),
-          archived: archivedSessionIds.has(entry.session.id),
-          settled: settledSessionIds.has(entry.session.id),
-          muted: mutedSessionIds.has(entry.session.id),
-        }),
-      ),
-    [
-      archivedSessionIds,
-      settledSessionIds,
-      attention.records,
-      attentionLabelsByRow,
-      currentWorkingThreadIds,
-      inactiveThreadIds,
-      mutedSessionIds,
-      sourceFilteredThreadEntries,
-      threadView.sourceFilter,
-      threadView.statusFilters,
-    ],
+  /** Whether a row of the list matches a view's statuses: the list's and each Filter preset's count share it. */
+  const matchesListStatus = useCallback(
+    (entry: (typeof sourceFilteredThreadEntries)[number], view: Pick<ThreadViewPreferences, 'statusFilters' | 'sourceFilter'>): boolean =>
+      ThreadViewModel.matchesStatusFilter({
+        filters: view.statusFilters,
+        // A subagent row reports its own state; a root row reports its children's, so a finished child keeps its
+        // parent in the view that names that label.
+        labels: attentionLabelsByRow.get(entry.session.id) ?? [],
+        unread: attention.records.has(entry.session.id),
+        running: view.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
+        inactive: inactiveThreadIds.has(entry.session.id),
+        archived: archivedSessionIds.has(entry.session.id),
+        settled: settledSessionIds.has(entry.session.id),
+        muted: mutedSessionIds.has(entry.session.id),
+      }),
+    [archivedSessionIds, attention.records, attentionLabelsByRow, currentWorkingThreadIds, inactiveThreadIds, mutedSessionIds, settledSessionIds],
   )
+  const visibleThreadEntries = useMemo(() => {
+    const listView = { statusFilters: threadView.statusFilters, sourceFilter: threadView.sourceFilter }
+    return sourceFilteredThreadEntries.filter(entry => matchesListStatus(entry, listView))
+  }, [matchesListStatus, sourceFilteredThreadEntries, threadView.sourceFilter, threadView.statusFilters])
+  // Each preset's rows, as the list would show them (round 29, item 2): counted only while the Filter panel is open,
+  // since matching every row per preset on each render was the sidebar's hottest loop while a turn streams.
+  const presetTallies = useMemo(() => {
+    const tallies = new Map<string, number>()
+    if (!filterOpen) return tallies
+    for (const view of threadViewSettings.views) {
+      if (view.enabled) tallies.set(view.id, threadEntriesForSource(view.sourceFilter).filter(entry => matchesListStatus(entry, view)).length)
+    }
+    return tallies
+  }, [filterOpen, matchesListStatus, threadEntriesForSource, threadViewSettings.views])
   const groupedAttentionRows = useMemo(() => {
     const filterRows = (rows: readonly SessionSummary[], label: ThreadAttentionLabel): SessionSummary[] => {
       if (threadView.groupBy !== 'status' || isBoard) return []
@@ -4328,6 +4982,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [orderedSections, preferences.separateRemoteThreads, props.openRemoteThreads, remoteRowsBySection, rowsBySection],
   )
   const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
+  // How to reorder the Custom sections, said to a screen reader instead of a native tooltip (council round 34, B10).
+  const sectionReorderHintId = useId()
   const commitSectionOrder = (fromShownIndex: number, toShownIndex: number): void => {
     if (fromShownIndex === toShownIndex) return
     changePreferences({
@@ -4478,7 +5134,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             now,
           })
         const pinnedIndex = thread.kind === 'local' ? pinnedOrder.get(thread.session.id) : undefined
-        const statusEntry = { thread, status, cameBackAt: transitionClock.current(sessionId, status.group, status.since, now) }
+        // A turn-end burst moves the row once, after its new group held for a moment; its glyph updates at once.
+        const group = groupSettler.current.groupOf(sessionId, status.group)
+        const settled = group === status.group ? status : { ...status, group }
+        const statusEntry = { thread, status: settled, cameBackAt: transitionClock.current(sessionId, group, status.since, now) }
         return pinnedIndex === undefined ? statusEntry : { ...statusEntry, pinnedIndex }
       })
       return ThreadStatusModel.groupEntries(statusEntries).map(group => ({
@@ -4523,6 +5182,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     pinnedIdList,
   ])
+  // A row whose group change waits to settle moves once it held: look again then.
+  useEffect(() => {
+    const wakeAt = groupSettler.current.wakeAt()
+    if (wakeAt === undefined) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, wakeAt - Date.now()))
+    return () => clearTimeout(timer)
+  }, [liveGroupedThreadEntries])
   // While the pointer is over the list or focus is in it, rows hold their places (plan Q2 T2.2); see held-groups.ts.
   const [heldGroups, setHeldGroups] = useState<HeldGroups | null>(null)
   const holding = useRef({ hover: false, focus: false })
@@ -4788,26 +5454,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
 
-  /**
-   * A row's inline verb. Answer and Approve open the thread, where the question or approval card is answered in place;
-   * Retry, Resume and Land on an inbox item run that item's provider verb through the inbox, exactly as the Inbox page
-   * does; a Resume the sidebar itself classified (interrupted turn) resumes it here.
-   */
+  /** A row's inline verb: `RowVerb.actionOf` decides what it does. */
   const actOnStatus = (sessionId: SessionSummary['id'], status: ThreadStatus): void => {
-    const verb = status.verb
-    if (verb === undefined || verb === 'Answer' || verb === 'Approve') {
+    const action = RowVerb.actionOf(status, { recovering: recoverySessionIds.has(sessionId), landConfirm: props.confirmLand !== undefined })
+    if (action.kind === 'open') {
       openThread(sessionId)
       return
     }
-    if (status.itemId === undefined) {
-      if (verb === 'Resume' && recoverySessionIds.has(sessionId)) void resumeRecoverySession(sessionId)
-      else openThread(sessionId)
+    if (action.kind === 'confirm-land') {
+      if (props.confirmLand?.(sessionId) !== true) openThread(sessionId)
       return
     }
-    const itemId = status.itemId
+    if (action.kind === 'resume') {
+      void resumeRecoverySession(sessionId)
+      return
+    }
     const act = async (): Promise<void> => {
       try {
-        const outcome = await inbox.act(itemId, verb)
+        const outcome = await inbox.act(action.itemId, action.verb)
         setNotice({ tone: outcome.ok ? 'success' : 'warning', message: outcome.message })
       } catch {
         setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarVerbFailed') })
@@ -5062,6 +5726,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const childRowCacheRef = useRef<ThreadChildRowCache | null>(null)
   childRowCacheRef.current ??= createThreadChildRowCache()
   const childRowCache = childRowCacheRef.current
+  const launchOrderCache = useRef(new Map<SessionSummary['id'], readonly string[]>())
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
 
@@ -5148,7 +5813,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const listVerb = (apply: (sessionIds: readonly string[]) => () => void): false | undefined => {
     const sessionIds = listTargets()
     if (sessionIds.length === 0) return false
+    const list = scrollAreaRef.current
+    const before =
+      list === null
+        ? undefined
+        : { orderedIds: ThreadListNavigationModel.visibleRows(list).map(row => row.id), focusedId: ThreadListNavigationModel.focusedRowId(list) }
     listUndo.current = apply(sessionIds)
+    // Done or Snooze moves the focused row away: focus the next row, never the page body (D15).
+    if (list !== null && before !== undefined) ThreadListNavigationModel.keepFocusInList(list, before)
     return undefined
   }
   const moveListFocus = (direction: 1 | -1, extend: boolean): false | undefined => {
@@ -5648,10 +6320,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // The open thread stays mounted wherever it moved, so arrow-key switching can put focus back on it.
     pinnedThreadIds: [activeRowDrag?.sessionId, selectedSession?.id],
     revealThreadId,
-    estimateSize: rowStyle.density === 'compact' ? 34 : 50,
+    // A row and its 6px gap (round five T1).
+    estimateSize: rowStyle.density === 'compact' ? 40 : 56,
     enabled: !isBoard,
   }
   const savedProjectChipOf = useSavedProjectChip()
+  // The command palette paints project marks with the colours these rows use (round two, item 13).
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    return PaletteBridge.addProjectColors(PaletteProjectColorsModel.sourceOf({ savedChipOf: savedProjectChipOf, palette: preferences.projectColorPalette }))
+  }, [isPrimarySurface, preferences.projectColorPalette, savedProjectChipOf])
+  // Each parent's subagent catalog in launch order, the same array while it is unchanged so the row's memo holds.
+  const childLaunchOrder = (parentId: SessionSummary['id']): readonly string[] | undefined => {
+    const catalog = sessionState.projectionsBySession[parentId]?.values.subagentCatalog
+    if (catalog === undefined) return undefined
+    const next = [...catalog].sort((left, right) => left.createdAt - right.createdAt).map(entry => entry.id)
+    const cached = launchOrderCache.current.get(parentId)
+    if (cached !== undefined && cached.length === next.length && cached.every((id, index) => id === next[index])) return cached
+    launchOrderCache.current.set(parentId, next)
+    return next
+  }
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
@@ -5694,7 +6382,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
         workspacePath={workspacePath}
-        projectChipClassName={savedProjectChip?.className}
+        projectChipTone={savedProjectChip?.tone}
         projectChipColor={savedProjectChip?.color}
         ownWorkspaceName={ownWorkspace?.name}
         ownWorkspacePath={ownWorkspace?.path}
@@ -5714,6 +6402,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         rowActions={rowActionButtons}
         childThreads={childRow.live}
         finishedChildThreads={childRow.finished}
+        childLaunchOrder={childLaunchOrder(session.id)}
         childrenOpen={shouldOpenChildThreadList({ children: childRow.listed, override: childrenOpenOverrides.get(session.id) })}
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={childRow.selectedChildId}
@@ -5724,6 +6413,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         // A project section's header already carries the mark; elsewhere every row leads with its project's mark.
         projectMark={threadView.groupBy !== 'project'}
         liveTurn={session.running ? liveTurns.get(session.id) : undefined}
+        runningJobs={runningJobs.get(session.id)}
         notifyTarget={
           !subscriptions.available || selectedSession === undefined || selectedSession.id === session.id
             ? undefined
@@ -5855,16 +6545,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
-  // The Filter menu's View section (productivity pass Q5, T5.3): the active view, its short label for the trigger, and
+  // The Filter menu's View section (productivity pass Q5, T5.3): the active view, and
   // the threads it matches for Mark view read / unread.
   const headerExtras = useSyncExternalStore(ListHeaderExtras.subscribe, ListHeaderExtras.get, () => ListHeaderExtras.empty)
   const activeViewTab = viewTabs.find(tab => tab.view.id === listThreadView.id)
-  const activeViewShortLabel =
-    activeViewTab === undefined
-      ? props.tSidebar('threadSidebarAllShort')
-      : activeViewTab.view.id === ALL_THREADS_VIEW_ID && activeViewTab.label === props.tSidebar('threadSidebarAllThreads')
-        ? props.tSidebar('threadSidebarAllShort')
-        : activeViewTab.label
   // The trigger's accessible name after "Filter: ": the active preset ("Needs you (edited)"), or with presets off the
   // filters themselves, as before b:xpvk.
   const activePresetLabel = activeViewTab?.label ?? props.tSidebar('threadSidebarAllThreads')
@@ -5873,30 +6557,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     : presetEdited
       ? props.tSidebar('threadSidebarPresetEdited', { name: activePresetLabel })
       : activePresetLabel
-  const activeViewThreadIds =
-    activeViewTab === undefined
-      ? []
-      : threadViewAttentionEntries
-          .filter(entry =>
-            ThreadViewModel.matchesAttentionView(entry, { filters: activeViewTab.view.statusFilters, sourceFilter: activeViewTab.view.sourceFilter }),
-          )
-          .map(entry => entry.thread.id)
+  // The rows the list draws now (council round 32, item 4): what Mark … shown as read / unread act on and count, the
+  // same rows the live region counts, edited filters included.
+  const shownThreadIds = visibleThreadEntries.map(entry => entry.session.id)
   const clearActiveViewUnread = (): void => {
-    const entries = activeViewThreadIds.flatMap(sessionId => {
+    const entries = shownThreadIds.flatMap(sessionId => {
       const record = attention.records.get(sessionId)
       return record === undefined ? [] : [{ sessionId, version: record.version }]
     })
     if (entries.length > 0) attention.clearUnreadMany(entries)
   }
   const markActiveViewUnread = (): void => {
-    const sessionIds = activeViewThreadIds.filter(sessionId => !attention.records.has(sessionId))
+    const sessionIds = shownThreadIds.filter(sessionId => !attention.records.has(sessionId))
     if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
   }
   const listFiltered = listThreadView.id !== ALL_THREADS_VIEW_ID || activeFilterLabels.length > 0 || presetEdited
-  const statusFilterSummary =
-    threadView.statusFilters.length === 0
-      ? props.tSidebar('threadSidebarFilterNone')
-      : threadView.statusFilters.map(filter => props.tSidebar(threadStatusFilterLabelKeys[filter])).join(' · ')
 
   // `notify_user`: the agent's own message, routed through its own “Agent messages” category.
   const userNotifications = useApi(userNotificationApi)
@@ -5930,6 +6605,287 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       />
     )
 
+  // The list's one Filter menu: beside the project picker on a desktop, the scope button in the search row on a phone
+  // (council round 10 B1), where it also holds the project.
+  const scopeSlot = headerExtras.scopeSlot
+  const scopeInput = {
+    filterCount: ThreadListScope.filterCount({ filtered: listFiltered, filterLabels: activeFilterLabels.length }),
+    project: projectFilterValue === ALL_PROJECTS ? null : projectFilterLabel,
+    filters: props.tSidebar('threadSidebarFilters'),
+  }
+  const scopeCount = ThreadListScope.count(scopeInput)
+  // The Filter panel (round nine, owner annotation): one level instead of five submenus, every value shown where it
+  // sits, a change applied at once beside the list; a footer for the list's other places; a phone sheet (the kit's).
+  const closeFilterThen =
+    (action: () => void): (() => void) =>
+    () => {
+      setFilterOpen(false)
+      action()
+    }
+  // Each verb counts the rows it changes, and hides when it would change none (council round 34, B11): "Mark 5 shown as
+  // read" over 5 rows of which 2 were unread promised three changes it never made.
+  const markCounts = markShownCounts(shownThreadIds, sessionId => attention.records.has(sessionId))
+  const markViewActions: ListFilterAction[] = [
+    ...(markCounts.toRead > 0
+      ? [{ id: 'mark-read', label: plural(props.tSidebar, 'threadSidebarMarkShownRead', markCounts.toRead), icon: null, disabled: !attention.available, onSelect: clearActiveViewUnread }]
+      : []),
+    ...(markCounts.toUnread > 0
+      ? [{ id: 'mark-unread', label: plural(props.tSidebar, 'threadSidebarMarkShownUnread', markCounts.toUnread), icon: null, disabled: !attention.available, onSelect: markActiveViewUnread }]
+      : []),
+  ]
+  const filterActions: ListFilterAction[] = [
+    // With presets on, the preset's own menu holds these.
+    ...(presetsOn ? [] : markViewActions),
+    ...headerExtras.sections.map(section => ({ id: section.panelId, label: section.label, icon: section.icon, onSelect: closeFilterThen(section.open) })),
+    {
+      id: 'thread-list-settings',
+      label: props.tSidebar('threadSidebarThreadListSettings'),
+      icon: <Settings2Icon />,
+      onSelect: closeFilterThen(() => setSettingsOpen(current => !current)),
+    },
+    ...(headerExtras.customize === undefined
+      ? []
+      : [{ id: 'customize', label: headerExtras.customize.label, icon: <SlidersHorizontalIcon />, onSelect: closeFilterThen(headerExtras.customize.toggle) }]),
+  ]
+  const projectNarrowed = scopeSlot !== null && projectFilterValue !== ALL_PROJECTS
+  /**
+   * Reset: All threads with no filter on, the grouping kept (it sits below Reset, in the panel's Display section), and in
+   * the phone sheet, which holds the project, All projects.
+   */
+  const resetListFilters = (): void => {
+    const reset = ThreadViewPreferencesModel.resetThreadViewFilters(threadViewSettings)
+    const threadViews = ThreadViewPreferencesModel.updateThreadViewSettings(reset.settings)
+    changePreferences(projectNarrowed ? { threadViews, workspaceFilter: null } : reset.workspaceFilter === undefined ? { threadViews } : { threadViews, workspaceFilter: reset.workspaceFilter })
+  }
+  const resetDisabled = activeFilterLabels.length === 0 && !projectNarrowed
+  /** Save the current filters as a new preset: the name prompt, or the limit's warning. */
+  const saveFiltersAsPreset = (): void => {
+    if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+      return
+    }
+    setFilterOpen(false)
+    setPresetPrompt({ mode: 'create' })
+  }
+  // The built-in All threads is never renamed, overwritten or deleted (council round 28, item 13).
+  const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID
+  const presetOptionsMenu = (
+    <PresetOptionsMenu
+      t={props.tSidebar}
+      label={activeViewTab?.label ?? ''}
+      builtIn={activeIsBuiltIn}
+      edited={presetEdited}
+      canDelete={!(threadViewSettings.views.length === 1 || viewTabs.length === 1)}
+      onSaveAs={saveFiltersAsPreset}
+      onRename={closeFilterThen(() =>
+        setPresetPrompt({
+          mode: 'rename',
+          viewId: listThreadView.id,
+          name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
+        }),
+      )}
+      onSaveChanges={() => savePresetChanges()}
+      onDelete={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
+      onManage={closeFilterThen(() => setViewsManagerOpen(true))}
+      markActions={markViewActions}
+    />
+  )
+  const filterPanelStyle: FilterPanelRoomStyle | undefined = filterPanelRoom === null ? undefined : { '--filter-panel-room': `${String(filterPanelRoom)}px` }
+  // The trigger's full name: "Filter: All threads (edited), 2 filters on". Also its tooltip on a desktop, where the button
+  // shows a badge and a truncating name (council round 32, item 1).
+  const filterTriggerLabel = `${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}`
+  // Only when it adds something, never on the focus the closing panel gives back (council round 34, A4).
+  const filterTip = useFilterTriggerTip({
+    panelOpen: filterOpen,
+    enabled: scopeSlot === null && !coarsePointer(),
+    adds: () => filterTriggerTipAdds({ count: scopeCount, edited: presetEdited, truncated: textTruncated(filterTriggerNameRef.current) }),
+  })
+  const filterMenu = (
+    <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+      {/* The desktop trigger's tooltip says its whole name; the phone scope button shows no tooltip. */}
+      <Tooltip open={filterTip.open} onOpenChange={filterTip.onOpenChange}>
+      <TooltipTrigger asChild>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          // The kit quiet secondary (council round 18 B1.4): the one look for an action beside a search field, the trigger
+          // fill and hairline with its label in secondary ink, ink while the menu is open, whether or not a filter is on.
+          ref={filterTriggerRef}
+          variant="quiet"
+          size="field"
+          data-thread-list-filter=""
+          data-filtered={listFiltered ? '' : undefined}
+          // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
+          data-thread-list-view-button=""
+          // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
+          // Radix's trigger opens its menu on ArrowDown unless the event is prevented first.
+          onKeyDown={event => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+            navigateThreadList(event.nativeEvent)
+            event.preventDefault()
+          }}
+          className={
+            scopeSlot === null
+              ? 'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'
+              : // The phone scope button: the funnel, "Filters" or the project, and the count of filters on; as wide as
+                // its words, at most 45% of the row.
+                'dshx:w-full dshx:min-w-0 dshx:gap-2 dshx:px-3'
+          }
+          // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
+          // filters it holds; the Status and Source rows inside the menu still spell those out. The phone scope button
+          // adds the project it holds.
+          // …and how many filters are on, as the count beside it shows (council round 29, item 11): "Filter: All threads,
+          // 2 filters on".
+          aria-label={filterTriggerLabel}
+          // The tooltip repeats the name: no description that restates it (round-33 follow-ups, item 1).
+          aria-describedby={undefined}
+          onPointerLeave={filterTip.release}
+          onBlur={filterTip.release}
+          data-preset-edited={presetEdited ? '' : undefined}
+          data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
+          data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
+        >
+          {scopeSlot === null && scopeCount !== null ? (
+            // On a desktop with filters on, the count takes the funnel's slot (council round 31, item 1): a 16px filter
+            // badge, so it reads as filters on, not as a result count, and the name gets the funnel's room ("All threads").
+            // Its fill is the ink at 20% (council round 32, item 1: bg-muted sat ~1.05:1 on the button): 1.5:1 off the
+            // button in light, 1.8:1 in dark, the numeral 9.4:1 / 6.8:1 on it.
+            <span
+              aria-hidden="true"
+              data-testid="thread-scope-count"
+              className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)] dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
+            >
+              {scopeCount}
+            </span>
+          ) : (
+            <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          )}
+          {/* The preset's full name, \"All threads\" not \"All\" (council round 30, item 2: \"All 2\" read as two results), in the
+              ink while the count pill beside it says filters are on. */}
+          <span ref={filterTriggerNameRef} className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>
+            {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
+          </span>
+          {scopeSlot !== null && scopeCount !== null ? (
+            // The phone's "Filters 2" (council round 11 B2): a neutral pill after the word (council round 29, item 11).
+            <Badge
+              aria-hidden="true"
+              data-testid="thread-scope-count"
+              className="dshx:h-4 dshx:min-w-4 dshx:rounded-full dshx:border-transparent dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)] dshx:px-1.25 dshx:py-0 dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
+            >
+              {scopeCount}
+            </Badge>
+          ) : null}
+          {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
+          {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
+        </Button>
+      </PopoverTrigger>
+      </TooltipTrigger>
+      {/* Beside the trigger, over the transcript, so it never covers the rows (round-33 follow-ups, item 1). */}
+      <TooltipContent side="right" align="center" sideOffset={6} data-thread-list-filter-tooltip="">
+        {filterTriggerLabel}
+      </TooltipContent>
+      </Tooltip>
+      <PopoverContent
+        // Beside the list on a desktop, so the rows it filters stay in view; the kit makes it the bottom sheet on a phone.
+        side="right"
+        align="start"
+        sideOffset={8}
+        collisionPadding={FILTER_PANEL_COLLISION_PADDING}
+        style={filterPanelStyle}
+        // Open on the preset in force, not on the first focusable control, the presets' ⋯ (round 28, item 14).
+        onOpenAutoFocus={event => {
+          const target = event.currentTarget instanceof HTMLElement ? filterPanelInitialFocus(event.currentTarget) : null
+          if (target === null) return
+          event.preventDefault()
+          target.focus()
+        }}
+        aria-label={props.tSidebar('threadSidebarFilters')}
+        // The phone sheet opens taller than the kit's 72dvh, so both Status rows show with three presets (round 28, item 10).
+        // A column that holds still: the panel inside scrolls under its sticky header (round 29, item 7).
+        // Its top holds on a desktop: no taller than the room below the trigger (round 31, item 7).
+        className="dshx-root dshx:flex dshx:max-h-[min(var(--radix-popover-content-available-height),var(--filter-panel-room,100dvh))] dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:overflow-hidden dshx:p-0 dshx:phone:max-h-[85dvh]! dshx:phone:overflow-hidden!"
+      >
+        <ListFilterPanel
+          t={props.tSidebar}
+          project={
+            scopeSlot === null ? undefined : (
+              <Combobox
+                contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
+                emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
+                label={props.tSidebar('threadSidebarProjectFilter')}
+                onValueChange={selectProject}
+                options={projectOptions}
+                searchAbove={0}
+                searchLabel={props.tSidebar('threadSidebarProjectSearch')}
+                searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
+                // One inline row, "Project · All projects ›", a list row rather than a field (round 28, item 10).
+                triggerClassName="dshx:h-11 dshx:w-full dshx:min-w-0 dshx:rounded-md dshx:border-transparent dshx:bg-transparent dshx:px-0 dshx:hover:border-transparent dshx:hover:bg-accent"
+                triggerContent={
+                  <span className="dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2" data-thread-project-row="">
+                    <FolderIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                    <span className="dshx:shrink-0 dshx:text-foreground">{props.tSidebar('threadSidebarGroupProject')}</span>
+                    <span className="dshx:ml-auto dshx:min-w-0 dshx:truncate dshx:text-right dshx:text-muted-foreground">{projectFilterLabel}</span>
+                    <ChevronRightIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                  </span>
+                }
+                value={projectFilterValue}
+              />
+            )
+          }
+          presets={
+            presetsOn
+              ? {
+                  items: viewTabs.map(({ view, label }) => {
+                    // An edited preset counts what the list draws now (council round 29, item 6), in its row and its name.
+                    const count = view.id === listThreadView.id && presetEdited ? visibleThreadEntries.length : (presetTallies.get(view.id) ?? null)
+                    return { id: view.id, label, count: view.showCount === false ? null : count }
+                  }),
+                  activeId: listThreadView.id,
+                  edited: presetEdited,
+                  onApply: selectThreadViewPreset,
+                  onSaveChanges: () => savePresetChanges(),
+                  onDiscard: () => selectThreadViewPreset(listThreadView.id),
+                  builtInId: ALL_THREADS_VIEW_ID,
+                  onSaveAs: saveFiltersAsPreset,
+                  options: presetOptionsMenu,
+                }
+              : undefined
+          }
+          status={showFilterControl ? { selected: threadView.statusFilters, onChange: statusFilters => updateThreadView({ statusFilters }) } : undefined}
+          source={showFilterControl ? { value: threadView.sourceFilter, onChange: sourceFilter => updateThreadView({ sourceFilter }) } : undefined}
+          sourceLabels={{
+            all: { short: props.tSidebar('threadSidebarAllShort'), name: props.tSidebar(threadSourceFilterLabelKeys.all) },
+            main: { short: props.tSidebar('threadSidebarFilterMainShort'), name: props.tSidebar(threadSourceFilterLabelKeys.main) },
+            // Label in name (council round 28, item 17): the visible "Subagents" is its name.
+            subagents: { short: props.tSidebar('threadSidebarFilterSubagentsShort'), name: props.tSidebar('threadSidebarFilterSubagentsShort') },
+          }}
+          group={
+            showGroupControl
+              ? {
+                  value: threadView.groupBy,
+                  options: ThreadBoardViewModel.groupingsOf(false),
+                  labels: {
+                    state: { short: props.tSidebar(threadGroupLabelKeys.state), name: props.tSidebar(threadGroupLabelKeys.state) },
+                    project: { short: props.tSidebar(threadGroupLabelKeys.project), name: props.tSidebar(threadGroupLabelKeys.project) },
+                    date: { short: props.tSidebar(threadGroupLabelKeys.date), name: props.tSidebar(threadGroupLabelKeys.date) },
+                    // "Manual" so the five fit one segmented row; its name stays "Arrange manually".
+                    // Label in name (council round 31, item 6): the visible "Custom" leads its name.
+                    status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar('threadSidebarGroupManualName') },
+                    none: { short: props.tSidebar(threadGroupLabelKeys.none), name: props.tSidebar(threadGroupLabelKeys.none) },
+                  },
+                  onChange: groupBy => updateThreadView({ groupBy }),
+                }
+              : undefined
+          }
+          reset={{ disabled: resetDisabled, onReset: resetListFilters }}
+          onDone={() => setFilterOpen(false)}
+          shown={plural(props.tSidebar, 'threadSidebarFilterShown', visibleThreadEntries.length)}
+          actions={filterActions}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+
   return (
     <TooltipProvider delayDuration={500}>
       <section
@@ -5958,7 +6914,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
                 triggerClassName={cn(
-                  'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
+                  'dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
                   isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
                 )}
                 triggerContent={
@@ -6140,7 +7096,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
                       <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
                       <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                        {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                        {ThreadBoardViewModel.groupingsOf(isBoard).map(groupBy => (
                           <DropdownMenuRadioItem key={groupBy} value={groupBy}>
                             {props.tSidebar(threadGroupLabelKeys[groupBy])}
                           </DropdownMenuRadioItem>
@@ -6212,8 +7168,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // Productivity pass Q5 (T5.3): above the first row the list keeps the project picker and one Filter menu; the
           // views, grouping, status and source filters, the Threads pages (Board) and both settings live in that menu.
           // The trigger keeps the former filter button's accessible name, "Filter: <active filters>".
-          <header className="dshx:px-2 dshx:py-1">
-            <div className="dshx:flex dshx:items-center dshx:gap-1">
+          // On touch the row sits 4px under the 44px search and directly over the first group head (council round 6 B8).
+          // The phone shell grid (round nine B4): fields fill from the 12px gutter, 8px under the search (its own padding)
+          // and about 12px over the first group head's label (6px here, the head's own half-leading the rest).
+          // On a phone (council round 10 B1) the row is gone: the Filter menu is the scope button in the search row, and
+          // the header keeps only the preset chips when they are on.
+          <header
+            className={
+              scopeSlot === null ? 'dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5' : 'dshx:px-3 dshx:pb-1.5 dshx:empty:hidden'
+            }
+          >
+            {/* Filter-row grammar (council round 8 B2): beside the search field, both value-showing triggers take the field
+                look, 8px apart; their values in ink at the body weight. */}
+            {scopeSlot !== null ? createPortal(filterMenu, scopeSlot) : (
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
               <Combobox
                 contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
                 emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
@@ -6223,7 +7191,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchAbove={0}
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
-                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent"
+                // The kit trigger's one control height, as the search (round nine B5); on a phone its value at the 24px
+                // text edge.
+                triggerClassName="dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:phone:px-3"
                 triggerContent={
                   <>
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
@@ -6234,295 +7204,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 }
                 value={projectFilterValue}
               />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={listFiltered ? 'secondary' : 'ghost'}
-                    size="sm"
-                    data-thread-list-filter=""
-                    // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
-                    data-thread-list-view-button=""
-                    // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
-                    // Radix's trigger opens its menu on ArrowDown unless the event is prevented first.
-                    onKeyDown={event => {
-                      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                      navigateThreadList(event.nativeEvent)
-                      event.preventDefault()
-                    }}
-                    className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
-                    // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
-                    // filters it holds; the Status and Source rows inside the menu still spell those out.
-                    aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}`}
-                    data-preset-edited={presetEdited ? '' : undefined}
-                  >
-                    <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                    <span className="dshx:truncate">{presetsOn ? activeViewShortLabel : activeFilterSummary}</span>
-                    {presetEdited ? (
-                      <span
-                        aria-hidden="true"
-                        data-testid="thread-preset-edited-dot"
-                        className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
-                      />
-                    ) : null}
-                    {activeViewTab?.attentionLabel === undefined ? null : (
-                      <StatusDot
-                        size="sm"
-                        data-testid="thread-view-attention-dot"
-                        className={cn(
-                          ThreadAttentionPresentationModel.attentionDotClass({
-                            attentionLabel: activeViewTab.attentionLabel,
-                            attentionColors: preferences.attentionColors,
-                            unread: false,
-                            running: false,
-                          }),
-                        )}
-                      />
-                    )}
-                    {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
-                    {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-56 dshx:overflow-y-auto"
-                >
-                  {presetsOn ? (
-                    // Filter presets (b:xpvk): first in the menu, one click to apply, the active one checked.
-                    <DropdownMenuGroup aria-label={props.tSidebar('threadSidebarPresets')} data-thread-presets="">
-                      <DropdownMenuLabel>{props.tSidebar('threadSidebarPresets')}</DropdownMenuLabel>
-                      <DropdownMenuRadioGroup value={presetEdited ? '' : listThreadView.id} onValueChange={selectThreadViewPreset}>
-                        {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
-                          <DropdownMenuRadioItem
-                            key={view.id}
-                            value={view.id}
-                            // The former view tab's accessible name: "Done (1), Turn finished".
-                            aria-label={
-                              attentionLabel === undefined && visibleCount === null
-                                ? label
-                                : `${label}${visibleCount === null ? '' : ` (${visibleCount})`}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
-                            }
-                            data-thread-list-view-button=""
-                            data-preset-active={view.id === listThreadView.id ? '' : undefined}
-                            // An edited preset stays marked as the one the edits started from.
-                            className={cn(presetEdited && view.id === listThreadView.id && 'dshx:font-medium')}
-                          >
-                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
-                            {presetEdited && view.id === listThreadView.id ? (
-                              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarPresetEditedShort')}</span>
-                            ) : null}
-                            {attentionLabel === undefined ? null : (
-                              <StatusDot
-                                size="sm"
-                                data-testid="thread-view-attention-dot"
-                                className={cn(
-                                  ThreadAttentionPresentationModel.attentionDotClass({
-                                    attentionLabel,
-                                    attentionColors: preferences.attentionColors,
-                                    unread: false,
-                                    running: false,
-                                  }),
-                                )}
-                              />
-                            )}
-                            {visibleCount === null ? null : <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{visibleCount}</span>}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                      {presetEdited ? (
-                        <>
-                          <DropdownMenuItem data-preset-save-changes="" onSelect={() => savePresetChanges()}>
-                            <SaveIcon aria-hidden="true" />
-                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                              {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
-                            </span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => selectThreadViewPreset(listThreadView.id)}>
-                            <RotateCcwIcon aria-hidden="true" />
-                            {props.tSidebar('threadSidebarPresetDiscardChanges')}
-                          </DropdownMenuItem>
-                        </>
-                      ) : null}
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          threadViewSettings.views.length >= MAX_THREAD_VIEWS
-                            ? setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
-                            : setPresetPrompt({ mode: 'create' })
-                        }
-                      >
-                        <BookmarkPlusIcon aria-hidden="true" />
-                        {props.tSidebar('threadSidebarPresetSaveAs')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}>
-                          <PencilIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarPresetOptions')}</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
-                          <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              setPresetPrompt({
-                                mode: 'rename',
-                                viewId: listThreadView.id,
-                                name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
-                              })
-                            }
-                          >
-                            {props.tSidebar('threadSidebarPresetRename')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
-                            {props.tSidebar('threadSidebarPresetUpdate')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
-                            onSelect={() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' })}
-                          >
-                            {props.tSidebar('threadSidebarPresetDelete')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
-                            onSelect={clearActiveViewUnread}
-                          >
-                            {props.tSidebar('threadSidebarMarkViewRead')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
-                            {props.tSidebar('threadSidebarMarkViewUnread')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => setViewsManagerOpen(true)}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                    </DropdownMenuGroup>
-                  ) : (
-                    <>
-                      <DropdownMenuItem
-                        disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
-                        onSelect={clearActiveViewUnread}
-                      >
-                        {props.tSidebar('threadSidebarMarkViewRead')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
-                        {props.tSidebar('threadSidebarMarkViewUnread')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {showGroupControl ? (
-                    // One click to see the list by project (polish pass b:r4et); unchecking returns to the default Status grouping.
-                    <DropdownMenuCheckboxItem
-                      checked={threadView.groupBy === 'project'}
-                      data-thread-group-by-project=""
-                      onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
-                    >
-                      <FolderIcon aria-hidden="true" />
-                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
-                    </DropdownMenuCheckboxItem>
-                  ) : null}
-                  {showGroupControl ? (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger
-                        aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
-                      >
-                        <LayersIcon aria-hidden="true" />
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                          {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
-                        </span>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarGroupBy')}>
-                        <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                          {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
-                            <DropdownMenuRadioItem key={groupBy} value={groupBy}>
-                              {props.tSidebar(threadGroupLabelKeys[groupBy])}
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  ) : null}
-                  {showFilterControl ? (
-                    <>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarFilterStatus')}: ${statusFilterSummary}`}>
-                          <ListFilterIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                            {props.tSidebar('threadSidebarFilterStatus')}: {statusFilterSummary}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-52 dshx:overflow-y-auto"
-                          aria-label={props.tSidebar('threadSidebarFilterStatus')}
-                        >
-                          <DropdownMenuCheckboxItem
-                            checked={threadView.statusFilters.length === 0}
-                            onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
-                            onSelect={event => event.preventDefault()}
-                          >
-                            {props.tSidebar(threadStatusFilterLabelKeys.all)}
-                          </DropdownMenuCheckboxItem>
-                          {THREAD_STATUS_FILTER_GROUPS.map(group => (
-                            <div key={group.id}>
-                              <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
-                              {group.filters.map(filter => (
-                                <DropdownMenuCheckboxItem
-                                  checked={threadView.statusFilters.includes(filter)}
-                                  key={filter}
-                                  onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
-                                  onSelect={event => event.preventDefault()}
-                                >
-                                  {props.tSidebar(threadStatusFilterLabelKeys[filter])}
-                                </DropdownMenuCheckboxItem>
-                              ))}
-                            </div>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger
-                          aria-label={`${props.tSidebar('threadSidebarFilterSource')}: ${props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}`}
-                        >
-                          <UsersIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                            {props.tSidebar('threadSidebarFilterSource')}: {props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarFilterSource')}>
-                          <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
-                            {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
-                              <DropdownMenuRadioItem key={filter} value={filter}>
-                                {props.tSidebar(threadSourceFilterLabelKeys[filter])}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </>
-                  ) : null}
-                  <DropdownMenuSeparator />
-                  {headerExtras.sections.map(section => (
-                    <DropdownMenuItem key={section.panelId} data-section={section.panelId} onSelect={section.open}>
-                      <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center" aria-hidden="true">
-                        {section.icon}
-                      </span>
-                      {section.label}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuItem onSelect={() => setSettingsOpen(current => !current)}>
-                    <Settings2Icon aria-hidden="true" />
-                    {props.tSidebar('threadSidebarThreadListSettings')}
-                  </DropdownMenuItem>
-                  {headerExtras.customize === undefined ? null : (
-                    <DropdownMenuItem onSelect={headerExtras.customize.toggle}>
-                      <SlidersHorizontalIcon aria-hidden="true" />
-                      {headerExtras.customize.label}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {filterMenu}
             </div>
+            )}
             {presetsOn && threadViewSettings.showPresetChips ? (
               <PresetChips
                 presets={viewTabs.map(tab => ({ id: tab.view.id, label: tab.label }))}
@@ -6776,34 +7460,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <div
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
+          onScroll={event => ListFade.restore(event.currentTarget)}
           data-shortcut-scope={isBoard ? undefined : 'list'}
           onPointerEnter={() => holdOrder('hover', true)}
           onPointerLeave={() => holdOrder('hover', false)}
-          onFocus={() => holdOrder('focus', true)}
+          onFocus={event => {
+            if (HeldGroupsModel.holdsOnFocus(event.target)) holdOrder('focus', true)
+          }}
           onBlur={event => {
             if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) holdOrder('focus', false)
           }}
           // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
-          // scrolls past its controls instead of squeezing the list to a sliver no row fits in.
-          className={cn('dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
+          // scrolls past its controls instead of squeezing the list to a sliver no row fits in. A row scrolled to the
+          // status bar thins out under a 24px fade (round five C5) instead of being cut; the list ends in padding as deep
+          // as the fade, so the last row, scrolled to the end, is never under it (round nine B6). A phone fades only 14px
+          // (council round 7 B4): the line above the tab bar reads instead of fading out.
+          className={cn(
+            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
+            // A selected row inside the fade zone switches the fade off (`ListFade`, round nine B6).
+            'dshx:data-[fade-off]:[mask-image:none]',
+            isBoard && 'dshx:p-4 dshx:[mask-image:none]',
+          )}
           onKeyDown={event => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}
         >
-          {heldUpdates > 0 ? (
-            <div className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:justify-center dshx:py-1">
-              <Button
-                size="xs"
-                variant="outline"
-                data-held-updates=""
-                className="dshx:rounded-full dshx:bg-background dshx:tabular-nums dshx:shadow-s1"
-                aria-label={`${tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}. ${tSidebar('threadSidebarHeldUpdatesHint')}`}
-                onClick={showHeldUpdates}
-              >
-                {tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}
-              </Button>
-            </div>
-          ) : null}
+          {isBoard ? null : (
+            <HeldUpdatesPill
+              count={heldUpdates}
+              label={count => tSidebar('threadSidebarHeldUpdates', { count })}
+              hint={tSidebar('threadSidebarHeldUpdatesHint')}
+              onShow={showHeldUpdates}
+            />
+          )}
           {peekSession === undefined ? null : (
             <RowPeek anchor={peekAnchor} open onOpenChange={open => (open ? undefined : setPeekId(null))}>
               <PeekCard
@@ -6861,44 +7550,40 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           {hoistedInterruptedRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInterrupted')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInterrupted', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarInterrupted')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({hoistedInterruptedRows.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
-                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
-                  {props.tSidebar('threadSidebarResumeAll')}
-                </Button>
-              </div>
-              <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarInterruptedHint')}</p>
+              {/* The standard group head (council round 34, B10): a muted label and its status count, not a coloured word. */}
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarInterrupted')}
+                count={hoistedInterruptedRows.length}
+                statusCounts={{ needsYou: 0, failed: hoistedInterruptedRows.length }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+                action={
+                  <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
+                    {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                    {props.tSidebar('threadSidebarResumeAll')}
+                  </Button>
+                }
+              >
+                <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground dshx:phone:px-3">{props.tSidebar('threadSidebarInterruptedHint')}</p>
+              </ThreadGroupHeader>
               {hoistedInterruptedRows.map(session => renderThreadRow(session, 'threadSidebarInterrupted'))}
             </section>
           ) : null}
           {hoistedNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarNeedsResume')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({hoistedNeedsResumeRows.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
-                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
-                  {props.tSidebar('threadSidebarResumeAll')}
-                </Button>
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarNeedsResume')}
+                count={hoistedNeedsResumeRows.length}
+                statusCounts={{ needsYou: hoistedNeedsResumeRows.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+                action={
+                  <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
+                    {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                    {props.tSidebar('threadSidebarResumeAll')}
+                  </Button>
+                }
+              />
               {hoistedNeedsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
             </section>
           ) : null}
@@ -6941,56 +7626,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarApprovalNeeded', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarApprovalNeeded')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.approvalNeeded.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarApprovalNeeded')}
+                count={groupedAttentionRows.approvalNeeded.length}
+                statusCounts={{ needsYou: groupedAttentionRows.approvalNeeded.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.approvalNeeded.map(session => renderThreadRow(session, 'threadSidebarApprovalNeeded'))}
             </section>
           ) : null}
           {groupedAttentionRows.inputNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInputNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInputNeeded', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarInputNeeded')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.inputNeeded.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarInputNeeded')}
+                count={groupedAttentionRows.inputNeeded.length}
+                statusCounts={{ needsYou: groupedAttentionRows.inputNeeded.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.inputNeeded.map(session => renderThreadRow(session, 'threadSidebarInputNeeded'))}
             </section>
           ) : null}
           {groupedAttentionRows.turnFinished.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarTurnFinished')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarTurnFinished', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarTurnFinished')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.turnFinished.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarTurnFinished')}
+                count={groupedAttentionRows.turnFinished.length}
+                status="ready"
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.turnFinished.map(session => renderThreadRow(session, 'threadSidebarTurnFinished'))}
             </section>
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
+            {threadView.groupBy === 'status' ? (
+              <span id={sectionReorderHintId} className="dshx:sr-only">
+                {props.tSidebar('threadSidebarSectionReorderHint')}
+              </span>
+            ) : null}
             {threadView.groupBy === 'status'
               ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
                   if (section === 'remote') {
@@ -7064,77 +7739,66 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       data-thread-board-column={isBoard ? section : undefined}
                       aria-label={isBoard ? `${props.tSidebar(sectionLabels[section])} column` : undefined}
                     >
-                      <button
-                        ref={element => {
-                          sectionHeaderRefs.current[index] = element
-                        }}
-                        type="button"
-                        data-thread-section-header=""
-                        title={props.tSidebar('threadSidebarSectionReorderHint')}
-                        className={cn(
-                          stickyHeaderClass,
-                          'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                          activeRowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
-                          activeRowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
-                          activeSectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
-                        )}
-                        aria-expanded={!collapsed}
-                        onPointerDown={event => {
-                          if (isBoard || event.button !== 0) return
-                          sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
-                        }}
-                        onPointerMove={event => {
-                          const gesture = drag.context.section
-                          if (gesture === null || gesture.pointerId !== event.pointerId) return
-                          if (gesture.centers === null) {
-                            if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
-                            event.currentTarget.setPointerCapture(event.pointerId)
-                            sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
-                          }
-                          event.preventDefault()
-                          sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
-                        }}
-                        onPointerUp={event => {
-                          const gesture = drag.context.section
-                          if (gesture === null || gesture.pointerId !== event.pointerId) return
-                          sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
-                        }}
-                        onPointerCancel={() => sendDrag({ type: 'section.end' })}
-                        onLostPointerCapture={() => {
-                          if (drag.matches('section')) sendDrag({ type: 'section.end' })
-                        }}
-                        onKeyDown={event => {
-                          if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
-                          const fromShownIndex = shownSections.indexOf(section)
-                          const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
-                          if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
-                          event.preventDefault()
-                          commitSectionOrder(fromShownIndex, toShownIndex)
-                        }}
-                        onClick={() => {
+                      {/* The standard group head (council round 34, B10): a muted label and a pill count, as every other
+                          grouping draws; a press and drag still reorders the sections, and Alt+Arrow moves one. */}
+                      <ThreadGroupHeader
+                        label={props.tSidebar(sectionLabels[section])}
+                        count={sectionRows.length}
+                        pill
+                        collapsed={collapsed}
+                        className={stickyHeaderClass}
+                        t={props.tSidebar}
+                        onToggle={() => {
                           if (dragActor.getSnapshot().context.suppressed === 'section') {
                             sendDrag({ type: 'suppression.consume' })
                             return
                           }
                           toggleSection(section)
                         }}
-                      >
-                        <span
-                          className="dshx:inline-flex dshx:shrink-0 dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
-                          aria-hidden="true"
-                        >
-                          <GripVerticalIcon className="dshx:size-3 dshx:cursor-grab dshx:active:cursor-grabbing" />
-                        </span>
-                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {sectionIcons[section]}
-                        </span>
-                        <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
-                        <span className="dshx:text-xs dshx:tabular-nums">({sectionRows.length})</span>
-                        <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {collapsed ? <ChevronDownIcon strokeWidth={1.5} size={12} /> : <ChevronUpIcon strokeWidth={1.5} size={12} />}
-                        </span>
-                      </button>
+                        toggleProps={{
+                          ref: element => {
+                            sectionHeaderRefs.current[index] = element
+                          },
+                          'aria-describedby': sectionReorderHintId,
+                          className: cn(
+                            activeRowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
+                            activeRowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
+                            activeSectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
+                          ),
+                          onPointerDown: event => {
+                            if (isBoard || event.button !== 0) return
+                            sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
+                          },
+                          onPointerMove: event => {
+                            const gesture = drag.context.section
+                            if (gesture === null || gesture.pointerId !== event.pointerId) return
+                            if (gesture.centers === null) {
+                              if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
+                              event.currentTarget.setPointerCapture(event.pointerId)
+                              sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
+                            }
+                            event.preventDefault()
+                            sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
+                          },
+                          onPointerUp: event => {
+                            const gesture = drag.context.section
+                            if (gesture === null || gesture.pointerId !== event.pointerId) return
+                            sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
+                          },
+                          onPointerCancel: () => sendDrag({ type: 'section.end' }),
+                          onLostPointerCapture: () => {
+                            if (drag.matches('section')) sendDrag({ type: 'section.end' })
+                          },
+                          onKeyDown: event => {
+                            if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                            const fromShownIndex = shownSections.indexOf(section)
+                            const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
+                            if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
+                            event.preventDefault()
+                            commitSectionOrder(fromShownIndex, toShownIndex)
+                          },
+                        }}
+                      />
                       {!collapsed ? (
                         <VirtualThreadRows
                           entries={sectionRows}
@@ -7161,10 +7825,29 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups)
                       : collapsedGroups.includes(group.key))
                   const resumableSessions = statusGroupResumableSessions.get(group.key) ?? []
+                  // The Needs you group's count chips take their status hue (round five T2): needs you, then failed.
+                  const statusCounts =
+                    group.key === `${STATUS_GROUP_KEY_PREFIX}needs-you`
+                      ? group.threads.reduce(
+                          (counts, thread) => {
+                            const status = thread.kind === 'local' ? threadStatusById.get(thread.session.id)?.status : undefined
+                            if (status === 'failed') return { ...counts, failed: counts.failed + 1 }
+                            return status === 'needs-you' ? { ...counts, needsYou: counts.needsYou + 1 } : counts
+                          },
+                          { needsYou: 0, failed: 0 },
+                        )
+                      : undefined
+                  // Working, Ready, Idle, Done and Drafts count beside their 10px status glyph (council round 15 B2, round 16 B2).
+                  const groupStatus = group.key.startsWith(STATUS_GROUP_KEY_PREFIX) ? groupCountStatusOf(group.key.slice(STATUS_GROUP_KEY_PREFIX.length)) : undefined
                   return (
                     <section
                       className={cn(
+                        // Groups stand 12px apart in the list (council round 13 B3; 20px read as loose islands): the last
+                        // row's 6px gap and this 6px; on a phone the last row's
+                        // gap alone, and none above the first, so the first Ready row shows above the tab bar under the 44px
+                        // search (round five B1, council round 6 B8).
                         'dshx:mt-1 dshx:rounded-md',
+                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-1.5 dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}
@@ -7182,6 +7865,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                                 })()
                           }
                           checkoutCount={group.checkoutCount}
+                          {...(statusCounts === undefined ? {} : { statusCounts })}
+                          {...(groupStatus === undefined ? {} : { status: groupStatus })}
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}
@@ -7283,44 +7968,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             />
           ) : null}
           {isBoard || draftSessions.length === 0 ? null : (
-            <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
-              <div
-                className={cn(
-                  stickyHeaderClass,
-                  'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:px-1 dshx:text-sm dshx:text-muted-foreground',
-                )}
-              >
-                <button
-                  type="button"
-                  data-thread-section-header=""
-                  className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-                  aria-expanded={draftsOpen}
-                  onClick={() => setDraftsOpen(current => !current)}
-                >
-                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    <ArchiveIcon strokeWidth={1.5} size={14} />
-                  </span>
-                  <span className="dshx:whitespace-nowrap">{props.tSidebar('threadSidebarDrafts')}</span>
-                  <span className="dshx:text-xs dshx:tabular-nums">({draftSessions.length})</span>
-                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    {draftsOpen ? <ChevronUpIcon strokeWidth={1.5} size={12} /> : <ChevronDownIcon strokeWidth={1.5} size={12} />}
-                  </span>
-                </button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="dshx:shrink-0"
-                  aria-label={props.tSidebar('threadSidebarDraftsCleanUp')}
-                  title={props.tSidebar('threadSidebarDraftsCleanUpHint')}
-                  disabled={draftsCleaning}
-                  onClick={() => void cleanUpDrafts()}
-                >
-                  <ArchiveIcon strokeWidth={1.5} size={13} />
-                </Button>
-              </div>
-              {draftsOpen ? draftSessions.map(session => renderThreadRow(session, undefined)) : null}
-            </section>
+            <DraftsSection
+              key="drafts"
+              drafts={draftSessions}
+              open={draftsOpen}
+              onOpenChange={setDraftsOpen}
+              cleanable={draftsCleanable}
+              cleaning={draftsCleaning}
+              onConfirm={ids => void cleanUpDrafts(ids)}
+              renderRow={session => renderThreadRow(session, undefined)}
+              headerClassName={stickyHeaderClass}
+              t={props.tSidebar}
+            />
           )}
           {sessionState.phase === 'ready' &&
           (isBoard || draftSessions.length === 0) &&
@@ -7340,37 +7999,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
         </div>
         {selectedSessionIds.length > 0 ? (
-          <div
-            role="toolbar"
-            aria-label={props.tSidebar('threadSidebarSelection')}
-            title={props.tSidebar('threadSidebarSelectionHint')}
-            data-testid="thread-selection-bar"
-            className="dshx:mx-2 dshx:mb-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:border dshx:bg-card dshx:p-1.5 dshx:text-xs"
-          >
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-medium" aria-live="polite">
-              {props.tSidebar('threadSidebarSelectedCount', { count: selectedSessionIds.length })}
-            </span>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}>
-              {allSelectedPinned ? <IconPinFillRegular size={13} /> : <PinIcon strokeWidth={1.5} size={13} />}
-              {props.tSidebar(allSelectedPinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-            </Button>
-            <Button size="xs" variant="outline" disabled={allSelectedSettled} onClick={settleSelection}>
-              <CircleCheckIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarSettle')}
-            </Button>
-            <Button size="xs" variant="outline" onClick={() => void applyToSelection('archive')}>
-              <ArchiveIcon strokeWidth={1.5} size={13} />
-              {props.tSidebar('threadSidebarArchive')}
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={props.tSidebar('threadSidebarClearSelection')}
-              onClick={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
-            >
-              <XIcon className="dshx:size-3.5" />
-            </Button>
-          </div>
+          <ThreadSelectionBar
+            count={selectedSessionIds.length}
+            allPinned={allSelectedPinned}
+            allSettled={allSelectedSettled}
+            onTogglePinned={() => void applyToSelection(allSelectedPinned ? 'unpin' : 'pin')}
+            onSettle={settleSelection}
+            onArchive={() => void applyToSelection('archive')}
+            onClear={() => setThreadSelection(EMPTY_THREAD_SELECTION)}
+            t={props.tSidebar}
+          />
         ) : null}
       </section>
       <ThreadViewManager

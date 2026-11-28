@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { animate, drawStroke, easings, everyFrame, motionSafe, presets, springs } from '../../motion/index.js'
 import { usePrefersReducedMotion } from '../../motion/react.js'
+import { formatDurationMs } from '../../lib/format-duration.js'
 import { cn } from '../../lib/utils.js'
 import { ClockIcon, MessageSquareTextIcon, WaypointsIcon } from '../../icons.js'
 import { Badge } from '../ui/badge.js'
@@ -65,8 +66,6 @@ export interface FallbackChainProps extends Omit<React.HTMLAttributes<HTMLElemen
 }
 
 const SQUARES = 28
-
-const formatMs = (ms: number) => (ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`)
 
 /** Wall-clock now while `active`, refreshed every frame (four times a second under reduced motion). */
 function useNow(active: boolean): number {
@@ -226,7 +225,7 @@ export function FallbackChain({
             <span aria-hidden className="dshx:h-4 dshx:w-px dshx:bg-border dshx:@max-pane-narrow:hidden" />
             <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:tabular-nums dshx:@max-pane-narrow:hidden">
               <ClockIcon aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" />
-              {formatMs(total)}
+              {formatDurationMs(total)}
             </span>
           </>
         )}
@@ -530,7 +529,7 @@ const AttemptCard = React.forwardRef<
               )}
               {timeoutMs === undefined ? null : (
                 <span className="dshx:ml-auto dshx:shrink-0 dshx:text-sm dshx:tabular-nums">
-                  {showTime ? formatMs(elapsed) : <span className="dshx:text-muted-foreground">–</span>}
+                  {showTime ? formatDurationMs(elapsed) : <span className="dshx:text-muted-foreground">–</span>}
                 </span>
               )}
             </span>
@@ -584,7 +583,7 @@ const AttemptCard = React.forwardRef<
               <>
                 <dt className="dshx:text-muted-foreground">Time</dt>
                 <dd className="dshx:text-right dshx:tabular-nums">
-                  {formatMs(elapsed)} of {formatMs(timeoutMs)}
+                  {formatDurationMs(elapsed)} of {formatDurationMs(timeoutMs)}
                 </dd>
               </>
             )}

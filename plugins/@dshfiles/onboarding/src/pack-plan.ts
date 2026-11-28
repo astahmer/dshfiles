@@ -8,7 +8,7 @@ export type PackAction = (typeof PACK_ACTIONS)[number]
 const OWNED_SCOPE = '@dshfiles/'
 export const PROFILE_INSTALLS_DOCS = 'https://github.com/astahmer/dshfiles/blob/main/docs/profile-installs.md'
 export const RESTART_GUIDANCE =
-  'Restart DSH when it suits you: Restart DSH (bottom of the sidebar) when DSH runs under the managed launcher, otherwise your own launcher.'
+  'Restart DSH when it suits you: use Restart DSH in the status bar when DSH runs under the managed launcher; otherwise stop DSH in its terminal and start it again.'
 
 const checklistStateSchema = Schema.Literals(['done', 'todo', 'unknown', 'off'])
 export const pluginStateSchema = Schema.Literals(['enabled', 'disabled', 'not-installed', 'unknown'])

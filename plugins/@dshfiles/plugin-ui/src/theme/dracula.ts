@@ -6,7 +6,7 @@
  * Every colour comes from the spec's palette, UI palette or ANSI palette, except where the spec has no role: the faint
  * and secondary text steps and the strong border, and red text on raised fills, which uses the spec's bright red.
  */
-import type { Backdrop, ThemeDefinition } from './theme-definition.ts'
+import type { Backdrop, IdentityTuple, ThemeDefinition } from './theme-definition.ts'
 
 /** Dracula Classic: palette, UI palette and ANSI bright colours. */
 export const DRACULA = {
@@ -46,6 +46,17 @@ export const ALUCARD = {
   red: '#cb3a2a',
   yellow: '#846e15',
 } as const
+
+/**
+ * The identity palette (round eight): the spec's six accent colours, in the order the owner chose, so each slot sits
+ * near the default theme's (azure → cyan, olive → green, copper → orange, violet → purple, magenta → pink). Alucard's
+ * yellow is darkened at its own hue (#846e15 → #7d6706) because the spec's yellow reads at only 4.09:1 on the raised
+ * fill; every other colour is the spec's own.
+ */
+const PALETTE_NAMES: IdentityTuple = ['Cyan', 'Green', 'Orange', 'Purple', 'Pink', 'Yellow']
+export const ALUCARD_TEXT_YELLOW = '#7d6706'
+const DRACULA_PALETTE: IdentityTuple = [DRACULA.cyan, DRACULA.green, DRACULA.orange, DRACULA.purple, DRACULA.pink, DRACULA.yellow]
+const ALUCARD_PALETTE: IdentityTuple = [ALUCARD.cyan, ALUCARD.green, ALUCARD.orange, ALUCARD.purple, ALUCARD.pink, ALUCARD_TEXT_YELLOW]
 
 /** A star: x and y inside its tile (px), radius (px), alpha. */
 type Star = readonly [x: number, y: number, r: number, a: number]
@@ -211,6 +222,8 @@ export const DRACULA_THEME: ThemeDefinition = {
       string: DRACULA.yellow,
     },
     backdrop: nightSky(),
+    palette: DRACULA_PALETTE,
+    paletteNames: PALETTE_NAMES,
   },
   light: {
     colours: {
@@ -241,5 +254,7 @@ export const DRACULA_THEME: ThemeDefinition = {
       function: ALUCARD.green,
       string: ALUCARD.yellow,
     },
+    palette: ALUCARD_PALETTE,
+    paletteNames: PALETTE_NAMES,
   },
 }

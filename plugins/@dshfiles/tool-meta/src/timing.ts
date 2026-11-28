@@ -1,7 +1,9 @@
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { ToolMetaTranslate } from './locales.js'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 export type TimeFormat = 'absolute' | 'relative'
 
@@ -56,12 +58,6 @@ const waitArgumentsSchema = Schema.Struct({
 export type ToolCallTimes = Schema.Codec.Encoded<typeof toolCallOwnerSchema>
 
 export class ToolTimingModel {
-  private static readonly clockFormat = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-
   private static readonly dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
   /**
@@ -107,20 +103,13 @@ export class ToolTimingModel {
     }
   }
 
-  /** A finished call keeps tenths under ten seconds; a running counter ticks in whole seconds. */
-  static readonly formatDuration = (input: { readonly ms: number; readonly live: boolean; readonly t: ToolMetaTranslate }): string => {
-    const ms = Math.max(0, input.ms)
-    if (ms < 10_000 && !input.live) return input.t('seconds', { n: (Math.round(ms / 100) / 10).toFixed(1) })
-    const totalSeconds = Math.floor(ms / 1000)
-    if (totalSeconds < 60) return input.t('seconds', { n: String(totalSeconds) })
-    const totalMinutes = Math.floor(totalSeconds / 60)
-    if (totalMinutes < 60) return input.t('minutes', { m: String(totalMinutes), s: String(totalSeconds % 60) })
-    return input.t('hours', { h: String(Math.floor(totalMinutes / 60)), m: String(totalMinutes % 60) })
-  }
+  /** The kit's grammar for time waited (DESIGN.md › Durations): `3s`, `2m 05s`, `1h 04m`, the same live and finished. */
+  static readonly formatDuration = (ms: number): string => formatElapsed(ms)
 
   static readonly formatMoment = (input: { readonly at: number; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }): string => {
     if (input.format === 'absolute') {
-      const clock = ToolTimingModel.clockFormat.format(input.at)
+      // The locale's 12/24 h through the kit's one clock formatter (council round 5 A6), as every other surface prints it.
+      const clock = formatClockTime(input.at)
       return new Date(input.at).toDateString() === new Date(input.now).toDateString() ? clock : `${ToolTimingModel.dayFormat.format(input.at)} ${clock}`
     }
     const seconds = Math.max(0, Math.floor((input.now - input.at) / 1000))
@@ -130,7 +119,14 @@ export class ToolTimingModel {
     return input.t('daysAgo', { n: String(Math.floor(seconds / 86_400)) })
   }
 
-  /** The visible line ("1.2 s · 14:02:11") and its spoken label. */
+  /** A call shorter than this shows no duration: a column of "0.0 s" hides the one slow step. */
+  static readonly shownFromMs = 1_000
+
+  /**
+   * The visible duration ("1.2 s") and the hover label that also names the start time. The text is empty for a call
+   * under a second and for a result whose call left the loaded history: the turn's time divider already gives the
+   * clock time, so a row repeats neither it nor a zero.
+   */
   static readonly describeTiming = (input: {
     readonly timing: ToolTiming
     readonly now: number
@@ -139,13 +135,13 @@ export class ToolTimingModel {
   }): DescribedTiming => {
     const { timing, now, format, t } = input
     if (timing.kind === 'ended') {
-      const end = ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t })
-      return { text: t('ended', { end }), label: t('endedLabel', { end }) }
+      return { text: '', label: t('endedLabel', { end: ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t }) }) }
     }
     const live = timing.kind === 'running'
-    const duration = ToolTimingModel.formatDuration({ ms: (live ? now : timing.endedAt) - timing.startedAt, live, t })
+    const ms = (live ? now : timing.endedAt) - timing.startedAt
+    const duration = ToolTimingModel.formatDuration(ms)
     const start = ToolTimingModel.formatMoment({ at: timing.startedAt, now, format, t })
-    return { text: `${duration} · ${start}`, label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
+    return { text: ms >= ToolTimingModel.shownFromMs ? duration : '', label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
   }
 
   /** What a line shows; equal keys mean a clock tick would change nothing on screen. */

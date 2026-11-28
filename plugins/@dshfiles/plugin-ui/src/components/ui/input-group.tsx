@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
 
 import { Button } from './button.js'
-import { Input } from './input.js'
+import { Input, fieldLook } from './input.js'
 import { Textarea } from './textarea.js'
 
 function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
@@ -14,8 +14,9 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="input-group"
       role="group"
       className={cn(
-        'dshx:group/input-group dshx:relative dshx:flex dshx:w-full dshx:items-center dshx:rounded-md dshx:border dshx:border-input dshx:shadow-xs dshx:transition-[color,box-shadow] dshx:outline-none dshx:dark:bg-input/30',
-        'dshx:h-8 dshx:min-w-0 dshx:has-[>textarea]:h-auto',
+        fieldLook,
+        'dshx:group/input-group dshx:relative dshx:flex dshx:w-full dshx:items-center dshx:transition-[color,box-shadow] dshx:outline-none',
+        'dshx:h-(--dshx-control-h) dshx:min-w-0 dshx:has-[>textarea]:h-auto',
 
         // Variants based on alignment.
         'dshx:has-[>[data-align=inline-start]]:[&>input]:pl-2',
@@ -23,8 +24,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
         'dshx:has-[>[data-align=block-start]]:h-auto dshx:has-[>[data-align=block-start]]:flex-col dshx:has-[>[data-align=block-start]]:[&>input]:pb-3',
         'dshx:has-[>[data-align=block-end]]:h-auto dshx:has-[>[data-align=block-end]]:flex-col dshx:has-[>[data-align=block-end]]:[&>input]:pt-3',
 
-        // Focus state.
-        'dshx:has-[[data-slot=input-group-control]:focus-visible]:border-ring dshx:has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] dshx:has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50',
+        // Focus state: the kit sheet draws the one ring on this wrapper while its field has focus (styles.css, K7).
 
         // Error state.
         'dshx:has-[[data-slot][aria-invalid=true]]:border-destructive dshx:has-[[data-slot][aria-invalid=true]]:ring-destructive/20 dshx:dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40',

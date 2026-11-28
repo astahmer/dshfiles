@@ -10,6 +10,7 @@ Feature: Tool call timing
     And the fake model starts a three-second bash call in a fresh workspace
     Then the running tool card counts its elapsed seconds
     And once the turn settles the tool card shows how long the call took and when it started
+    And the settled bash row is only as wide as its words, with its duration right after them
 
   @scenario:tool-meta.wait-timer
   Scenario: A timed wait shows its deadline without presenting it as job progress

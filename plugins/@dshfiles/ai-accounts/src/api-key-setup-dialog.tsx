@@ -208,7 +208,7 @@ export const ApiKeySetupDialog = (props: {
               )
             ) : (
               <p className="dshx:text-sm dshx:text-muted-foreground">
-                Secret Catalog is unavailable. You can still enter a key below or configure this reference in the Host environment.
+                Secret Catalog is unavailable. You can still enter a key below or set this reference in the environment DSH starts with.
               </p>
             )}
           </details>

@@ -218,3 +218,40 @@ describe('send button states (visual refresh T3.3)', () => {
     expect(sendState({ running: true, draft: '', busyEnter: 'queue' })).toEqual({ mode: 'stop', label: 'input.stop', disabled: false })
   })
 })
+
+describe('a running continuable subagent child (council round 25, item 6)', () => {
+  const child = (draft: string, busyEnter: 'queue' | 'steer' = 'queue') => {
+    const base = barProps({ variant: 'composer' })
+    const session = base.useSession(snapshot => snapshot)
+    const input = base.useInput(snapshot => snapshot)
+    if (session === undefined || input === undefined) throw new Error('fixture lacks a session')
+    const subagent = { address: { parentSessionId: SessionId('parent'), childSessionId: session.sessionId, mode: 'continuable' as const } }
+    const element = mount({
+      ...base,
+      useSession: selected({ ...session, running: true, blank: false, subagent }),
+      useInput: selected({ ...input, draft }),
+      useBusyEnter: selected(busyEnter),
+    })
+    const seat = [...element.querySelectorAll<HTMLButtonElement>('[data-composer-card] button[aria-label="input.stop"], [data-composer-card] button[data-send-mode]')]
+    return { seat, buttons: seat.map(button => ({ mode: button.dataset.sendMode, label: button.getAttribute('aria-label'), disabled: button.disabled })), stop: base.stop, submit: base.keyboard?.submit }
+  }
+
+  it('shows one Stop in Send\'s seat while the draft is empty, not a Stop beside a disabled Send', () => {
+    const { seat, buttons, stop } = child('')
+    expect(buttons).toEqual([{ mode: 'stop', label: 'input.stop', disabled: false }])
+    act(() => seat[0]?.click())
+    expect(stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('brings Send back once text is typed, delivering as Enter would, and keeps the separate Stop', () => {
+    const queued = child('also this')
+    expect(queued.buttons).toEqual([
+      { mode: undefined, label: 'input.stop', disabled: false },
+      { mode: 'queue', label: 'input.send.queue', disabled: false },
+    ])
+    act(() => queued.seat[1]?.click())
+    expect(queued.submit).toHaveBeenCalledWith('queue', 'click')
+    document.body.replaceChildren()
+    expect(child('also this', 'steer').buttons.at(-1)).toEqual({ mode: 'steer', label: 'input.send.steer', disabled: false })
+  })
+})

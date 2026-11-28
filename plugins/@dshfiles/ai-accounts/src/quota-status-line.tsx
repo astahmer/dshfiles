@@ -1,7 +1,8 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { ChartColumnIcon, PlusIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
+import { ChartColumnIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ProviderGlyph } from './provider-glyph.js'
 import { useApi } from '@dshfiles/dshx/client'
@@ -39,7 +40,7 @@ export interface QuotaStatusLineProps {
   readonly activeAccountRunning: boolean
   /** Route the open thread's next requests through an account (its right-click menu), when a thread is on stage. */
   readonly onUseForThread?: (accountId: string) => void
-  /** The strip's two quiet tools at its end: add an account, open AI account settings. */
+  /** Add an account and open AI account settings: two tools in the popover's header, so the strip stays one item. */
   readonly onAddAccount: () => void
   readonly onOpenAccounts: () => void
 }
@@ -126,7 +127,7 @@ const AccountLine = (props: {
   const signIn = 'unavailable' in item && item.disabled !== true && item.unavailable.label === 'Sign in again'
   return (
     <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5" data-quota-account={item.instanceId}>
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome={item.disabled === true} />
       <span className={cn('dshx:max-w-28 dshx:min-w-0 dshx:truncate', props.active && 'dshx:font-medium dshx:text-foreground')}>{props.name}</span>
       <Meter item={item} />
       <span
@@ -151,7 +152,7 @@ const segmentClass =
   'dshx-root dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 
 /**
- * One account's compact segment (b:hbtt): glyph · short name · 28 px meter · "51%". Neutral while healthy, amber at
+ * One account's compact segment (b:hbtt): glyph · short name · 24 px meter · "51%". Neutral while healthy, amber at
  * 15% left or less, red "limit" once reached; an account that is off is dimmed and reads "off".
  */
 const AccountSegment = (props: {
@@ -171,13 +172,14 @@ const AccountSegment = (props: {
       data-quota-account={item.instanceId}
       data-quota-off={item.disabled === true ? '' : undefined}
     >
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={item.kind} monochrome={item.disabled === true} />
       <span className={cn(props.long === true ? 'dshx:max-w-28' : 'dshx:max-w-12', 'dshx:truncate', props.active && 'dshx:font-medium dshx:text-foreground')}>
         {props.label}
       </span>
+      {/* A 24 × 3 px track in tertiary ink at 40%, visible on the bar; the fill holds 3:1 on it (council round 5, C6). */}
       <span
         aria-hidden="true"
-        className="dshx:relative dshx:inline-block dshx:h-1 dshx:w-7 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted"
+        className="dshx:relative dshx:inline-block dshx:h-0.75 dshx:w-6 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-full dshx:bg-faint-foreground/40"
         data-quota-meter=""
       >
         {'unavailable' in item ? null : (
@@ -322,29 +324,12 @@ const ActiveWithoutQuota = (props: { readonly accountId: string; readonly label:
       onClick={props.onClick}
       type="button"
     >
-      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={account.kind} monochrome />
+      <ProviderGlyph className="dshx:size-3 dshx:shrink-0" kind={account.kind} />
       <span className="dshx:max-w-28 dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{account.displayName}</span>
       <span className="dshx:shrink-0">{props.label === 'In use by this thread' ? 'in use' : 'last used'}</span>
     </button>
   )
 }
-
-const toolClass =
-  'dshx-root dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
-
-/** A quiet icon tool at the strip's end, named for assistive technology and in its tooltip. */
-const StripTool = (props: { readonly label: string; readonly tooltip: string; readonly onClick: () => void; readonly children: JSX.Element }): JSX.Element => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <button aria-label={props.label} className={toolClass} onClick={props.onClick} type="button">
-        {props.children}
-      </button>
-    </TooltipTrigger>
-    <TooltipContent className="dshx-root" side="top">
-      {props.tooltip}
-    </TooltipContent>
-  </Tooltip>
-)
 
 export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null => {
   const { usage } = useAccountsUsage()
@@ -417,33 +402,8 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
     rootRef.current = element
     setRoot(current => (current === element ? current : element))
   }
-  const tools = (
-    // Phone: the tools sit in the opened list, never in the pill text.
-    <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center" {...(props.compact ? { 'data-status-detail': '' } : {})}>
-      <StripTool
-        label="Add AI account"
-        onClick={() => {
-          setOpen(false)
-          props.onAddAccount()
-        }}
-        tooltip="Add account"
-      >
-        <PlusIcon aria-hidden className="dshx:size-3.5" />
-      </StripTool>
-      <StripTool
-        label="AI account settings"
-        onClick={() => {
-          setOpen(false)
-          props.onOpenAccounts()
-        }}
-        tooltip="AI account settings"
-      >
-        <Settings2Icon aria-hidden className="dshx:size-3.5" />
-      </StripTool>
-    </span>
-  )
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Popover onOpenChange={setOpen} open={open}>
         <PopoverAnchor asChild>
           <span
@@ -455,6 +415,8 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
             )}
             data-quota-status-line=""
             data-quota-segments={props.compact ? undefined : inline.length}
+            // A quota running low or spent is worth the phone strip's row; frame-layout shows it only for this mark.
+            data-status-actionable={items.some(item => UsageOverviewModel.stripTone(item) !== 'ok') ? '' : undefined}
             ref={attachRoot}
             role="group"
           >
@@ -621,10 +583,14 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
                 </span>
               </>
             )}
-            {tools}
             {arrangement.error === null ? null : (
               <span className="dshx:text-xs dshx:text-destructive" role="alert">
                 {arrangement.error}
+                {arrangement.retry === null ? null : (
+                  <Button className="dshx:ml-1 dshx:h-auto dshx:p-0 dshx:text-xs" onClick={arrangement.retry} size="xs" type="button" variant="link">
+                    Retry
+                  </Button>
+                )}
               </span>
             )}
           </span>
@@ -632,7 +598,9 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
         <UsagePopoverContent
           close={() => setOpen(false)}
           keepOpenWithin={rootRef}
+          onAddAccount={props.onAddAccount}
           onConnectAccount={props.onConnectAccount}
+          onOpenAccounts={props.onOpenAccounts}
           onOpenUsageHistory={props.onOpenUsageHistory}
           order="remaining"
         />

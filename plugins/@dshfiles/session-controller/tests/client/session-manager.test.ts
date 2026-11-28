@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionManager } from '../../src/native/client/sessions/manager.js'
 import type { SessionRemotes } from '../../src/native/client/sessions/remotes.js'
 import type { SessionSummary } from '../../src/native/types.js'
@@ -163,5 +163,62 @@ describe('SessionManager list projections', () => {
       [child, false, 'Child title'],
     ])
     await manager.dispose()
+  })
+})
+
+describe('SessionManager reconnect', () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  const failure = (): RemoteResult<{ items: readonly SessionSummary[] }> => ({
+    ok: false,
+    // SAFETY: the manager reads only `ok` and stores the failure value opaquely.
+    error: { code: 'transport/unavailable', message: 'Failed to fetch' } as never,
+  })
+
+  it('keeps list-row values until a new baseline lands and retries a failed pull', async () => {
+    vi.useFakeTimers()
+    const { manager, pulls } = createManager()
+    const id = SessionId('session-titled')
+    const first = manager.refreshList()
+    pulls[0]?.resolve(listResult([summary(id, {
+      projections: { kind: 'cached', asOfSeq: 4, values: { title: 'Fix the build' } },
+    })]))
+    await first
+    manager.handleControlFrame({ type: 'projection', sessionId: id, seq: 5, changes: [{ key: 'promptedTurnCount', val: 2 }] })
+    expect(manager.getListSnapshot().items[0]?.title).toBe('Fix the build')
+
+    manager.handleConnected()
+    expect(manager.getListSnapshot().items[0]?.title).toBe('Fix the build')
+    expect(manager.projectionValues(id)).toEqual(expect.objectContaining({ promptedTurnCount: 2 }))
+    // The selector pull and the older-Host fallback both fail.
+    pulls[1]?.resolve(failure())
+    await vi.waitFor(() => { expect(pulls).toHaveLength(3) })
+    pulls[2]?.resolve(failure())
+    await vi.waitFor(() => { expect(manager.getListSnapshot().state).toBe('error') })
+    expect(manager.getListSnapshot().items[0]?.title).toBe('Fix the build')
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(pulls).toHaveLength(4)
+    pulls[3]?.resolve(listResult([summary(id, {
+      projections: { kind: 'cached', asOfSeq: 5, values: { title: 'Fix the build, then land' } },
+    })]))
+    await vi.waitFor(() => { expect(manager.getListSnapshot().state).toBe('idle') })
+    expect(manager.getListSnapshot().items[0]?.title).toBe('Fix the build, then land')
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(pulls).toHaveLength(4)
+    await manager.dispose()
+  })
+
+  it('stops retrying once disposed', async () => {
+    vi.useFakeTimers()
+    const { manager, pulls } = createManager()
+    void manager.refreshList()
+    pulls[0]?.resolve(failure())
+    await vi.waitFor(() => { expect(pulls).toHaveLength(2) })
+    pulls[1]?.resolve(failure())
+    await vi.waitFor(() => { expect(manager.getListSnapshot().state).toBe('error') })
+    await manager.dispose()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(pulls).toHaveLength(2)
   })
 })

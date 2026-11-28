@@ -98,8 +98,23 @@ export const AccountConnectionOptions = (props: ConnectionOptionsProps): JSX.Ele
   )
 }
 
+/** The home-folder field of each CLI that keeps its login in a folder; any other kind is a Claude Code home. */
+const HOME_FIELD = {
+  codex: { label: 'Shared Codex home', description: 'Shared state. Custom homes need a separate auth overlay.' },
+  antigravity: {
+    label: 'HOME for agy',
+    description: 'Home whose .gemini folder holds this Google login. Empty uses your own; give each extra Google account its own folder.',
+  },
+  vibe: { label: 'VIBE_HOME', description: 'Vibe profile folder holding the `vibe --setup` login. Empty uses ~/.vibe.' },
+  claude: { label: 'CLAUDE_CONFIG_DIR', description: 'Directory containing your Claude Code login.' },
+} as const satisfies Record<'codex' | 'antigravity' | 'vibe' | 'claude', { readonly label: string; readonly description: string }>
+
+const homeFieldFor = (kind: AccountKind): (typeof HOME_FIELD)[keyof typeof HOME_FIELD] =>
+  kind === 'codex' || kind === 'antigravity' || kind === 'vibe' ? HOME_FIELD[kind] : HOME_FIELD.claude
+
 const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
   const codex = props.account.kind === 'codex'
+  const homeField = homeFieldFor(props.account.kind)
   const form = useAppForm({
     defaultValues: { homePath: props.account.homePath, shadowHomePath: props.account.shadowHomePath },
     validationLogic: revalidateLogic(),
@@ -118,31 +133,7 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
         }}
       >
         <fieldset disabled={props.busy} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
-          <form.AppField name="homePath">
-            {field => (
-              <field.TextField
-                label={
-                  codex
-                    ? 'Shared Codex home'
-                    : props.account.kind === 'antigravity'
-                      ? 'HOME for agy'
-                      : props.account.kind === 'vibe'
-                        ? 'VIBE_HOME'
-                        : 'CLAUDE_CONFIG_DIR'
-                }
-                monospace
-                description={
-                  codex
-                    ? 'Shared state; custom homes need a separate auth overlay.'
-                    : props.account.kind === 'antigravity'
-                      ? 'Home whose .gemini folder holds this Google login. Empty uses your own; give each extra Google account its own folder.'
-                      : props.account.kind === 'vibe'
-                        ? 'Vibe profile folder holding the `vibe --setup` login. Empty uses ~/.vibe.'
-                        : 'Directory containing your Claude Code login.'
-                }
-              />
-            )}
-          </form.AppField>
+          <form.AppField name="homePath">{field => <field.TextField label={homeField.label} monospace description={homeField.description} />}</form.AppField>
           {codex ? (
             <form.AppField name="shadowHomePath">
               {field => (
@@ -200,7 +191,7 @@ export const ExistingConnectionReference = (props: ConnectionOptionsProps): JSX.
               label="Existing credential reference"
               monospace
               placeholder={example}
-              description="An existing DSH credential or Host environment variable."
+              description="An existing DSH credential or an environment variable DSH was started with."
             />
           )}
         </form.AppField>

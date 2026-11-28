@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "live-model-selection-policy",
-      "title": "Subagent model routes follow the saved setting in running threads",
-      "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
+      "title": "Subagent models follow your setting",
+      "summary": "Running threads use the subagent models you allowed in Settings without a restart.",
+      "details": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["enabled", "disabled-mid-session"],
@@ -46,7 +47,8 @@
     {
       "id": "subagent-agent-argument",
       "title": "subagent starts a child as a configured agent",
-      "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
+      "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
+      "details": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["no-provider", "inherit", "agent", "refused"],
@@ -99,7 +101,8 @@
     {
       "id": "child-turn-guard",
       "title": "Keep a delegated child working when its turn hands the task back",
-      "summary": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The wording decides, not the tool count: a turn that fetched, rebased and installed and then handed back is resumed too. A turn that already changed files (fileChangeTools) or ran jj describe/jj commit is real work and is never resumed, and minToolCalls only resumes a turn that quit with no closing text. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent.",
+      "summary": "A subagent that hands its task back before doing real work is asked to keep working, a bounded number of times.",
+      "details": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The wording decides, not the tool count: a turn that fetched, rebased and installed and then handed back is resumed too. A turn that already changed files (fileChangeTools) or ran jj describe/jj commit is real work and is never resumed, and minToolCalls only resumes a turn that quit with no closing text. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent.",
       "surfaces": ["host"],
       "configuration": [
         {

@@ -8,6 +8,8 @@
  * the Shiki tokens it gives. A scheme the definition leaves out keeps the generated palette.
  */
 import type * as Schema from 'effect/Schema'
+import { IdentityDerivation } from './identity-derivation.ts'
+import { COOL_ORDER, IDENTITY_SLOT_COUNT } from './identity-palette.ts'
 import { PaletteMath, type PaletteInput, type Scheme } from './palette.ts'
 import { ReadabilityModel, type Rgb, type VeilInput } from './readability.ts'
 import { SCENE_IDS, SceneCatalog, type SceneGlass } from './scene-catalog.ts'
@@ -67,10 +69,27 @@ export interface Backdrop {
   readonly glass?: SceneGlass
 }
 
+/** Six values, one per identity slot (0–5). */
+export type IdentityTuple = readonly [string, string, string, string, string, string]
+
+/**
+ * What the identity palette is, for the agent tool description and the docs (owner decision of 2026-11-26): the six
+ * colours a user picks for a project, a Backlog tag or an agent. A choice stores the slot, so a theme recolours it.
+ */
+export const PALETTE_GUIDE = {
+  palette:
+    'six #rrggbb identity colours (slots 0–5) users pick for projects, Backlog tags and agents; each must read as text (4.5:1) on bg, panel and raised and should stay clear of the success, warning and danger hues. Left out, six are derived from the theme’s syntax and accent colours.',
+  paletteNames: 'six short names for the palette slots, in the same order (the swatch names a screen reader and the picker show); needs palette.',
+} as const
+
 export interface SchemeTheme {
   readonly colours: Readonly<Record<ColourRole, string>>
   readonly syntax?: Readonly<Partial<Record<SyntaxRole, string>>>
   readonly backdrop?: Backdrop
+  /** The identity palette (`PALETTE_GUIDE.palette`); derived from the theme's own colours when left out. */
+  readonly palette?: IdentityTuple
+  /** A name per palette slot (`PALETTE_GUIDE.paletteNames`). */
+  readonly paletteNames?: IdentityTuple
 }
 
 export interface ThemeDefinition {
@@ -88,6 +107,7 @@ export const MAX_BACKDROP_LAYERS = 3
 const MAX_BACKDROP_ITEMS = 4
 const MAX_LAYER_LENGTH = 8_000
 const MAX_KEYFRAMES_LENGTH = 4_000
+const MAX_PALETTE_NAME_LENGTH = 24
 const HEX = /^#[0-9a-f]{6}$/iu
 const ID = /^[a-z0-9][a-z0-9-]{0,47}$/u
 const FORBIDDEN = /url\s*\(|@import|expression\s*\(|javascript:|<\/?style/iu
@@ -121,6 +141,59 @@ function checkKeyframes(text: string, errors: string[], where: string): void {
     index += 1
   }
   if (depth !== 0) errors.push(`${where}: keyframes have unbalanced braces`)
+}
+
+/** A palette entry: a #rrggbb colour, lower-cased, or undefined. */
+function parseHexEntry(entry: unknown): string | undefined {
+  return typeof entry === 'string' && HEX.test(entry) ? entry.toLowerCase() : undefined
+}
+
+/** A palette slot name: 1 to `MAX_PALETTE_NAME_LENGTH` characters once trimmed, or undefined. */
+function parseNameEntry(entry: unknown): string | undefined {
+  const name = typeof entry === 'string' ? entry.trim() : ''
+  return name === '' || name.length > MAX_PALETTE_NAME_LENGTH ? undefined : name
+}
+
+/** Six entries, or undefined when the list is not six of them (its error is recorded). */
+function parseSix(
+  value: unknown,
+  where: string,
+  errors: string[],
+  parseEntry: typeof parseHexEntry,
+  what: { readonly list: string; readonly entry: string },
+): IdentityTuple | undefined {
+  if (!Array.isArray(value) || value.length !== IDENTITY_SLOT_COUNT) {
+    errors.push(`${where}: exactly ${IDENTITY_SLOT_COUNT} ${what.list}, one per slot`)
+    return undefined
+  }
+  const entries: string[] = []
+  value.forEach((entry, index) => {
+    const parsed = parseEntry(entry)
+    if (parsed === undefined) errors.push(`${where}[${index}]: ${what.entry} is required`)
+    else entries.push(parsed)
+  })
+  const [a, b, c, d, e, f] = entries
+  return a === undefined || b === undefined || c === undefined || d === undefined || e === undefined || f === undefined ? undefined : [a, b, c, d, e, f]
+}
+
+/** The identity palette and its names, checked; names need a palette (a derived one has no order to name). */
+function checkPalette(value: UntrustedObject, where: string, errors: string[]): Pick<SchemeTheme, 'palette' | 'paletteNames'> {
+  const palette =
+    value.palette === undefined
+      ? undefined
+      : parseSix(value.palette, `${where}.palette`, errors, parseHexEntry, { list: '#rrggbb colours', entry: 'a #rrggbb colour' })
+  const paletteNames =
+    value.paletteNames === undefined
+      ? undefined
+      : parseSix(value.paletteNames, `${where}.paletteNames`, errors, parseNameEntry, {
+          list: 'names',
+          entry: `a name of 1 to ${MAX_PALETTE_NAME_LENGTH} characters`,
+        })
+  if (value.paletteNames !== undefined && value.palette === undefined) errors.push(`${where}.paletteNames: give palette too (names follow its order)`)
+  let out: Pick<SchemeTheme, 'palette' | 'paletteNames'> = {}
+  if (palette !== undefined) out = { ...out, palette }
+  if (paletteNames !== undefined) out = { ...out, paletteNames }
+  return out
 }
 
 function checkScheme(value: unknown, where: string, errors: string[]): SchemeTheme | undefined {
@@ -178,11 +251,14 @@ function checkScheme(value: unknown, where: string, errors: string[]): SchemeThe
       backdrop = parsed
     }
   }
+  const identity = checkPalette(value, where, errors)
   const full = completeColours(colours)
   if (full === undefined) return undefined
   let scheme: SchemeTheme = { colours: full }
   if (Object.keys(syntax).length > 0) scheme = { ...scheme, syntax }
   if (backdrop !== undefined) scheme = { ...scheme, backdrop }
+  if (identity.palette !== undefined) scheme = { ...scheme, palette: identity.palette }
+  if (identity.paletteNames !== undefined) scheme = { ...scheme, paletteNames: identity.paletteNames }
   return scheme
 }
 
@@ -272,6 +348,7 @@ function contrastWarnings(definition: ThemeDefinition): string[] {
     for (const role of ['accent', 'success', 'warning', 'danger', 'info'] as const) check(role, c[role], 4.5)
     const onAccent = ratio(c.onAccent, c.accent)
     if (onAccent < 4.5) warnings.push(`${scheme}: onAccent on accent is ${onAccent.toFixed(2)}:1 (needs 4.5:1)`)
+    theme.palette?.forEach((colour, slot) => check(`palette[${slot}]`, colour, 4.5))
     for (const [role, colour] of Object.entries(theme.syntax ?? {})) {
       if (role === 'comment') continue
       const value = ratio(colour, c.panel)
@@ -301,6 +378,10 @@ function pins(theme: SchemeTheme): string[] {
   const out: string[] = []
   const push = (name: string, value: string) => out.push(`  ${name}: ${value};`)
   NEUTRAL_ROLES.forEach((role, step) => push(`--dshx-tone-${step}`, theme.colours[role]))
+  // The nav column is the theme's own panel colour (council round 6 A4 lifts only the generated dark palette).
+  push('--dshx-tone-nav', theme.colours.panel)
+  // Its Ready dot is its own success colour (council round 6 A6 lightens only the generated light palette's).
+  push('--dshx-ready-mark', theme.colours.success)
   push('--dshx-tone-accent', theme.colours.accent)
   push('--dshx-tone-accent-bg', rgba(theme.colours.accent, 0.14))
   push('--dshx-tone-accent-border', rgba(theme.colours.accent, 0.35))
@@ -315,6 +396,17 @@ function pins(theme: SchemeTheme): string[] {
     if (role === 'string') push('--shiki-token-string-expression', colour)
   }
   return out
+}
+
+/**
+ * The identity slots a scheme writes over styles.css (round eight): `--dshx-project-balanced-<n>` is slot n, and
+ * `--dshx-project-cool-<n>` the same six in the cool order, so every `project-tone-*` class, `ProjectMark` and swatch
+ * follows the theme.
+ */
+function identityPins(palette: IdentityTuple): string[] {
+  const balanced = palette.map((colour, slot) => `  --dshx-project-balanced-${slot}: ${colour};`)
+  const cool = COOL_ORDER.map((slot, n) => `  --dshx-project-cool-${n}: ${palette[slot]};`)
+  return [...balanced, ...cool]
 }
 
 /** The main workbench: the conversation and its tabs, never the sidebars, dialogs or the composer. */
@@ -634,6 +726,8 @@ function backdropCss(scope: string, theme: SchemeTheme, backdrop: Backdrop, scen
     // The turn rail: previous, its ticks and next on a slim, centred pill of that surface with a soft hairline, the
     // arrows always shown; the filter on its own round chip above it.
     '  --dshx-backdrop-rail-pad: 2px;',
+    // The pill is the track here: chat's resting 8% ink fill under the ticks steps aside (council round 34 B2).
+    '  --dshx-backdrop-rail-fill: transparent;',
     '  --dshx-backdrop-rail-gap: 4px;',
     '  --dshx-backdrop-rail-inset: 4px;',
     '  --dshx-backdrop-rail-align: center;',
@@ -733,6 +827,12 @@ function definitionCss(
     if (theme === undefined) continue
     const selector = selectors[scheme]
     parts.push([`${selector} {`, ...pins(theme), '}'].join('\n'))
+    // The light block is guarded: these slots have no generated dark value to out-rank a light one in dark.
+    parts.push(
+      [`${scheme === 'light' ? `${selector}:not([data-ds-dark-theme])` : selector} {`, ...identityPins(IdentityDerivation.paletteOf(theme, scheme)), '}'].join(
+        '\n',
+      ),
+    )
     if (theme.backdrop !== undefined)
       parts.push(backdropCss(scheme === 'light' ? `${selector}:not([data-ds-dark-theme])` : selector, theme, theme.backdrop, scenes, reading))
   }

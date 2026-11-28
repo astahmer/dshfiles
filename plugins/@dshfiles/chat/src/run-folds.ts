@@ -29,6 +29,11 @@ export type RunFoldStatus = 'working' | 'done' | 'stopped' | 'failed' | 'needs-y
 
 export interface RunFoldMemberState {
   readonly status: RunFoldStatus
+  /**
+   * A `failed` call that never started its work (a subagent call refused before a child existed). It stays a problem,
+   * but the summary names it apart: "failed" counts only work whose turn failed (council round 22, item 3).
+   */
+  readonly notStarted?: boolean
   /** Browser clock, epoch ms, when known; feeds the summary's "longest" time. */
   readonly startedAt?: number
   readonly finishedAt?: number
@@ -56,6 +61,24 @@ export interface RunFoldText {
   readonly active: string
   /** The settled state word: "done" for a job, "finished" for a subagent. */
   readonly done: string
+  /**
+   * The run's total as calls ("8 calls"), for a kind whose run lists every call (council round 22, item 3); without it
+   * the total uses `count`.
+   */
+  readonly calls?: (count: number) => string
+  /** "1 didn't start": members marked `notStarted`; without it they count as failed. */
+  readonly notStarted?: (count: number) => string
+}
+
+/** The provider and model a child session runs on, both safe to show; what the kit's `RouteModel` draws. */
+export interface RunFoldChildRoute {
+  readonly provider: string
+  readonly model: string
+}
+
+export interface RunFoldChildRouteInput {
+  readonly childSessionId: string
+  readonly useSessions: UseSessions
 }
 
 export interface RunFoldKind {
@@ -73,6 +96,12 @@ export interface RunFoldKind {
   readonly useStates: (input: RunFoldStatesInput) => readonly RunFoldMemberState[]
   /** A hook returning this kind's words. */
   readonly useText: () => RunFoldText
+  /**
+   * For a kind whose calls start child sessions: the model a child runs on, so the notice that reports a child's failed
+   * run names it beside the child (council round 23, item 7). A hook: return an equal value while nothing changed;
+   * undefined when the model is unknown, never a guess.
+   */
+  readonly useChildRoute?: (input: RunFoldChildRouteInput) => RunFoldChildRoute | undefined
 }
 
 export const TranscriptRunFolds = defineRegistry<RunFoldKind>('@dshfiles/chat.transcript-run-fold')

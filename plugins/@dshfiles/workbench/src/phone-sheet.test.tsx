@@ -24,6 +24,17 @@ describe('PhoneSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 
+  it('rounds its top corners on the 16 px sheet step', () => {
+    render(
+      <PhoneSheet shown heading="Thread panel" onClose={() => {}}>
+        <p>Changes body</p>
+      </PhoneSheet>,
+    )
+    const sheet = screen.getByRole('dialog', { name: 'Thread panel' })
+    expect(sheet.className).toContain('dshx:rounded-t-2xl')
+    expect(sheet.className).not.toContain('dshx:rounded-t-xl')
+  })
+
   it('is modal while shown: focus moves in, Tab stays inside, and focus returns to the trigger on close', () => {
     const Page = (props: { readonly shown: boolean }): JSX.Element => (
       <>

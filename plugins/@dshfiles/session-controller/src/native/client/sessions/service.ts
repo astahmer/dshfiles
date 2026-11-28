@@ -564,6 +564,11 @@ export class ClientSessions implements ISessions {
     this.manager.handleConnected()
   }
 
+  /** Re-pull a failed list at once: the page learned that the Host answers again. */
+  handleHostReachable(): void {
+    void this.manager.retryFailedList()
+  }
+
   /**
    * Create a Host Session and publish its catalog row before resolving.
    * Callers retain the returned identity before borrowing its binding.

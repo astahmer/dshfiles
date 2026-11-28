@@ -18,7 +18,15 @@ export const ConversationHeaderSurface = ({
     )
   // The presentation host owns its recovery control; leave that corner clear
   // without changing native header internals or moving any contributed action.
-  return reserveHostCorner ? <div className="dshx:min-w-0 dshx:shrink-0 dshx:pr-8">{header}</div> : header
+  // Round five B8: the clearance stopped the header's rule 32px short of the pane's right edge; the wrapper draws that
+  // rule across the whole pane and the header inside draws none (ConversationRoot.module.css reads the marker).
+  return reserveHostCorner ? (
+    <div data-conversation-header-reserved="" className="dshx:min-w-0 dshx:shrink-0 dshx:pr-8">
+      {header}
+    </div>
+  ) : (
+    header
+  )
 }
 
 /** Composition-root registration shared by native and fixed Workbench occurrences. */

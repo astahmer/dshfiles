@@ -5,6 +5,7 @@ import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { InboxIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
 import { useInboxThreadSignals } from './inbox-signals.js'
@@ -23,6 +24,8 @@ export const WaitingThreadsPanel = (props: {
   readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
   readonly sessions: ISessions
   readonly openThread: (sessionId: string) => void
+  /** Opens the thread header's Land confirmation; false when nothing can confirm. Land never runs on one click here. */
+  readonly confirmLand?: ((sessionId: string) => boolean) | undefined
 }): JSX.Element => {
   const t = props.t
   const [tab, setTab] = useState<WaitingThreadTab>('needs-you')
@@ -46,7 +49,11 @@ export const WaitingThreadsPanel = (props: {
       setBusy(false)
     }
   }
-  const act = (itemId: string, verb: NonNullable<InboxThreadSignal['verb']>): void => {
+  const act = (sessionId: string, itemId: string, verb: NonNullable<InboxThreadSignal['verb']>): void => {
+    if (verb === 'Land') {
+      if (props.confirmLand?.(sessionId) !== true) props.openThread(sessionId)
+      return
+    }
     void settle(async () => {
       const outcome = await inbox.act(itemId, verb)
       if (!outcome.ok) setNotice({ tone: 'error', text: outcome.message })
@@ -56,6 +63,9 @@ export const WaitingThreadsPanel = (props: {
     <Page
       scroll
       heading={t('waitingThreadsTitle')}
+      // An Inbox page: the Inbox rail glyph in its tone (council round 7 B6).
+      mark={<InboxIcon />}
+      markTone="inbox"
       description={t('waitingThreadsDescription')}
       className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
       tabs={{
@@ -100,7 +110,7 @@ export const WaitingThreadsPanel = (props: {
                     {t('waitingThreadsOpen')}
                   </Button>
                   {verb === undefined ? null : (
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => act(signal.itemId, verb)}>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => act(sessionId, signal.itemId, verb)}>
                       {verb}
                     </Button>
                   )}

@@ -4,6 +4,7 @@
  * none of the palette's runtime.
  */
 import { defineContract, defineRegistry, type Subscribable } from '@dshfiles/dshx/client'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ReactNode } from 'react'
 
 export interface PaletteWorkspace {
@@ -68,6 +69,47 @@ export interface CommandPaletteService {
   setRecentLimit(recentLimit: number): void
   readonly state: Subscribable<CommandPaletteState>
 }
+
+/** The colour one project wears: a theme-aware class that sets `color:`, or a CSS colour the operator picked. */
+export interface PaletteProjectColor {
+  readonly className?: string
+  readonly color?: string
+  /** The palette tone (0-5) the kit `ProjectMark` paints; a custom `color` wins over it. */
+  readonly tone?: number
+  /** The thread list's project palette, so the tile matches the list's. */
+  readonly palette?: 'balanced' | 'cool'
+}
+
+/** Paints a thread row's project mark, so a project wears the same colour in the palette as in the thread list. */
+export interface PaletteProjectColorSource {
+  /** `path` is the project folder (a thread workspace resolves to the repository it was cut from), `title` its name. */
+  readonly colorOf: (project: { readonly path: string | undefined; readonly title: string }) => PaletteProjectColor | undefined
+}
+
+/** The plugin that owns project colours adds one source; the latest wins. Without one, project marks stay neutral ink. */
+export const PaletteProjectColors = defineRegistry<PaletteProjectColorSource>('@dshfiles/command-palette.project-color')
+
+/** A thread row's status: the shared glyph and one of the six words, in the providing plugin's language. */
+export interface PaletteThreadStatus {
+  readonly status: WorkStatus
+  readonly label: string
+  /**
+   * A Needs-you or Failed thread's kind in the one attention word list (Approval, Question, Turn failed), as the list
+   * row's line 2 says it. Every row reads `[mark] project · word · age` through the kit's AttentionMeta (council round
+   * 16 B1): the word is this kind, else `label` (an older provider, any other status).
+   */
+  readonly kind?: string | undefined
+}
+
+/** What the thread list says of each thread, so a palette row and a list row never disagree (DESIGN.md R2). */
+export interface PaletteThreadStatusSource {
+  /** Null while the provider projects no statuses; then rows keep their own running fact. */
+  readonly getSnapshot: () => ReadonlyMap<string, PaletteThreadStatus> | null
+  readonly subscribe: (listener: () => void) => () => void
+}
+
+/** The plugin that owns thread statuses adds one source; the latest wins. */
+export const PaletteThreadStatuses = defineRegistry<PaletteThreadStatusSource>('@dshfiles/command-palette.thread-status')
 
 /** Rows other plugins add with `api.add(PaletteActions, action)`; they wait here while the palette loads. */
 export const PaletteActions = defineRegistry<PaletteAction>('@dshfiles/command-palette.action')

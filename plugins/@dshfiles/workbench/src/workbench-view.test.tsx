@@ -544,6 +544,37 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {})).toEqual([])
   })
 
+  it('reopens the right pane on the view it last showed, not on the chooser', async () => {
+    // Opening Changes, closing it and reopening the pane took two clicks: the chooser, then Changes (F20).
+    const { api, onClose, setVisible } = renderRightWorkbench('changes')
+    act(() => api.getPanel('changes')?.api.close())
+    await flushLayoutChange()
+    expect(onClose).toHaveBeenCalledOnce()
+    setVisible(false)
+    setVisible(true)
+    await flushLayoutChange()
+    expect(api.panels.map(panel => panel.id)).toEqual(['changes'])
+    expect(screen.queryByLabelText('Choose a view')).toBeNull()
+  })
+
+  it('opens the chooser when the pane has no last view, or that view now lives in another pane', async () => {
+    const { api, setVisible } = renderRightWorkbench('changes')
+    let mainApi: DockviewApi | undefined
+    render(
+      <WorkbenchView registry={registryWith('changes')} store={createLayoutStore({ storage: memoryStorage() })} t={t} region="main" onApi={ready => (mainApi = ready)} />,
+    )
+    act(() => api.getPanel('changes')?.api.close())
+    await flushLayoutChange()
+    // The main view's default layout shows the same view now.
+    expect(mainApi?.getPanel('changes')).toBeDefined()
+    expect(workbenchRegions().holds('changes')).toBe(true)
+    setVisible(false)
+    setVisible(true)
+    await flushLayoutChange()
+    expect(api.panels).toHaveLength(1)
+    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+  })
+
   it('keeps the right pane open after a partial close and closes its final chooser too', async () => {
     const { api, onClose } = renderRightWorkbench('a', 'b')
     act(() => api.getPanel('a')?.api.close())
@@ -640,7 +671,7 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {})).toEqual([])
   })
 
-  it('reopens an auto-closed empty right pane with one chooser using the same API without reset or handoff replay', async () => {
+  it('reopens an auto-closed right pane on its last view using the same API without reset or handoff replay', async () => {
     const { api, onClose, onApi, setVisible, view } = renderRightWorkbench('a')
     const native = view.container.querySelector('.dv-dockview')
     act(() => api.getPanel('a')?.api.close())
@@ -651,8 +682,7 @@ describe('WorkbenchView', () => {
     expect(workbenchRegions().get('right')).toBe(api)
     expect(view.container.querySelector('.dv-dockview')).toBe(native)
     setVisible(true)
-    expect(api.panels).toHaveLength(1)
-    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+    expect(api.panels.map(panel => panel.id)).toEqual(['a'])
     await flushLayoutChange()
     expect(onClose).toHaveBeenCalledOnce()
     expect(onApi).toHaveBeenCalledOnce()
@@ -682,6 +712,41 @@ describe('WorkbenchView', () => {
     expect(draftOf('resource')).toBe(draft)
     expect(draft.value).toBe('adopted while retained')
     expect(mounts.get('resource')).toBe(before)
+  })
+
+  it("puts the empty right pane's own chooser away once a view arrives, and keeps a chooser the user opened", async () => {
+    // A pane emptied of choosers only has no last view, so it reopens on its own chooser.
+    const { api, registry, setVisible } = renderRightWorkbench()
+    await flushLayoutChange()
+    act(() => api.panels[0]?.api.close())
+    setVisible(false)
+    await flushLayoutChange()
+    setVisible(true)
+    expect(api.panels).toHaveLength(1)
+    expect(NewViewTabs.isChooser(api.panels[0]!.id)).toBe(true)
+    act(() => {
+      registry.register({ id: 'resource', title: 'Resource', component: DraftPanel, hiddenFromAdd: true })
+      api.addPanel({ id: 'resource', title: 'Resource', component: WORKBENCH_COMPONENT })
+    })
+    await flushLayoutChange()
+    expect(api.panels.map(panel => panel.id)).toEqual(['resource'])
+
+    act(() => void NewViewTabs.open(api))
+    await flushLayoutChange()
+    expect(api.panels).toHaveLength(2)
+  })
+
+  it('leaves the docking menu out of the pane header on a phone and keeps New tab', () => {
+    const media = window.matchMedia
+    window.matchMedia = (query: string): MediaQueryList =>
+      Object.assign(new EventTarget(), { matches: query.includes('max-width'), media: query, onchange: null, addListener: () => {}, removeListener: () => {} })
+    try {
+      renderRightWorkbench('a')
+      expect(screen.getAllByRole('button', { name: 'New tab' }).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('button', { name: 'Pane options' })).toBeNull()
+    } finally {
+      window.matchMedia = media
+    }
   })
 
   it('retains bottom and left final-tab chooser semantics without closing their parents', async () => {
@@ -1205,6 +1270,24 @@ describe('WorkbenchView', () => {
     expect(Object.keys(store.get()?.panels ?? {}).sort()).toEqual(['a', 'b'])
   })
 
+  it('names a panel whose source is gone by its last title and never shows its id', async () => {
+    const storage = memoryStorage()
+    const resourceId = 'dshfiles-resource/session-2e1cc08c/tab2'
+    const registry = registryWith('a')
+    const release = registry.register({ id: resourceId, title: 'Changes', component: DraftPanel })
+    const first = renderWorkbench(registry, storage)
+    act(() => first.api.getPanel(resourceId)?.api.setActive())
+    await flushLayoutChange()
+    first.view.unmount()
+    release()
+
+    const { view } = renderWorkbench(registry, storage)
+    const placeholder = view.container.querySelector(`[data-workbench-panel-id="${resourceId}"]`)
+    expect(placeholder?.textContent).toContain('missingThreadPanelNamed:{"title":"Changes"}')
+    expect(placeholder?.textContent).not.toContain('dshfiles-resource')
+    expect(placeholder?.querySelector('[data-slot="empty-state"]')).not.toBeNull()
+  })
+
   it('keeps a saved panel whose plugin is gone as a closable placeholder that recovers on registration', async () => {
     const storage = memoryStorage()
     const first = renderWorkbench(registryWith('a', 'gone'), storage)
@@ -1214,10 +1297,10 @@ describe('WorkbenchView', () => {
 
     const registry = registryWith('a')
     const { api } = renderWorkbench(registry, storage)
-    expect(screen.getByText('missingPanel:{"id":"gone"}')).toBeTruthy()
+    expect(screen.getByText('missingPanel')).toBeTruthy()
 
     act(() => void registry.register({ id: 'gone', title: 'gone', component: DraftPanel }))
-    expect(screen.queryByText('missingPanel:{"id":"gone"}')).toBeNull()
+    expect(screen.queryByText('missingPanel')).toBeNull()
     expect(draftOf('gone')).toBeTruthy()
 
     act(() => void registry.register({ id: 'gone', title: 'gone', component: () => null })())

@@ -3,7 +3,7 @@ import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { destinationLabel } from './getting-started-page.js'
+import { destinationLabel } from './destination-labels.js'
 import { PHONE_QUERY, ReachModel, type FeatureReach, type WalkStep } from './reach-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { createWalk, type WalkController, type WalkSnapshot } from './walk-controller.js'
@@ -173,7 +173,7 @@ export const WalkUnreadable = (props: { readonly onRetry: () => void; readonly o
       <p className="dshx:text-sm">Show me where could not load this feature's steps. Try again, or end the walk and open the feature from Getting started.</p>
       <div className="dshx:flex dshx:justify-end dshx:gap-2">
         <Button onClick={props.onRetry} size="sm">
-          Try again
+          Retry
         </Button>
         <Button onClick={props.onEnd} size="sm" variant="ghost">
           End

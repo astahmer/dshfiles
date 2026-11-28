@@ -4,7 +4,8 @@
     {
       "id": "pause-stalled-goals",
       "title": "Pause goals after consecutive empty rounds",
-      "summary": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
+      "summary": "A goal pauses after several rounds in a row where the agent produced nothing.",
+      "details": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
       "surfaces": ["client", "host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -101,7 +102,8 @@
     {
       "id": "bounded-goal-continuation",
       "title": "Extend or close goals within bounded policy",
-      "summary": "Add a narrowly scoped Host tool to extend an active goal on its exact final round and complete a round-limit-blocked goal only with evidence.",
+      "summary": "The agent can extend a goal on its last round, or finish one only with evidence.",
+      "details": "Add a narrowly scoped Host tool to extend an active goal on its exact final round and complete a round-limit-blocked goal only with evidence.",
       "surfaces": ["host", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",

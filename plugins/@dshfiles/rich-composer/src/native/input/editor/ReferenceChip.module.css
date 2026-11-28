@@ -34,3 +34,12 @@
   text-decoration: line-through;
   opacity: 0.7;
 }
+
+/*
+ * dshfiles: an agent mention (ReferenceChip.tsx) wears the agent's identity colour, set inline from the theme's slot,
+ * on its own 18% wash, as its sent-message chip and a project mark do; hover keeps the wash instead of the link tint.
+ */
+.chip.agentTone,
+.chip.agentTone:hover {
+  background: color-mix(in oklab, currentColor 18%, transparent);
+}

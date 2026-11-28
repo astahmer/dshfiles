@@ -34,7 +34,8 @@
   --dv-floating-titlebar-background-color: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
   --dv-floating-titlebar-border-bottom: var(--dv-floating-border);
   --dv-group-view-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
-  --dv-tabs-and-actions-container-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+  /* The strip sits on the nav surface (council round 6 B6): only the selected tab is on the canvas and joins it. */
+  --dv-tabs-and-actions-container-background-color: var(--dshx-surface-nav, var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1)));
   --dv-activegroup-visiblepanel-tab-background-color: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
   --dv-activegroup-hiddenpanel-tab-background-color: var(--dsh-main-tab-bg);
   --dv-inactivegroup-visiblepanel-tab-background-color: var(--dsh-main-tab-bg);
@@ -43,15 +44,16 @@
   --dv-activegroup-visiblepanel-tab-color: var(--dsw-alias-label-primary);
   --dv-activegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-visiblepanel-tab-color: var(--dsw-alias-label-secondary);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-tertiary);
+  /* One ink for every tab not on screen (council round 18 B2.1): secondary in and outside the focused group. */
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-separator-border: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   --dv-paneview-header-border-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   /* One tab chrome for both surfaces (the native strip declares the same names in main-tabs): the selected tab
-   * sits on the content background, the others stay one tint above it, and a hairline divides them. Derived from
-   * the label colour so the same mix reads on the light and the dark palette. */
-  --dsh-main-tab-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-bg-hover: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-chip: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+   * sits on the content background and joins it, the others are transparent on the strip's nav surface (council
+   * round 6 B6) and lift to the raised step on hover, and a hairline divides them. Without the generated tones, a mix
+   * of the label colour keeps the hover step on the light and the dark palette. */
+  --dsh-main-tab-bg: transparent;
+  --dsh-main-tab-bg-hover: var(--dshx-tone-raised, color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base)));
   color: var(--dsw-alias-label-primary);
 }
 
@@ -62,8 +64,20 @@
   box-shadow: inset 0 -1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
 }
 
+/* One chrome (council round 3 B1, strip-overhang.ts): the main region's top-left tab row starts after a folded
+ * sidebar's header row, which overhangs the stage's corner; the overhang is 0 while the column is open. */
+.dshfiles-workbench-theme .dv-tabs-and-actions-container[data-workbench-top-start] {
+  padding-inline-start: var(--dshfiles-sidebar-overhang, 0px);
+}
+
 .dshfiles-workbench-theme .dv-groupview > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab:hover {
   background-color: var(--dsh-main-tab-bg-hover);
+}
+
+/* Every tab starts its content 12px in (round five T5): the tab content owns the inset, so a tab with a status seat,
+ * a pinned tab and a page tab line up. Dockview's own 8px side padding would add to it. */
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab {
+  padding-inline: 0;
 }
 
 /* The divider stops at a selected tab: the tab merges with the content below instead of sitting in a box. */
@@ -82,8 +96,8 @@
   box-shadow: none;
 }
 
-/* Tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
- * background. Close buttons stay visible on every tab, pinned tabs excepted. */
+/* Tab chrome: the selected tab carries a top edge (muted outside the focused group) on the base background. Close
+ * buttons stay visible on every tab, pinned tabs excepted. */
 .dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab::before {
   content: '';
   position: absolute;
@@ -95,15 +109,38 @@
   background-color: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
 }
 
-/* Selection in the focused group is the one accent the chrome carries. */
+/* Selection in the focused group is marked in ink (council round 6): indigo means attention only, as the kit's
+ * selected marker. */
 .dshfiles-workbench-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab::before {
-  background-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  background-color: var(--dsw-alias-label-primary);
 }
 
-/* Touch has no hover (visual refresh T5.4): a tab's close answers a 44pt tap. */
+/* A scrolled strip has no scrollbar: the edge that hides tabs fades out, so a cut-off title reads as "more this way"
+ * instead of a clipped glyph. tab-strip-edges.ts marks the strip and leaves out an edge the selected tab sits on, so
+ * the selected tab is never the faded one. A mask reads only alpha, so the opaque stop is the text colour, not a hex. */
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='start'] {
+  mask-image: linear-gradient(to right, transparent, currentColor 28px);
+}
+
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='end'] {
+  mask-image: linear-gradient(to left, transparent, currentColor 28px);
+}
+
+.dshfiles-workbench-theme .dv-tabs-container[data-workbench-tabs-clipped='both'] {
+  mask-image: linear-gradient(to right, transparent, currentColor 28px, currentColor calc(100% - 28px), transparent);
+}
+
+/* Touch has no hover (visual refresh T5.4): a tab's close answers a 44pt tap. Raised over the next tab and dockview's
+ * horizontal scrollbar overlay, which otherwise took the area's right and bottom edges; each tab ends 12px after its
+ * close, so the strip's clip never cuts the area (merge 534773f0). */
 @media (pointer: coarse) {
   .dshfiles-workbench-theme [data-workbench-tab-close] {
     position: relative;
+    z-index: 1;
+  }
+
+  .dshfiles-workbench-theme [data-workbench-tab-id] {
+    padding-inline-end: 12px;
   }
 
   .dshfiles-workbench-theme [data-workbench-tab-close]::after {
@@ -186,7 +223,8 @@
  * occupant marks the document with data-shell-phone-nav and draws a top bar with Back), the main region's tab rows
  * are desktop chrome that only crowd 390px: hide them; the list, Back and the thread panel sheet navigate instead.
  * Without that shell nothing changes, so a profile without phone navigation keeps its tabs. */
-@media (max-width: 639.98px) {
+/* The phone-shell rule (kit PHONE_SHELL_QUERY), not a width: a phone turned sideways (844x390) is still the phone. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   [data-shell-phone-nav] [data-workbench-region='main'] .dv-tabs-and-actions-container {
     display: none;
   }

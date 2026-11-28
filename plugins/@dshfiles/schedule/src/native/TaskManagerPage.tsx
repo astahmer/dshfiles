@@ -42,6 +42,11 @@ export interface TaskManagerInjected extends TaskDetailInjected {
   readonly onClearEnded: () => Promise<void>
   /** Create a task directly through the Host, without a model request. */
   readonly onCreateTask: (request: ScheduleCreateRequest) => Promise<TaskCreateOutcome>
+  /**
+   * dshfiles: open the Automations page, which starts a new thread from a schedule or a webhook. Undefined while no
+   * plugin registers that page, so the description names it without a link that leads nowhere.
+   */
+  readonly openAutomations: () => (() => void) | undefined
 }
 
 /** Root-scoped task catalog props derived from the framework and injected actions. */
@@ -58,7 +63,8 @@ type StatusFilter = 'all' | ScheduleCatalogEntry['status']
  * @returns the searchable task list beside the selected task's detail.
  */
 export function TaskManagerPage(props: TaskManagerPageProps) {
-  const { useCatalog, onNewTask, onClearEnded, onRetry, onCreateTask, t } = props
+  const { useCatalog, onNewTask, onClearEnded, onRetry, onCreateTask, openAutomations, t } = props
+  const showAutomations = openAutomations()
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const catalog = useCatalog(snapshot => snapshot)
@@ -197,8 +203,18 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
       <div className={css.listPane}>
         <div className={css.pageScroll}>
           <div className={css.pageContent}>
-            <div className={css.pageHeading}>
-              <h1 ref={headingRef} tabIndex={-1}>{t('title')}</h1>
+            {/* dshfiles: the kit's `page-header` slot, so on the phone the top bar alone names the page. */}
+            <div className={css.pageHeading} data-slot="page-header">
+              <div className={css.pageTitle}>
+                <h1 ref={headingRef} tabIndex={-1}>{t('title')}</h1>
+                <p className={css.pageDescription}>
+                  {t('description')}{' '}{t('description.otherBefore')}
+                  {showAutomations === undefined ? t('description.otherLink') : (
+                    <button type="button" className={css.descriptionLink} onClick={showAutomations}>{t('description.otherLink')}</button>
+                  )}
+                  {t('description.otherAfter')}
+                </p>
+              </div>
               <div className={css.creationActions}>
                 <span className={css.createGroup} role="group" aria-label={t('host.create')}>
                   <Button variant="primary" size="sm" className={clsx(css.headerAction, css.createPrimary)} icon={<IconPlusOutlineRegular size={13} />}

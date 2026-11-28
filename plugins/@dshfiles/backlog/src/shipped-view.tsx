@@ -1,7 +1,7 @@
 import { isApiError } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { BotIcon, GitCommitHorizontalIcon, GitPullRequestIcon, RefreshCwIcon, RocketIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { BotIcon, GitCommitHorizontalIcon, GitPullRequestIcon, RefreshCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useMemo } from 'react'
@@ -133,7 +133,7 @@ const Summary = (props: {
             </span>
             {stale ? <span className="dshx:rounded-full dshx:bg-warning/12 dshx:px-1.5 dshx:text-warning">Out of date</span> : null}
             <Button size="xs" variant="ghost" className="dshx:ml-auto" disabled={busy} onClick={() => summarize.mutate(true)}>
-              <RefreshCwIcon className={cn('dshx:size-3', busy && 'dshx:animate-spin')} />
+              <RefreshCwIcon className={cn('dshx:size-3', busy && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
               Regenerate
             </Button>
           </div>
@@ -142,7 +142,7 @@ const Summary = (props: {
       {summary === null ? (
         <div>
           <Button size="xs" variant="outline" disabled={busy} onClick={() => summarize.mutate(false)}>
-            <SparklesIcon className={cn('dshx:size-3', busy && 'dshx:animate-pulse')} />
+            <SparklesIcon className={cn('dshx:size-3', busy && 'dshx:animate-pulse dshx:motion-reduce:animate-none')} />
             {busy ? 'Summarizing…' : 'Summarize'}
           </Button>
         </div>
@@ -246,12 +246,10 @@ export const ShippedView = (props: {
   const current = shipped.data?.buckets[0]
   return (
     <div className="dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
-      <div className="dshx:mx-auto dshx:flex dshx:max-w-4xl dshx:flex-col dshx:gap-5 dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">
+      {/* A view of the Backlog page: its heading is a plain section heading over the full pane, no icon tile. */}
+      <div className="dshx:flex dshx:flex-col dshx:gap-5 dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">
         <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
-          <span className="dshx:inline-flex dshx:size-9 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
-            <RocketIcon aria-hidden className="dshx:size-4 dshx:text-muted-foreground" />
-          </span>
-          <h2 className="dshx:text-lg dshx:font-semibold dshx:tracking-tight">Shipped</h2>
+          <h2 className="dshx:text-sm dshx:font-semibold">Shipped</h2>
           <div
             role="radiogroup"
             aria-label="Shipped period"
@@ -283,7 +281,7 @@ export const ShippedView = (props: {
             <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
               <span className="dshx:min-w-0">{errorMessage(shipped.error, 'What shipped could not be read.')}</span>
               <Button size="xs" variant="outline" onClick={() => void shipped.refetch()}>
-                Try again
+                Retry
               </Button>
             </p>
           )

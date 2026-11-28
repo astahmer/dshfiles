@@ -25,36 +25,60 @@ const statusLabels = { inbox: 'Inbox', todo: 'Todo', doing: 'In progress', done:
 const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', question: 'Question' } satisfies Record<BacklogKind, string>
 const attentionLabels = { none: 'No attention', 'needs-input': 'Needs you', blocked: 'Blocked', waiting: 'Waiting' } satisfies Record<BacklogAttention, string>
 
+// Council round 12, D2: every ring in secondary ink (#646362 light, about 5.8:1 on the page; #a7a4a1 dark, about 7.4:1),
+// so a column of rings stays quiet beside the titles. The shape, not the tone, tells the statuses apart.
 const statusTone = {
   inbox: 'dshx:text-muted-foreground',
   todo: 'dshx:text-muted-foreground',
-  doing: 'dshx:text-warning',
-  done: 'dshx:text-success',
-  dropped: 'dshx:text-destructive',
+  doing: 'dshx:text-muted-foreground',
+  done: 'dshx:text-muted-foreground',
+  dropped: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogStatus, string>
 
-/** Linear-style progress rings: dashed for untriaged, empty, half, then a green check or a red cross, since a filled
- * dot is what a project's own colour dot looks like. */
-const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?: string }): JSX.Element => (
-  <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0', statusTone[props.status], props.className)}>
-    {props.status === 'inbox' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 1.8" /> : null}
-    {props.status === 'todo' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" /> : null}
+/** Freshness the glyph draws as stale: an open item idle past its limit may be out of date. */
+const isStale = (freshness: string): boolean => freshness === 'stale' || freshness === 'dormant'
+
+/**
+ * The glyph's one shape: a 16 px ring edged 1.5 px. A stale ring is dashed in ten even steps around its 39.3 px
+ * circumference, so the dashes meet without a seam.
+ */
+const Ring = (props: { readonly stale?: boolean | undefined }): JSX.Element => (
+  <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={props.stale === true ? '2.45 1.477' : undefined} />
+)
+
+/**
+ * Status as an ink ring (council round 10, D3; owner decision: statuses stay ink): an open item (Inbox, Todo) is the
+ * open ring, In progress fills its right half, Done draws a check inside it, Dropped one diagonal stroke in muted ink
+ * (DESIGN.md › Colour roles: the red cross is Failed's, and a page's own vocabulary takes no status hue). The round 8
+ * to-do square read as a checkbox beside the menu chevron. The dashed edge is only for a stale item (council round 6,
+ * D3).
+ */
+const StatusIcon = (props: { readonly status: BacklogStatus; readonly stale?: boolean; readonly className?: string }): JSX.Element => (
+  <svg
+    aria-hidden
+    viewBox="0 0 16 16"
+    width="16"
+    height="16"
+    data-stale={props.stale === true || undefined}
+    className={cn('dshx:size-4 dshx:shrink-0', props.stale === true ? 'dshx:text-muted-foreground' : statusTone[props.status], props.className)}
+  >
+    {props.status === 'inbox' || props.status === 'todo' ? <Ring stale={props.stale} /> : null}
     {props.status === 'doing' ? (
       <>
-        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M7 3.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" />
+        <Ring stale={props.stale} />
+        <path d="M8 4.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" />
       </>
     ) : null}
     {props.status === 'done' ? (
       <>
-        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <path d="m4.2 7.2 1.9 1.9 3.7-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <Ring />
+        <path d="m5.4 8.1 1.85 1.85 3.35-3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ) : null}
     {props.status === 'dropped' ? (
       <>
-        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <path d="m4.9 4.9 4.2 4.2m0-4.2-4.2 4.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <Ring />
+        <path d="m5.5 10.5 5-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </>
     ) : null}
   </svg>
@@ -66,10 +90,10 @@ const kindIcons = { task: SquareCheckIcon, bug: BugIcon, idea: LightbulbIcon, no
 >
 const kindTone = {
   task: 'dshx:text-muted-foreground',
-  bug: 'dshx:text-destructive',
-  idea: 'dshx:text-warning',
-  note: 'dshx:text-info',
-  question: 'dshx:text-teal',
+  bug: 'dshx:text-muted-foreground',
+  idea: 'dshx:text-muted-foreground',
+  note: 'dshx:text-muted-foreground',
+  question: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogKind, string>
 
 const KindIcon = (props: { readonly kind: BacklogKind; readonly className?: string }): JSX.Element => {
@@ -174,7 +198,11 @@ const ActorAvatar = (props: { readonly actorId: string | undefined; readonly cla
         <span
           className={cn(
             'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:ring-2 dshx:ring-background',
-            agent ? 'dshx:bg-violet/20 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/20 dshx:text-info',
+            agent
+              ? 'dshx:bg-identity-2/20 dshx:text-identity-2'
+              : system
+                ? 'dshx:bg-muted dshx:text-muted-foreground'
+                : 'dshx:bg-identity-1/20 dshx:text-identity-1',
             props.className,
           )}
         >
@@ -213,6 +241,7 @@ export class ItemGlyphs {
   static readonly kindLabels = kindLabels
   static readonly attentionLabels = attentionLabels
   static readonly StatusIcon = StatusIcon
+  static readonly isStale = isStale
   static readonly KindIcon = KindIcon
   static readonly AttentionBadge = AttentionBadge
   static readonly AttentionIcon = AttentionIcon

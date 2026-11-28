@@ -130,9 +130,10 @@ export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.
 }
 
 /**
- * A newer release (or a failed check) as a quiet banner above the General rows, not a row among the preferences
+ * A newer release (or a failed check) as a quiet banner after the General rows, not a row among the preferences
  * (visual refresh T4.4): one muted surface with the TL;DR toggle and a dismiss. Nothing renders while the
- * installed release is current or the notice was dismissed for that version.
+ * installed release is current or the notice was dismissed for that version. It answers after the page painted, so it
+ * fades in (120ms, opacity only) below the rows instead of pushing them (round three item 30).
  */
 export const DshReleaseBanner = (props: { readonly t: ShellTranslate }): JSX.Element | null => {
   const { query: status, off } = useReleaseStatus()
@@ -145,7 +146,7 @@ export const DshReleaseBanner = (props: { readonly t: ShellTranslate }): JSX.Ele
     releaseStatus?.releases.flatMap(release => release.highlights.map(highlight => ({ ...highlight, version: release.version }))).slice(0, 8) ?? []
   return (
     <div
-      className="dshx:mt-2 dshx:mb-1 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:bg-muted dshx:px-3 dshx:py-2.5"
+      className="dshx:mt-4 dshx:mb-1 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:bg-muted dshx:px-3 dshx:py-2.5 dshx:animate-in dshx:fade-in-0 dshx:duration-(--dshx-duration-fade) dshx:ease-(--dshx-motion-ease-enter)"
       data-dsh-release-banner=""
       role="status"
     >

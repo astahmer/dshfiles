@@ -7,6 +7,8 @@
  * mirror answers, so a reload of a custom theme does not flash warm stone first. The settings value always wins once
  * it arrives; the cache is presentation only and is cleared when the theme returns to the default.
  */
+import { IdentityPalette, PALETTE_NAMES_ATTRIBUTE, type IdentityNames } from '@dshfiles/plugin-ui/theme/identity'
+
 export const RUNTIME_STYLE_ID = 'dshfiles-ui-styles-theme'
 export const RUNTIME_CACHE_KEY = 'dshfiles-ui-styles:theme-css:v1'
 
@@ -70,9 +72,27 @@ function writeCachedThemeCss(css: string, storage: StorageLike | undefined = saf
   }
 }
 
+/** The part of `<html>` the palette names need; a real `document.documentElement` is one. */
+export interface PaletteNamesRoot {
+  getAttribute(name: string): string | null
+  setAttribute(name: string, value: string): void
+  removeAttribute(name: string): void
+}
+
+/**
+ * Publish the active theme's identity slot names on `<html>` (`PALETTE_NAMES_ATTRIBUTE`), for the kit PalettePicker's
+ * swatch names; removed when the default slots apply. The slot colours themselves travel in the theme CSS.
+ */
+function applyPaletteNames(root: PaletteNamesRoot, names: IdentityNames): void {
+  const value = IdentityPalette.serializeNames(names)
+  if (value === '') root.removeAttribute(PALETTE_NAMES_ATTRIBUTE)
+  else if (root.getAttribute(PALETTE_NAMES_ATTRIBUTE) !== value) root.setAttribute(PALETTE_NAMES_ATTRIBUTE, value)
+}
+
 /** The runtime theme style element and its first-paint cache. */
 export class RuntimeTheme {
   static readonly applyThemeCss = applyThemeCss
   static readonly readCachedThemeCss = readCachedThemeCss
   static readonly writeCachedThemeCss = writeCachedThemeCss
+  static readonly applyPaletteNames = applyPaletteNames
 }

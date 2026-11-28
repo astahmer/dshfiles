@@ -2,6 +2,7 @@ import { Option, Schema } from 'effect'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { useMemo } from 'react'
+import { ListTodoIcon } from '@dshfiles/plugin-ui/icons'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -19,6 +20,9 @@ import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/en
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+/** The Backlog page and its editor load when the page first opens, not at page boot. */
+const BacklogPanel = lazyView(() => import('./backlog-panel.js').then(module => module.BacklogPanel), { label: 'Backlog' })
+
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
@@ -31,7 +35,8 @@ import { BacklogMentionChip } from './backlog-mention-chip.js'
 import { BacklogMentionDropInput } from './backlog-mention-drop.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
-import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
+import type { StartThreadPorts } from './backlog-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
 import { RevisionBacklinks, ThreadBacklinks } from './backlinks-chips.js'
@@ -144,7 +149,7 @@ export default defineClient({
         const text =
           failed.length === 0
             ? `Started ${String(started.length)} threads for ${StartThreadForm.refs(request.items)}`
-            : `Started ${String(started.length)} of ${String(requests.length)} threads; ${String(failed.length)} failed.`
+            : `Started ${String(started.length)} of ${String(requests.length)} threads. ${String(failed.length)} failed: start them again.`
         if (report) BacklogNotices.show({ text, kind: failed.length === 0 ? 'success' : 'failure', sessionId: null })
         const last = started.at(-1)
         return failed.length === 0 && last !== undefined ? { ok: true, sessionId: last.sessionId } : { ok: false, reason: text }
@@ -203,12 +208,12 @@ export default defineClient({
           agent = found.agent
         } catch {
           return automatic
-            ? { kind: 'failed', reason: 'The agent list is unavailable, so the reply was not routed.' }
+            ? { kind: 'failed', reason: 'The agent list did not load, so the reply was not routed. Reply again.' }
             : { kind: 'skipped', reason: 'agents-unavailable' }
         }
         if (agent === null)
           return automatic
-            ? { kind: 'failed', reason: 'The @dsh agent is unavailable, so the reply was not routed.' }
+            ? { kind: 'failed', reason: 'The @dsh agent was not found, so the reply was not routed. Check the handle and reply again.' }
             : { kind: 'skipped', reason: 'unknown-agent' }
         if (!agent.enabled)
           return automatic
@@ -216,7 +221,7 @@ export default defineClient({
             : { kind: 'skipped', reason: 'disabled-agent' }
         if (mention !== null) {
           const candidates = await api.safe.agentContinuationCandidates({ id: item.id, handle })
-          if (!candidates.ok) return { kind: 'failed', reason: `Existing threads could not be checked: ${candidates.error.message}` }
+          if (!candidates.ok) return { kind: 'failed', reason: `Existing threads could not be checked. Reply again. ${candidates.error.message}` }
           if (candidates.value.length > 0) {
             const selection = await chooseContinuation({ agent: AgentComments.choice(agent), threads: candidates.value })
             if (selection.kind === 'cancel') return { kind: 'skipped', reason: 'continuation-cancelled' }
@@ -422,19 +427,10 @@ export default defineClient({
   },
 })
 
+/**
+ * The Backlog's nav glyph is the Work destination's list glyph, the one its rail item and tab draw, at the nav's 1.5
+ * stroke, so the item reads as the same place in all three seats (council round 6, D3).
+ */
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
-  <svg
-    aria-hidden
-    width={props.size ?? 18}
-    height={props.size ?? 18}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <rect x="3.5" y="4" width="5" height="16" rx="1.5" />
-    <rect x="10" y="4" width="5" height="10" rx="1.5" />
-    <rect x="16.5" y="4" width="4" height="6" rx="1.5" />
-  </svg>
+  <ListTodoIcon aria-hidden data-backlog-panel-glyph="" size={props.size ?? 18} strokeWidth={1.5} />
 )

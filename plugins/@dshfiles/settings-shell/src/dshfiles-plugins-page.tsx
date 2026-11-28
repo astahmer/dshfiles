@@ -34,11 +34,13 @@ export const bundleDisplayTitle = (
   return SettingsGroups.humanizeId(bundle.name)
 }
 
+/** The manifest's description for people; a package.json description is a note between developers and never shows. */
 export const bundleDisplayDescription = (
-  bundle: Pick<PluginBundle, 'description' | 'packageDescription'>,
+  bundle: Pick<PluginBundle, 'description'>,
   resolveLocaleText: (text: NonNullable<PluginBundle['description']>) => string,
-): string => resolveBundleText(bundle.description, resolveLocaleText).trim() || (bundle.packageDescription ?? '').trim()
+): string => resolveBundleText(bundle.description, resolveLocaleText).trim()
 
+/** The Settings entry a bundle's Settings button opens: its section's or its page's, else the one named for it. */
 export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bundle: Pick<PluginBundle, 'name' | 'rowIds'>): string | undefined => {
   const rowSet = new Set(bundle.rowIds)
   for (const group of groups) {
@@ -46,7 +48,10 @@ export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bund
       if (entry.id === DSHFILES_PLUGINS_SECTION_ID) continue
       if (entry.bundleName === bundle.name) return entry.id
       if (entry.sectionId !== undefined && rowSet.has(entry.sectionId)) return entry.id
-      if (entry.pages.some(page => rowSet.has(page.ns)) || entry.hiddenPages.some(page => rowSet.has(page.ns))) return entry.id
+      // By its page id: a block of a task entry (Layout › Main tabs) opens that entry; a whole-entry page is the entry.
+      const page = entry.pages.find(candidate => rowSet.has(candidate.ns))
+      if (page !== undefined) return page.pageId
+      if (entry.hiddenPages.some(candidate => rowSet.has(candidate.ns))) return entry.id
     }
   }
   return undefined
@@ -109,7 +114,8 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
       if (status === 'disabled' && bundle.enabled) return false
       if (needle === '') return true
       const title = bundleDisplayTitle(bundle, props.resolveLocaleText).toLowerCase()
-      const description = bundleDisplayDescription(bundle, props.resolveLocaleText).toLowerCase()
+      // The package description is not shown, but it still finds the plugin.
+      const description = `${bundleDisplayDescription(bundle, props.resolveLocaleText)} ${bundle.packageDescription ?? ''}`.toLowerCase()
       return `${title} ${bundle.name.toLowerCase()} ${description}`.includes(needle)
     })
   }, [scopedBundles, status, query, props.resolveLocaleText])
@@ -168,7 +174,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
 
   return (
     <div className="dshx:@container dshx:flex dshx:flex-col dshx:gap-4" data-dshfiles-plugins-page="">
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:py-3">
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:py-3">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <span className="dshx:text-sm dshx:font-medium dshx:text-foreground">
@@ -190,7 +196,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
             </Button>
           )}
           <Button disabled={props.refreshing} onClick={props.onRefresh} size="sm" variant="outline">
-            <RefreshCwIcon aria-hidden="true" className={cn('dshx:size-3.5', props.refreshing && 'dshx:animate-spin')} />
+            <RefreshCwIcon aria-hidden="true" className={cn('dshx:size-3.5', props.refreshing && 'dshx:motion-safe:animate-spin')} />
             {t('pluginsPage.refresh')}
           </Button>
         </div>
@@ -246,7 +252,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
 
       {props.error !== undefined && (
         <div
-          className="dshx:rounded-xl dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:px-4 dshx:py-3 dshx:text-sm dshx:text-destructive"
+          className="dshx:rounded-lg dshx:border dshx:border-destructive/40 dshx:bg-destructive/5 dshx:px-4 dshx:py-3 dshx:text-sm dshx:text-destructive"
           role="alert"
         >
           {props.error}
@@ -255,14 +261,14 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
 
       {props.loading && props.bundles.length === 0 && (
         <div className="dshx:flex dshx:flex-col dshx:gap-2">
-          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-xl" />
-          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-xl" />
-          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-xl" />
+          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-lg" />
+          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-lg" />
+          <Skeleton className="dshx:h-14 dshx:w-full dshx:rounded-lg" />
         </div>
       )}
 
       {!props.loading && props.error === undefined && grouped.length === 0 && (
-        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-dashed dshx:border-border dshx:px-6 dshx:py-10 dshx:text-center">
+        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-dashed dshx:border-border dshx:px-6 dshx:py-10 dshx:text-center">
           <PuzzleIcon aria-hidden="true" className="dshx:size-5 dshx:text-muted-foreground" />
           <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{t('pluginsPage.empty')}</p>
         </div>
@@ -273,12 +279,12 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
         return (
           <section aria-label={section.label} className="dshx:flex dshx:flex-col dshx:gap-2" data-plugins-category={section.id} key={section.id}>
             <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:px-1">
-              <h3 className="dshx:m-0 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{section.label}</h3>
+              <h3 className="dshx:m-0 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{section.label}</h3>
               <span className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
                 {sectionEnabled}/{section.items.length}
               </span>
             </div>
-            <div className="dshx:divide-y dshx:divide-border/70 dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card">
+            <div className="dshx:divide-y dshx:divide-border/70 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
               {section.items.map(bundle => {
                 const title = bundleDisplayTitle(bundle, props.resolveLocaleText)
                 const description = bundleDisplayDescription(bundle, props.resolveLocaleText)
@@ -289,7 +295,7 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
                 return (
                   <div
                     className={cn(
-                      'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-4 dshx:py-3 dshx:transition-colors dshx:duration-100 dshx:hover:bg-accent/25',
+                      'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-4 dshx:py-3 dshx:hover:bg-accent/25',
                       !bundle.enabled && 'dshx:opacity-80',
                     )}
                     data-dshfiles-bundle={bundle.name}

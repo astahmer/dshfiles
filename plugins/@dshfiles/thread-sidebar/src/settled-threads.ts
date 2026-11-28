@@ -1,7 +1,8 @@
 /**
- * The settled status is two settings fields read together: the ids, and when each was settled. The
- * timestamp is what makes both the banner's date and the archive delay possible, so it is written,
- * pruned and read through the helpers here rather than by hand at each call site.
+ * The settled status is two values read together: the ids, and when each was settled. The timestamp is what makes
+ * both the banner's date and the archive delay possible, so it is written, pruned and read through the helpers here
+ * rather than by hand at each call site. The Host keeps it in its own store (settled-store.ts); a Host started before
+ * that store keeps it in two settings fields of the same names.
  */
 export interface SettledStatus {
   readonly settledSessionIds: string[]
@@ -112,7 +113,42 @@ const archivedStillSettled = (input: {
   readonly autoArchiveRunning: boolean
 }): readonly string[] => (input.autoArchiveRunning ? [] : input.settledSessionIds.filter(sessionId => input.archivedSessionIds.has(sessionId)))
 
+/**
+ * The change one settled-status write makes, from the status a page read and the full status it wants next: the ids to
+ * settle (with their instant) and to restore. Sending the change instead of the whole status keeps a settle the Host
+ * made meanwhile.
+ */
+export interface SettledStatusChange {
+  readonly settle: Record<string, number | null>
+  readonly unsettle: string[]
+}
+
+const changeBetween = (current: SettledStatus, next: SettledStatus): SettledStatusChange => {
+  const before = new Set(current.settledSessionIds)
+  const after = new Set(next.settledSessionIds)
+  const settle: Record<string, number | null> = {}
+  for (const sessionId of after) if (!before.has(sessionId)) settle[sessionId] = next.settledAt[sessionId] ?? null
+  return { settle, unsettle: [...before].filter(sessionId => !after.has(sessionId)) }
+}
+
+/** Apply such a change: restore first, then settle, keeping the first instant of a thread already settled. */
+/** A change as the wire delivers it: read-only maps and lists. */
+export interface SettledStatusChangeInput {
+  readonly settle: Readonly<Record<string, number | null>>
+  readonly unsettle: readonly string[]
+}
+
+const applyChange = (status: SettledStatus, change: SettledStatusChangeInput): SettledStatus => {
+  const restored = unsettle(status, change.unsettle)
+  const settledAt = { ...restored.settledAt }
+  for (const [sessionId, at] of Object.entries(change.settle)) if (settledAt[sessionId] === undefined && at !== null) settledAt[sessionId] = at
+  const settledSessionIds = [...new Set([...restored.settledSessionIds, ...Object.keys(change.settle)])]
+  return { settledSessionIds, settledAt: withOnlySettledIds(settledAt, settledSessionIds) }
+}
+
 export class SettledThreadsModel {
+  static readonly changeBetween = changeBetween
+  static readonly applyChange = applyChange
   static readonly archivedStillSettled = archivedStillSettled
   static readonly settle = settle
   static readonly unpinSettledThreads = unpinSettledThreads

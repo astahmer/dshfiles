@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "sqlite-store-open",
-      "title": "One SqlClient layer for a plugin-owned SQLite file",
-      "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only. `deferred` moves that open to the first call on a plugin's own service, for stores whose first read comes later than activation.",
+      "title": "Open a plugin's own database safely",
+      "summary": "Each plugin's database opens in a private folder and its updates run once.",
+      "details": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only. `deferred` moves that open to the first call on a plugin's own service, for stores whose first read comes later than activation.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -74,7 +75,8 @@
     {
       "id": "sqlite-store-space",
       "title": "Free pages go back to the disk",
-      "summary": "A new file is created with auto_vacuum = INCREMENTAL, a bounded incremental_vacuum pass returns at most 32 free pages every 5 minutes, and `reclaim` gives every free page back on the store's own connection: incremental_vacuum on an incremental file, or one converting VACUUM on an older file, only when a user asked. `space` reports page and free-page counts and the mode. An existing file is never converted on its own.",
+      "summary": "Plugin databases give free space back to the disk over time.",
+      "details": "A new file is created with auto_vacuum = INCREMENTAL, a bounded incremental_vacuum pass returns at most 32 free pages every 5 minutes, and `reclaim` gives every free page back on the store's own connection: incremental_vacuum on an incremental file, or one converting VACUUM on an older file, only when a user asked. `space` reports page and free-page counts and the mode. An existing file is never converted on its own.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -144,7 +146,8 @@
     {
       "id": "sqlite-store-lock-wait",
       "title": "Lock-wait spans",
-      "summary": "A top-level transaction that waited at least 50 ms before its body started (for the store's one connection, or in BEGIN IMMEDIATE for another connection's write lock) records a `sqlite lock wait` span with the file name and the wait; one that gave up with SQLITE_BUSY after waiting records it as failed.",
+      "summary": "A database write that waited for a lock records how long, so slow writes show in traces.",
+      "details": "A top-level transaction that waited at least 50 ms before its body started (for the store's one connection, or in BEGIN IMMEDIATE for another connection's write lock) records a `sqlite lock wait` span with the file name and the wait; one that gave up with SQLITE_BUSY after waiting records it as failed.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

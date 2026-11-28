@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -12,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { createPortal } from 'react-dom'
 import { onboardingApi } from './api.js'
 import { FirstRun } from './first-run.js'
-import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
+import type { GettingStartedProps } from './getting-started-page.js'
 import { OnScreenProjects, type OnScreenProject } from './on-screen-project.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
@@ -22,6 +23,9 @@ import { ShowMeWhere, WalkUnreadable } from './show-me-where.js'
 import { StarterTaskCards, StarterTasks } from './starter-tasks.js'
 import { WalkStore } from './walk-store.js'
 import { WizardStore } from './wizard-store.js'
+
+/** The Getting started page loads when it first opens, not at page boot. */
+const GettingStartedPage = lazyView(() => import('./getting-started-page.js').then(module => module.GettingStartedPage), { label: 'Getting started' })
 
 const PANEL_ID = 'dshfiles-onboarding'
 const WIZARD_STEP_ID = 'dshfiles-onboarding-setup'
@@ -107,11 +111,14 @@ export default defineClient({
     const subscribeWorkspaces = (listener: () => void): (() => void) => ctx.workspaces.list.subscribe(listener)
     const readWorkspaces = () => ctx.workspaces.list.getSnapshot().items
     /** Try it starts its demo in this project; the Host checks it is registered. */
-    const useOnScreenProject = (): OnScreenProject | null => {
+    const useOnScreenProject = (sessionId?: string): OnScreenProject | null => {
       const sessions = useSyncExternalStore(subscribeSessions, readSessions, readSessions)
       const workspaces = useSyncExternalStore(subscribeWorkspaces, readWorkspaces, readWorkspaces)
       const threadDirectories = useThreadDirectories(workspaces)
-      return useMemo(() => OnScreenProjects.of({ sessions, workspaces, threadDirectories }), [sessions, threadDirectories, workspaces])
+      return useMemo(
+        () => OnScreenProjects.of({ sessions, workspaces, threadDirectories, sessionId }),
+        [sessions, threadDirectories, workspaces, sessionId],
+      )
     }
 
     /** Into the composer on screen, else a new thread draft; neither sends. */
@@ -234,10 +241,11 @@ export default defineClient({
     ctx.slots.inject('settings.onboarding', () => ctx.slots.register({ name: 'settings.onboarding', id: WIZARD_STEP_ID, order: 10 }, decorate(FirstRunStep)))
 
     // The new-thread hero's first tasks for the project on screen, until the first thread has a message.
-    const HeroStarterTasks = (): ReactNode => {
+    const HeroStarterTasks = (props: { readonly heroSessionId: string | undefined }): ReactNode => {
       const settings = useOnboardingSettings()
       const sessions = useSyncExternalStore(subscribeSessions, readSessions, readSessions)
-      const project = useOnScreenProject()
+      // The hero's own blank Session names the project: the Workbench stage does not retain it as the main view.
+      const project = useOnScreenProject(props.heroSessionId)
       const insert = useInsertPrompt()
       if (!settings.starterTasks) return null
       return <StarterTaskCards beforeFirstThread={StarterTasks.beforeFirstThread(sessions)} insert={insert} project={project?.title ?? null} />
@@ -245,9 +253,9 @@ export default defineClient({
     ctx.slots.inject('conversation.hero.suggestions', () =>
       ctx.slots.register(
         { name: 'conversation.hero.suggestions', id: 'dshfiles-onboarding-starter-tasks', order: 20 },
-        decorate(() => (
+        decorate((props: { readonly heroSessionId: string | undefined }) => (
           <PluginQueryProvider>
-            <HeroStarterTasks />
+            <HeroStarterTasks heroSessionId={props.heroSessionId} />
           </PluginQueryProvider>
         )),
       ),

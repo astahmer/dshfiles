@@ -18,7 +18,7 @@ describe('plugin-guide Host', () => {
       expect(served.freshness.runtimeDshVersion).toBe(GUIDE_CATALOG.dshVersion)
 
       const found = await client.search({ query: 'palette', kind: 'registry' })
-      expect(found.entries.map(entry => entry.publicSymbol)).toEqual(['PaletteActions'])
+      expect(found.entries.map(entry => entry.publicSymbol).sort()).toEqual(['PaletteActions', 'PaletteProjectColors', 'PaletteThreadStatuses'])
 
       expect(host.tools.get('plugin_guide_search')?.name).toBe('plugin_guide_search')
       const result = await host.runTool({ name: 'plugin_guide_search', arguments: { query: 'sidebar', kind: 'slot' } })

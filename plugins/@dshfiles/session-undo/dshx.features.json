@@ -5,7 +5,8 @@
     {
       "id": "turn-undo-redo",
       "title": "Undo and redo a turn: conversation and files together",
-      "summary": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the original; redo restores the files the undo replaced and brings the original back.",
+      "summary": "Undo a turn to roll back its conversation and file changes together, and redo it again.",
+      "details": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the original; redo restores the files the undo replaced and brings the original back.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -83,7 +84,8 @@
     {
       "id": "turn-rewind",
       "title": "Rewind to before any recorded turn, files included",
-      "summary": "The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound turn and its files back. A file restore is refused while another live thread works in the same folder (it would overwrite that thread's edits), with an explicit Rewind anyway override.",
+      "summary": "Rewind to before any turn, files included, from the composer's Rewind menu.",
+      "details": "The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound turn and its files back. A file restore is refused while another live thread works in the same folder (it would overwrite that thread's edits), with an explicit Rewind anyway override.",
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -145,7 +147,8 @@
     {
       "id": "turn-checkpoint",
       "title": "Each turn names the jj revision its edits left, with Restore to here",
-      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: reference the Jujutsu panel opens), and Restore to here rewinds to the start of the next recorded turn, so files and conversation return to how this turn left them. A git workspace takes no turn-end snapshot and shows nothing.",
+      "summary": "Each turn names the revision its edits left, with Restore to here in its menu.",
+      "details": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: reference the Jujutsu panel opens), and Restore to here rewinds to the start of the next recorded turn, so files and conversation return to how this turn left them. A git workspace takes no turn-end snapshot and shows nothing.",
       "surfaces": ["client", "host", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",

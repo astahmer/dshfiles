@@ -1,6 +1,7 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
@@ -14,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
@@ -22,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/co
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, ChevronDownIcon, CopyIcon, RefreshCwIcon, ScrollTextIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
 import { FiringAlertsBanner, FiringAlertsCount } from './alerts/alert-badges.js'
@@ -31,10 +33,10 @@ import { AlertsView, useFiringCount } from './alerts/alerts-view.js'
 import { tracesApi, type ListInput } from './api.js'
 import { BoardsView } from './boards/boards-view.js'
 import { SavedViewsMenu } from './boards/saved-views.js'
-import { ErrorGroups, OperationsTable, ServiceStrip } from './insights.js'
+import { ErrorGroups, OperationsTable } from './insights.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesKeys, tracesQueries } from './queries.js'
-import { EmptyStoreGuide, exportBlocked, ReceiverBadge, ReceiverMessage } from './receiver-status.js'
+import { EmptyStoreGuide, exportBlocked, ReceiverBadge, ReceiverMessage, receiverEndpoint } from './receiver-status.js'
 import { TraceDetailView } from './trace-detail.js'
 import { LogsView, type LogCorrelation } from './log-list.js'
 import { MetricsView } from './metrics-view.js'
@@ -43,7 +45,7 @@ import { createThreadOpener } from './open-thread.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { Schema, type Types } from 'effect'
-import { tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
+import { isMoreTab, MORE_TABS, tracesTabSchema, WINDOW_OPTIONS, type MoreTab, type TracesView } from './view-state.js'
 import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import { panelStores } from './panel-stores.js'
 
@@ -124,6 +126,14 @@ export const TracesPanel = (props: {
   const filtered = search.length > 0 || view.service !== null || view.operation !== null || view.status !== 'all' || view.minDurationMs !== null
   const storeEmpty = status !== undefined && status.store.traces === 0 && status.store.logs === 0 && status.store.metricPoints === 0
   const services = statsQuery.data?.services.map(service => service.service) ?? []
+  const endpoint = status === undefined ? null : receiverEndpoint(status)
+  const moreLabels = {
+    map: t('tabMap'),
+    metrics: t('tabMetrics'),
+    operations: t('tabOperations'),
+    errors: t('tabErrors'),
+    boards: props.tAlerts('tabBoards'),
+  } satisfies Record<MoreTab, string>
 
   return (
     <TooltipProvider>
@@ -135,7 +145,12 @@ export const TracesPanel = (props: {
           status === undefined ? undefined : (
             <>
               <ReceiverBadge status={status} t={t} />
-              <span className="dshx:text-xs dshx:text-muted-foreground" data-testid="traces-store-summary">
+              <span
+                className="dshx:text-xs dshx:text-muted-foreground"
+                data-testid="traces-store-summary"
+                data-receiver-state={status.state}
+                data-endpoint={receiverEndpoint(status) ?? undefined}
+              >
                 {status.store.traces} {t('traces')} · {status.store.spans} {t('spans')} · {status.store.logs} {t('logs')} {t('storedSummary')}
               </span>
             </>
@@ -147,6 +162,16 @@ export const TracesPanel = (props: {
             label: t('refresh'),
             icon: <RefreshCwIcon aria-hidden />,
             onSelect: () => void queryClient.invalidateQueries({ queryKey: tracesKeys.all }),
+          },
+          {
+            id: 'copy-endpoint',
+            label: t('copyEndpoint'),
+            icon: <CopyIcon aria-hidden />,
+            placement: 'overflow',
+            disabled: endpoint === null,
+            onSelect: () => {
+              if (endpoint !== null) void writeClipboard(endpoint)
+            },
           },
           {
             id: 'clear',
@@ -188,26 +213,35 @@ export const TracesPanel = (props: {
           <EmptyStoreGuide status={status} compact={!storeEmpty} t={t} />
         ) : null}
 
-        {statsQuery.data === undefined ? null : (
-          <ServiceStrip stats={statsQuery.data} onPick={service => update({ service, operation: null, tab: 'traces', traceId: null })} t={t} />
-        )}
-
         <FiringAlertsBanner firing={view.tab === 'alerts' ? null : firing} onShow={() => update({ tab: 'alerts' })} t={props.tAlerts} />
 
         <Tabs value={view.tab} onValueChange={value => update({ tab: Schema.decodeUnknownSync(tracesTabSchema)(value) })} className="dshx:min-h-0 dshx:flex-1">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-            <TabsList className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto">
-              <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
-              <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
-              <TabsTrigger value="map">{t('tabMap')}</TabsTrigger>
-              <TabsTrigger value="metrics">{t('tabMetrics')}</TabsTrigger>
-              <TabsTrigger value="operations">{t('tabOperations')}</TabsTrigger>
-              <TabsTrigger value="errors">{t('tabErrors')}</TabsTrigger>
-              <TabsTrigger value="boards">{props.tAlerts('tabBoards')}</TabsTrigger>
-              <TabsTrigger value="alerts">
-                {props.tAlerts('tabAlerts')} <FiringAlertsCount firing={firing} />
-              </TabsTrigger>
-            </TabsList>
+            <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+              <TabsList className="dshx:max-w-full dshx:justify-start dshx:overflow-x-auto">
+                <TabsTrigger value="traces">{t('tabTraces')}</TabsTrigger>
+                <TabsTrigger value="logs">{t('tabLogs')}</TabsTrigger>
+                <TabsTrigger value="alerts">
+                  {props.tAlerts('tabAlerts')} <FiringAlertsCount firing={firing} />
+                </TabsTrigger>
+                {isMoreTab(view.tab) ? <TabsTrigger value={view.tab}>{moreLabels[view.tab]}</TabsTrigger> : null}
+              </TabsList>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-label={t('tabMoreLabel')} className="dshx:text-muted-foreground">
+                    {t('tabMore')}
+                    <ChevronDownIcon aria-hidden className="dshx:opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="dshx-root">
+                  {MORE_TABS.map(tab => (
+                    <DropdownMenuItem key={tab} onSelect={() => update({ tab })}>
+                      {moreLabels[tab]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
               <SavedViewsMenu t={props.tAlerts} stores={stores} />
               {view.tab === 'traces' || view.tab === 'logs' || view.tab === 'alerts' ? null : (
@@ -268,7 +302,7 @@ export const TracesPanel = (props: {
                     min={0}
                     aria-label={t('minDuration')}
                     placeholder={t('minDuration')}
-                    className="dshx:h-8 dshx:w-36 dshx:font-mono!"
+                    className="dshx:h-8 dshx:w-40"
                     value={view.minDurationMs ?? ''}
                     onChange={event => update({ minDurationMs: event.target.value === '' ? null : Math.max(0, Number(event.target.value)) })}
                   />

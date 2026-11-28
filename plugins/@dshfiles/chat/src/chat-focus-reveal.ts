@@ -130,7 +130,13 @@ export const createChatFocusRevealMachine = (timing: RevealTiming) =>
       highlight: ({ context }) => {
         const target = context.landed
         if (target === null) return
-        target.scrollIntoView({ block: 'center' })
+        // A request to open a tool call clicks the call's own row (the first collapsed row in document order, before
+        // anything nested in its body) and brings the row to the top, so its output reads below it.
+        const row = context.focus?.open === true && target.hasAttribute('data-chat-call-id')
+          ? target.querySelector<HTMLElement>('[role="button"][aria-expanded]')
+          : null
+        if (row?.getAttribute('aria-expanded') === 'false') row.click()
+        target.scrollIntoView({ block: row === null ? 'center' : 'start' })
         target.setAttribute(CHAT_FOCUS_ATTRIBUTE, '')
       },
       clearHighlight: ({ context }) => {

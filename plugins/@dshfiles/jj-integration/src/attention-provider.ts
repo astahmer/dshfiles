@@ -2,7 +2,7 @@ import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type 
 import { JjViewReads } from '@dshfiles/jj-cli'
 import { DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, Option, Queue, Ref, Stream } from 'effect'
 import type { RepositoryView, ThreadView } from './api.js'
 import { Landing, LandingMessages } from './landing.js'
 import { RepositoryViews } from './repository-views.js'
@@ -291,7 +291,10 @@ const make = Effect.gen(function* () {
       return refused(outcome.failure.message)
     }
     const result = outcome.success
-    if (result.status === 'landed') return { ok: true, message: `Landed ${plural(result.revisions.length, 'revision')} on ${result.bookmark}.` }
+    if (result.status === 'landed') {
+      yield* retractReady(path).pipe(Effect.catchCause(() => Effect.void))
+      return { ok: true, message: `Landed ${plural(result.revisions.length, 'revision')} on ${result.bookmark}.` }
+    }
     return refused(LandingMessages.forResult(result) ?? `Nothing landed (${result.status}).`)
   })
 
@@ -318,9 +321,24 @@ const make = Effect.gen(function* () {
     Effect.forkScoped,
   )
 
+  /**
+   * A workspace whose work just landed has nothing left to land: its Ready item goes before the land answers (round three
+   * item 28), instead of after the debounced rescan, so the thread list and Inbox stop offering Land with it.
+   */
+  const retractReady = Effect.fn('jj-integration attention retract ready')(function* (path: string) {
+    if (!(yield* apis.isServed(attentionApi))) return
+    const location = yield* views.bestEffortLocation(path)
+    const keys = [...new Set([path, ...(Option.isSome(location) ? [location.value.workspaceRoot] : [])])].map(root => `${root}:ready`)
+    yield* Effect.forEach(keys, dedupeKey => inbox.resolve({ source: READY_TO_LAND_SOURCE, dedupeKey }), { discard: true })
+    yield* Ref.update(stated, current => new Set([...current].filter(key => !keys.includes(key))))
+  })
+
   return {
     /** Re-read the workspaces now, e.g. after a land from the Changes facet or the Land view, so a landed item resolves at once. */
     refresh: Queue.offer(pokes, undefined).pipe(Effect.asVoid),
+    /** Resolve the landed workspace's Ready item now; the next reconcile confirms it. Never fails the land. */
+    landed: (path: string) =>
+      retractReady(path).pipe(Effect.catchCause(cause => Effect.logWarning('jj-integration: the landed Ready item was not retracted', cause))),
     /** A queued land stopped: say so in the inbox until a land of that workspace is tried again. */
     queuedLandFailed: (path: string, message: string) =>
       Effect.flatMap(Clock.currentTimeMillis, at =>

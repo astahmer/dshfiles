@@ -25,6 +25,27 @@ const STEPS = [
   { id: 'first-task', title: 'Start a first task', items: [] },
 ] as const satisfies readonly { readonly id: WizardStep; readonly title: string; readonly items: readonly Prerequisite[] }[]
 
+/** How long the setup check may take before the card says it could not check. */
+const CHECK_TIMEOUT_MS = 5_000
+
+/** Run the check with its own abort signal, failing it when the query is cancelled or the check takes too long. */
+const withCheckTimeout = <T,>(signal: AbortSignal, run: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+  const controller = new AbortController()
+  const abort = (): void => controller.abort()
+  signal.addEventListener('abort', abort, { once: true })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error('The setup check did not answer in time.'))
+    }, CHECK_TIMEOUT_MS)
+  })
+  return Promise.race([run(controller.signal), timeout]).finally(() => {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', abort)
+  })
+}
+
 export const STARTER_PROMPTS = StarterTasks.list({ project: undefined }).map(task => task.prompt)
 
 const Item = (props: { readonly item: ChecklistItem; readonly routes: RouteServices; readonly go: (route: Route) => void }): ReactNode => {
@@ -91,7 +112,8 @@ export const SetupWizard = (props: SetupWizardProps): ReactNode => {
   const [inserted, setInserted] = useState(false)
   const overview = useQuery({
     queryKey: ['onboarding', 'overview', '', null],
-    queryFn: ({ signal }) => props.loadOverview({}, signal),
+    // Round four item 23: a check that does not answer in 5 s says so and offers Retry, instead of "Checking…" for good.
+    queryFn: ({ signal }) => withCheckTimeout(signal, request => props.loadOverview({}, request)),
     enabled: props.open,
     retry: false,
   })
@@ -145,6 +167,17 @@ export const SetupWizard = (props: SetupWizardProps): ReactNode => {
           <p className="dshx:text-sm dshx:text-muted-foreground" role="status">
             Checking…
           </p>
+        ) : null}
+        {overview.isError ? (
+          // A failed check is not an empty step: say what could not be checked, and offer it again.
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" data-wizard-check="failed">
+            <p className="dshx:text-sm dshx:text-muted-foreground" role="status">
+              {step.id === 'account' ? 'Could not check your accounts.' : 'Could not check your projects.'}
+            </p>
+            <Button onClick={() => void overview.refetch()} size="sm" variant="outline">
+              Retry
+            </Button>
+          </div>
         ) : null}
         <EntityList aria-label={step.title}>
           {items.map(item => (

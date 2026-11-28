@@ -29,15 +29,17 @@ const timingLine = (page: Page) => page.locator('[data-dshfiles-tool-meta]')
 
 /** A settled turn folds its steps and groups its shell calls; both are reopened to reach the tool card. */
 const revealSettledToolCard = async (page: Page): Promise<void> => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const card = page.locator('[data-chat-call-id]').first()
   if (await card.isVisible()) return
   const group = page.getByText('Ran commands', { exact: true }).last()
   // The transcript re-renders while it reconnects after a settings save, so a fold toggle can land on a stale row.
   await expect(async () => {
+    if (await card.isVisible()) return
+    // The owned Chat fork folds a turn under "Worked for"; the native Chat these compositions boot says "Completed in".
     if (!(await group.isVisible()))
       await page
-        .getByText(/^Worked for /)
+        .getByText(/^(Worked for|Completed in) /)
         .last()
         .click()
     await expect(group.or(card).first()).toBeVisible({ timeout: 2_000 })
@@ -59,11 +61,11 @@ When('the fake model starts a three-second bash call in a fresh workspace', asyn
 
 Then('the running tool card counts its elapsed seconds', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'tool-meta-running-call-counts-up', async () => {
-    const timer = page.getByRole('timer', { name: /^Running for \d+ s, started \d{2}:\d{2}$/ })
+    const timer = page.getByRole('timer', { name: /^Running for \d+s, started \d{1,2}:\d{2}(?: [AP]M)?$/ })
     await expect(timer).toBeVisible({ timeout: 30_000 })
-    const first = Number(/^(\d+) s/.exec((await timer.textContent()) ?? '')?.[1])
+    const first = Number(/^(\d+)s/.exec((await timer.textContent()) ?? '')?.[1])
     await expect(async () => {
-      expect(Number(/^(\d+) s/.exec((await timer.textContent()) ?? '')?.[1])).toBeGreaterThan(first)
+      expect(Number(/^(\d+)s/.exec((await timer.textContent()) ?? '')?.[1])).toBeGreaterThan(first)
     }).toPass({ timeout: 5_000 })
   })
 })
@@ -93,7 +95,7 @@ When('a second thread waits for jobs with a timeout', async ({ page }: { page: P
 Then('the wait tool card names its target and shows an accessible timeout progress bar', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'tool-meta-wait-tool-names-target-and-shows-timeout-progress', async () => {
     await expect(page.getByText('Waiting for all running background jobs to settle', { exact: true })).toBeVisible({ timeout: 30_000 })
-    const progress = page.getByRole('progressbar', { name: /^Wait timeout countdown: \d+ s remaining of 12 s$/ })
+    const progress = page.getByRole('progressbar', { name: /^Wait timeout countdown: \d+s remaining of 12s$/ })
     await expect(progress).toBeVisible({ timeout: 30_000 })
     const initial = Number(await progress.getAttribute('aria-valuenow'))
     await expect(async () => {
@@ -206,10 +208,51 @@ Then('the approval card is gone and the command never ran', async ({ page }: { p
 Then('once the turn settles the tool card shows how long the call took and when it started', async ({ page }: { page: Page }) => {
   await revealSettledToolCard(page)
   await recordAssertion(page, 'tool-meta-settled-call-shows-duration-and-start', async () => {
-    const note = page.getByRole('note', { name: /^Took \d+\.\d s, started \d{2}:\d{2}$/ })
+    const note = page.getByRole('note', { name: /^Took \d+s, started \d{1,2}:\d{2}(?: [AP]M)?$/ })
     await expect(note).toBeVisible()
-    await expect(note).toHaveText(/^[3-9]\.\d s · \d{2}:\d{2}$/)
+    await expect(note).toHaveText(/^[3-9]s$/)
     await expect(page.getByRole('timer')).toHaveCount(0)
+  })
+})
+
+/** 34em of the 14px prose: the measure a one-line work row stops at (DESIGN.md, layout: transcript measure). */
+const PROSE_MEASURE_PX = 34 * 14
+
+Then('the settled bash row is only as wide as its words, with its duration right after them', async ({ page }: { page: Page }) => {
+  await revealSettledToolCard(page)
+  await recordAssertion(page, 'tool-meta-work-row-fits-its-content', async () => {
+    const frame = page.locator('[data-dshfiles-tool-meta-frame]').filter({ hasText: 'Wait three seconds' }).first()
+    await expect(frame).toHaveAttribute('data-dshfiles-tool-meta-fit', '')
+    const geometry = await frame.evaluate(element => {
+      const textRight = (root: Element): number => {
+        let right = Number.NEGATIVE_INFINITY
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (node.textContent?.trim() === '' || node.parentElement?.closest('[data-dshfiles-tool-meta-label]') !== null) continue
+          const range = document.createRange()
+          range.selectNodeContents(node)
+          for (const box of range.getClientRects()) if (box.width > 0) right = Math.max(right, box.right)
+        }
+        return right
+      }
+      const row = element.querySelector('[data-dshfiles-tool-meta-row]')
+      const duration = element.querySelector('[data-dshfiles-tool-meta-label] [data-dshfiles-tool-meta]')
+      const column = element.closest('[data-chat-call-id]')
+      if (row === null || duration === null || column === null) return undefined
+      const range = document.createRange()
+      range.selectNodeContents(duration)
+      const durationLeft = Math.min(...[...range.getClientRects()].filter(box => box.width > 0).map(box => box.left))
+      return {
+        box: row.getBoundingClientRect().width,
+        column: column.getBoundingClientRect().width,
+        gap: durationLeft - textRight(row),
+      }
+    })
+    if (geometry === undefined) throw new Error('The bash row, its duration or its column is missing.')
+    expect(geometry.box).toBeLessThanOrEqual(PROSE_MEASURE_PX)
+    expect(geometry.box).toBeLessThan(geometry.column)
+    expect(geometry.gap).toBeGreaterThanOrEqual(0)
+    expect(geometry.gap).toBeLessThanOrEqual(16)
   })
   await finishJourneyAssertions(page)
 })
@@ -232,7 +275,7 @@ const saveAndReturnToThread = async (page: Page): Promise<void> => {
       .getByRole('treeitem', { name: /^Fake thread title/ })
       .first()
       .click()
-    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Fake thread title', { timeout: 2_000 })
+    await expect(page.getByRole('navigation', { name: /^(?:Thread|Session) hierarchy$/ })).toContainText('Fake thread title', { timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
 }
 
@@ -246,7 +289,7 @@ When('the tool timing time format is set to {string}', async ({ page }: { page: 
 Then('the tool card start time reads relative to now', async ({ page }: { page: Page }) => {
   await revealSettledToolCard(page)
   await recordAssertion(page, 'tool-meta-relative-start-time', async () => {
-    await expect(page.getByRole('note', { name: /^Took \d+\.\d s, started \d+ (s|min) ago$/ })).toBeVisible()
+    await expect(page.getByRole('note', { name: /^Took \d+s, started \d+ (s|min) ago$/ })).toBeVisible()
   })
 })
 

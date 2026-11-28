@@ -58,8 +58,8 @@ const VIEWPORT_JITTER = 1
 /** `@dshfiles/settings-shell`'s one Settings page (destination-shell opens it the same way). */
 export const SETTINGS_PANEL_ID = 'dshfiles-settings'
 
-/** The tab bar's roots: their list has no Back, it is the bottom of the stack. */
-const ROOTS: ReadonlySet<DestinationId> = new Set(['threads', 'inbox'])
+/** The tab bar's roots (destination-shell PHONE_TABS): their list has no Back, it is the bottom of the stack. */
+const ROOTS: ReadonlySet<DestinationId> = new Set(['threads', 'inbox', 'land'])
 
 /**
  * The phone stack (docs/ade-ux §8 phase 6, prior-art §3.2 rule 1): tab root → list → stage. The top bar names the

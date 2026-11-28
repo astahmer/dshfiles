@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "readable-web-fetch",
-      "title": "Answer ctx.web fetches across redirects with the readable article",
-      "summary": "A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.",
+      "title": "Fetch pages as readable articles",
+      "summary": "Fetched web pages arrive as the readable article, safely across redirects.",
+      "details": "A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.",
       "surfaces": ["host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -92,7 +93,8 @@
     {
       "id": "web-citations",
       "title": "Source chips under web_search and web_fetch results",
-      "summary": "Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tooltip. A click opens the page in the browser pane beside the thread when one takes it, otherwise in a new tab; a modified or middle click always opens a new tab.",
+      "summary": "Web search and fetch results show a chip for each page they returned.",
+      "details": "Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tooltip. A click opens the page in the browser pane beside the thread when one takes it, otherwise in a new tab; a modified or middle click always opens a new tab.",
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",

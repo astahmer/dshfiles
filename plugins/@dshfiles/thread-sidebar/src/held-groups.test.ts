@@ -73,3 +73,17 @@ describe('ThreadListNavigationModel.move', () => {
     expect(ThreadListNavigationModel.focusedRowId(root)).toBe('b')
   })
 })
+
+describe('hold on focus', () => {
+  const element = (focusVisible: boolean): Element => {
+    const node = document.createElement('button')
+    Object.defineProperty(node, 'matches', { value: (selector: string) => (selector === ':focus-visible' ? focusVisible : false) })
+    return node
+  }
+
+  it('holds for keyboard focus only, so a clicked row lets go when the pointer leaves', () => {
+    expect(HeldGroupsModel.holdsOnFocus(element(true))).toBe(true)
+    expect(HeldGroupsModel.holdsOnFocus(element(false))).toBe(false)
+    expect(HeldGroupsModel.holdsOnFocus(null)).toBe(false)
+  })
+})

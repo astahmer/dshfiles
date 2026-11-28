@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import { useId } from 'react'
 import { automationFormProblem, type AutomationForm } from './automation-form.js'
@@ -23,6 +24,13 @@ const WEEKDAYS = [
   ['7', 'Sun'],
 ] as const
 
+/** Every zone the browser knows, with the saved one first kept even when the list lacks it (an older alias). */
+const timeZoneOptions = (current: string): readonly { readonly value: string; readonly label: string }[] => {
+  const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+  const all = zones.includes(current) || current === '' ? zones : [current, ...zones]
+  return (all.includes('UTC') ? all : [...all, 'UTC']).map(zone => ({ value: zone, label: zone.replaceAll('_', ' ') }))
+}
+
 /**
  * Create or edit one automation. The Host validates the schedule (time zone, cron, DST) and the template again and
  * answers with what to fix; that message is shown under the form.
@@ -40,6 +48,7 @@ export const AutomationDialog = (props: {
 }): JSX.Element => {
   const projectLabel = useId()
   const weekdaysLabel = useId()
+  const timeId = useId()
   const form = useAppForm({
     defaultValues: props.initial,
     validationLogic: revalidateLogic(),
@@ -148,7 +157,7 @@ export const AutomationDialog = (props: {
                           onChange={event => field.handleChange(event.currentTarget.value)}
                         />
                         <FieldDescription>
-                          A global Secret Catalog alias. DSH stores only this reference and reads the value on the Host for each request.
+                          A global Secret Catalog alias. DSH stores only this reference and reads the value on this host for each request.
                         </FieldDescription>
                       </Field>
                     )}
@@ -174,7 +183,21 @@ export const AutomationDialog = (props: {
                     <form.AppField name="cron">{field => <field.TextField label="Cron expression" monospace placeholder="0 9 * * 1-5" />}</form.AppField>
                   ) : null}
                   {timingKind === 'daily' || timingKind === 'weekly' ? (
-                    <form.AppField name="time">{field => <field.TextField label="Time (HH:mm)" placeholder="09:00" />}</form.AppField>
+                    <form.Field name="time">
+                      {field => (
+                        <Field>
+                          <FieldLabel htmlFor={timeId}>Time</FieldLabel>
+                          <Input
+                            id={timeId}
+                            type="time"
+                            className="dshx:w-fit"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={event => field.handleChange(event.currentTarget.value)}
+                          />
+                        </Field>
+                      )}
+                    </form.Field>
                   ) : null}
                   {timingKind === 'weekly' ? (
                     <form.Field name="weekdays">
@@ -202,23 +225,47 @@ export const AutomationDialog = (props: {
                   {timingKind === 'every' ? (
                     <form.AppField name="everyMinutes">{field => <field.TextField label="Every (minutes)" placeholder="60" />}</form.AppField>
                   ) : (
-                    <form.AppField name="timeZone">{field => <field.TextField label="Time zone (IANA)" placeholder="Europe/Paris" />}</form.AppField>
+                    <form.Field name="timeZone">
+                      {field => (
+                        <Field>
+                          <FieldLabel id={`${field.name}-label`}>Time zone</FieldLabel>
+                          <Combobox
+                            label="Time zone"
+                            matchTriggerWidth
+                            value={field.state.value}
+                            placeholder="Choose a time zone"
+                            searchPlaceholder="Search by city or region"
+                            emptyLabel="No time zone matches."
+                            options={timeZoneOptions(field.state.value)}
+                            onValueChange={value => field.handleChange(value)}
+                          />
+                        </Field>
+                      )}
+                    </form.Field>
                   )}
                 </>
               )
             }
           </form.Subscribe>
-          <form.AppField name="prompt">
-            {field => (
-              <field.TextAreaField
-                label="Prompt"
-                required
-                rows={5}
-                placeholder="Review open pull requests and summarize what needs attention."
-                description="A webhook prompt may read the request with {{body.path.to.field}} and {{headers.name}}; inserted values are marked as untrusted data."
-              />
+          <form.Subscribe selector={state => state.values.triggerKind}>
+            {triggerKind => (
+              <form.AppField name="prompt">
+                {field => (
+                  <field.TextAreaField
+                    label="Prompt"
+                    required
+                    rows={5}
+                    placeholder="Review open pull requests and summarize what needs attention."
+                    // The template syntax reads a webhook request: it has nothing to read on a schedule.
+                    {...(triggerKind === 'webhook' && {
+                      description:
+                        'Read the request with {{body.path.to.field}} and {{headers.name}}; inserted values are marked as untrusted data.',
+                    })}
+                  />
+                )}
+              </form.AppField>
             )}
-          </form.AppField>
+          </form.Subscribe>
           <div className="dshx:grid dshx:grid-cols-3 dshx:gap-3 dshx:max-sm:grid-cols-1">
             <form.AppField name="agentPreset">{field => <field.TextField label="Agent preset (optional)" />}</form.AppField>
             <form.AppField name="provider">{field => <field.TextField label="Provider (optional)" />}</form.AppField>

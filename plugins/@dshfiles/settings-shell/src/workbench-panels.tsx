@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
-import type { GroupedEntries } from './settings-groups.js'
+import type { GroupedEntries, SettingsOriginFilter } from './settings-groups.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import type { FieldTarget } from './shell-machine.js'
 
@@ -71,6 +71,16 @@ export const createSettingsHubRouter = () => {
   }
 }
 
+/** What a shown Settings pane displays: its category, its search and its All / DSH / Plugins filter. */
+export interface SettingsHubShown {
+  readonly activeId: string | undefined
+  readonly query: string
+  readonly originFilter: SettingsOriginFilter
+}
+
+const NO_COLUMNS: ObservableSnapshot<number> = { getSnapshot: () => 0, subscribe: () => () => undefined }
+const NO_ORIGIN_FILTER: ObservableSnapshot<SettingsOriginFilter> = { getSnapshot: () => 'all', subscribe: () => () => undefined }
+
 /**
  * The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor.
  * Open requests still steer it: without them every caller naming a section landed on General.
@@ -81,6 +91,12 @@ export const createSettingsWorkbenchHub = (sources: {
   readonly initial?: () => SettingsOpenRequest
   readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'onClose'>
   readonly closeSettings: () => void
+  /** How many side columns draw the category list now (council round 4 B1): above 0 the pane drops its own. */
+  readonly columns?: ObservableSnapshot<number> | undefined
+  /** The shown pane's category and query, so the column marks and counts what this pane shows; undefined once hidden. */
+  readonly report?: ((shown: SettingsHubShown | undefined) => void) | undefined
+  /** The shell's source filter, which the side column also sets; absent, the pane keeps its own. */
+  readonly originFilter?: { readonly observable: ObservableSnapshot<SettingsOriginFilter>; readonly set: (next: SettingsOriginFilter) => void } | undefined
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
     const groups = useObservable(sources.groups)
@@ -89,6 +105,11 @@ export const createSettingsWorkbenchHub = (sources: {
     const [field, setField] = useState(initial?.field)
     const [target, setTarget] = useState(initial?.target)
     const [query, setQuery] = useState(initial?.query ?? '')
+    // The shell's source filter when it lends one (the side column sets it too), else the pane's own.
+    const [ownOriginFilter, setOwnOriginFilter] = useState<SettingsOriginFilter>('all')
+    const sharedOriginFilter = useObservable(sources.originFilter?.observable ?? NO_ORIGIN_FILTER)
+    const originFilter = sources.originFilter === undefined ? ownOriginFilter : sharedOriginFilter
+    const setOriginFilter = sources.originFilter?.set ?? setOwnOriginFilter
     const visible = useRef(props.visible !== false)
     visible.current = props.visible !== false
     const [host, setHost] = useState<HTMLDivElement | null>(null)
@@ -114,6 +135,13 @@ export const createSettingsWorkbenchHub = (sources: {
       if (shown) sources.router.activate(hub)
     }, [shown, hub])
     const close = props.onClose ?? sources.closeSettings
+    const columnNavigation = useObservable(sources.columns ?? NO_COLUMNS) > 0
+    const report = sources.report
+    useEffect(() => {
+      if (!shown || report === undefined) return
+      report({ activeId, query, originFilter })
+      return () => report(undefined)
+    }, [shown, activeId, query, originFilter, report])
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
@@ -137,6 +165,7 @@ export const createSettingsWorkbenchHub = (sources: {
         {host !== null && (
           <SettingsTab
             {...view}
+            columnNavigation={columnNavigation}
             host={host}
             sectionOwner={owner}
             sectionTarget={target}
@@ -144,9 +173,19 @@ export const createSettingsWorkbenchHub = (sources: {
               select(entry.sectionId)
               setTarget(entry.target)
             }}
-            onClose={close}
+            // A docked hub always sits in a pane whose tab closes it (and a phone shows Back above it): a header × would
+            // be a second control for the same thing. Sections still get `close` through their owner.
+            onClose={undefined}
             onSelect={select}
+            // A phone's Back returns this pane to its category list (round five B6).
+            onBack={() => {
+              setActiveId(undefined)
+              setField(undefined)
+              setTarget(undefined)
+            }}
             onSearch={setQuery}
+            onOriginFilter={setOriginFilter}
+            originFilter={originFilter}
           />
         )}
       </div>

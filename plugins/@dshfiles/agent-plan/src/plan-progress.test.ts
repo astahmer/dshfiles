@@ -1,3 +1,4 @@
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { describe, expect, it } from 'vitest'
 import { PlanProgress, type PlanItem, type PlanWrite } from './plan-progress.js'
 
@@ -15,7 +16,19 @@ describe('PlanProgress', () => {
     expect(PlanProgress.label(progress)).toBe('Step 3 of 3')
     expect(progress.currentStep?.content).toBe('Test')
     expect(progress.steps.map(step => PlanProgress.elapsed(step, 100_000))).toEqual([30_000, 64_000, 5_000])
-    expect(PlanProgress.formatDuration(64_000)).toBe('1m 04s')
+    expect(formatElapsed(64_000)).toBe('1m 04s')
+  })
+
+  it('shows no time for a step that never started or took under a whole second, and the kit grammar after', () => {
+    expect(PlanProgress.shownDuration(undefined)).toBeUndefined()
+    expect(PlanProgress.shownDuration(0)).toBeUndefined()
+    expect(PlanProgress.shownDuration(400)).toBeUndefined()
+    // C9: rounding made 0.6s read "1s" while the kit's clock, which floors, still read "0s" beside it.
+    expect(PlanProgress.shownDuration(999)).toBeUndefined()
+    expect(PlanProgress.shownDuration(1_400)).toBe('1s')
+    expect(PlanProgress.shownDuration(64_999)).toBe(formatElapsed(64_999))
+    expect(PlanProgress.shownDuration(125_000)).toBe('2m 05s')
+    expect(PlanProgress).not.toHaveProperty('formatDuration')
   })
 
   it('times a step that jumped straight to completed from the write before and reports a finished plan', () => {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { ModeChipCatalog, ModeChipModel, type ModeChipHost } from './mode-chip-model.ts'
 import { CONTEXT_METER_VISIBLE_FROM, contextTone } from './context-tone.ts'
@@ -88,5 +91,35 @@ describe('the context meter (b:v9yh)', () => {
     expect(contextTone(80)).toBe('warn')
     expect(contextTone(94)).toBe('warn')
     expect(contextTone(95)).toBe('danger')
+  })
+})
+
+describe('the mode chip in a narrow bar (unslop phone 6)', () => {
+  // Collapse order (DESIGN.md, plugin-ui): the model name truncates before the mode chip loses its words, because the
+  // words say whether the agent may edit. Only the icon step of a very narrow docked pane leaves the bare icon.
+  const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'mode-chip.tsx'), 'utf8')
+  const classesOf = (marker: string): string => {
+    const at = source.indexOf(marker)
+    const open = source.lastIndexOf('<', at)
+    return source.slice(open, source.indexOf('>', at))
+  }
+
+  it('keeps "Can edit" through the compact step and drops it only at the icon step', () => {
+    const label = classesOf('data-composer-mode-label=""')
+    expect(label).not.toContain('dshx:in-data-model-compact:hidden')
+    expect(label).toContain('dshx:in-data-model-icon:hidden')
+  })
+
+  // Round five C1 (council round 5): a phone's bar keeps "Can edit" while it fits; only a tight bar drops it to its icon.
+  it('keeps "Can edit" at the mark step of a phone bar and drops it only when that bar is tight', () => {
+    const label = classesOf('data-composer-mode-label=""')
+    expect(label).not.toContain('dshx:in-data-model-mark:hidden')
+    expect(label).toContain('dshx:in-data-model-mark-tight:hidden')
+  })
+
+  it('stops the chip from shrinking in the compact step, so the model name truncates first', () => {
+    const chip = source.slice(source.indexOf('aria-label={`Access mode, current: ${label}`}'), source.indexOf('data-composer-mode-chip=""'))
+    expect(chip).toContain('dshx:in-data-model-compact:shrink-0')
+    expect(chip).toContain('dshx:in-data-model-icon:shrink')
   })
 })

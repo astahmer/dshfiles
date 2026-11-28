@@ -1,10 +1,18 @@
+import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { useState } from 'react'
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useId, useState } from 'react'
+import { STATS_MORE_LINK } from './cost-summary.js'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
 
-const TABLE_COLUMNS = ['requests', 'sessions', 'averageTokens', 'input', 'cacheRead', 'cacheWrite', 'output', 'cacheShare', 'costShare', 'cost'] as const
+/**
+ * The table summarizes first: requests, threads, tokens and cost; token composition and the shares open under "Show
+ * breakdown" (council round 17, D2).
+ */
+const SUMMARY_COLUMNS = ['requests', 'sessions', 'tokens', 'cost'] as const
+const TABLE_COLUMNS = ['requests', 'sessions', 'tokens', 'averageTokens', 'input', 'cacheRead', 'cacheWrite', 'output', 'cacheShare', 'costShare', 'cost'] as const
 
 type TableColumn = (typeof TABLE_COLUMNS)[number]
 type CalendarMetric = 'tokens' | 'cost' | 'requests'
@@ -12,6 +20,7 @@ type CalendarMetric = 'tokens' | 'cost' | 'requests'
 const columnLabels = {
   requests: 'Requests',
   sessions: 'Threads',
+  tokens: 'Tokens',
   averageTokens: 'Avg tokens / req',
   input: 'Input',
   cacheRead: 'Cache read',
@@ -28,6 +37,7 @@ const sortableValue = (row: ChartView['breakdown']['model'][number], column: Tab
   if (column === 'requests') return row.requests
   if (column === 'sessions') return row.sessions ?? null
   if (column === 'cost') return row.cost
+  if (column === 'tokens') return row.tokens
   if (column === 'costShare') return row.cost
   if (column === 'averageTokens') return row.missingUsage === 0 && row.requests > 0 ? row.tokens / row.requests : null
   if (column === 'input') return row.missingUsage === 0 ? (row.input ?? null) : null
@@ -41,6 +51,7 @@ const sortableValue = (row: ChartView['breakdown']['model'][number], column: Tab
 const cellValue = (row: ChartView['breakdown']['model'][number], column: TableColumn, totalCost: number | null): string => {
   if (column === 'requests') return numberValue(row.requests)
   if (column === 'sessions') return numberValue(row.sessions)
+  if (column === 'tokens') return row.missingUsage === 0 ? numberValue(row.tokens) : `${numberValue(row.tokens)}*`
   if (column === 'averageTokens') {
     const average = sortableValue(row, column)
     return average === null ? '—' : numberValue(average)
@@ -64,11 +75,20 @@ export const UsageBreakdownTable = (props: {
   readonly view: ChartView
   readonly groupBy: ChartQuery['groupBy']
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
+  /** Opens with the token composition and shares showing. */
+  readonly defaultBreakdown?: boolean
 }): JSX.Element => {
   const [sort, setSort] = useState<{ column: TableColumn | 'group'; direction: 'asc' | 'desc' }>({ column: 'cost', direction: 'desc' })
+  const [breakdown, setBreakdown] = useState(props.defaultBreakdown === true)
+  const tableId = useId()
+  const columns: readonly TableColumn[] = breakdown ? TABLE_COLUMNS : SUMMARY_COLUMNS
+  const toggleBreakdown = (): void => {
+    // Closing the breakdown never leaves the rows sorted by a column that is no longer on screen.
+    if (breakdown && sort.column !== 'group' && !SUMMARY_COLUMNS.some(column => column === sort.column)) setSort({ column: 'cost', direction: 'desc' })
+    setBreakdown(!breakdown)
+  }
   const rows = props.view.breakdown[props.groupBy] ?? []
   const totalCost = props.view.summary.missingUsage === 0 && props.view.summary.unpriced === 0 ? props.view.summary.cost : null
-  const totals = rows.reduce((sum, row) => sum + row.cost, 0)
   const sorted = [...rows].sort((left, right) => {
     const a = sort.column === 'group' ? left.key.toLocaleLowerCase() : sortableValue(left, sort.column)
     const b = sort.column === 'group' ? right.key.toLocaleLowerCase() : sortableValue(right, sort.column)
@@ -79,57 +99,94 @@ export const UsageBreakdownTable = (props: {
   const toggleSort = (column: TableColumn | 'group'): void => {
     setSort(current => ({ column, direction: current.column === column && current.direction === 'desc' ? 'asc' : 'desc' }))
   }
-  const heading = (column: TableColumn | 'group', label: string): JSX.Element => (
-    <th key={column} className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:font-medium dshx:text-muted-foreground first:dshx:text-left">
-      <Button size="xs" variant="ghost" onClick={() => toggleSort(column)} aria-label={`Sort by ${label}`}>
-        {label}
-        {sort.column === column ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''}
-      </Button>
-    </th>
-  )
+  /**
+   * A bare sort control on the cell's own inset, so each label sits on its column's value edge, with a fixed arrow seat
+   * (on the outer side: after the left-aligned first label, before the right-aligned numeric ones) so sorting never
+   * moves a label (council round 12, D1).
+   */
+  const heading = (column: TableColumn | 'group', label: string): JSX.Element => {
+    const active = sort.column === column
+    const arrow = (
+      <span aria-hidden data-sort-slot="" className="dshx:inline-block dshx:w-3 dshx:shrink-0 dshx:text-center">
+        {active ? (sort.direction === 'asc' ? '↑' : '↓') : ''}
+      </span>
+    )
+    return (
+      <th
+        key={column}
+        scope="col"
+        aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+        className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:text-left"
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(column)}
+          aria-label={`Sort by ${label}`}
+          className="dshx:inline-flex dshx:min-h-6 dshx:items-center dshx:gap-0.5 dshx:rounded-sm dshx:hover:text-foreground"
+        >
+          {column === 'group' ? (
+            <>
+              {label}
+              {arrow}
+            </>
+          ) : (
+            <>
+              {arrow}
+              {label}
+            </>
+          )}
+        </button>
+      </th>
+    )
+  }
+  // Models and accounts carry the provider mark "Where it went" draws (council round 14, D1); projects and purposes have none.
+  const marked = props.groupBy === 'model' || props.groupBy === 'provider'
   return (
-    <section className="dshx:min-w-0 dshx:border-t dshx:border-border dshx:pt-4">
-      <h3 className="dshx:mb-2 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
-      <div className="dshx:overflow-x-auto">
-        <table className="dshx:w-full dshx:text-xs">
-          <thead className="dshx:border-b dshx:bg-muted/30">
+    // The hairline card the totals, trend and "Where it went" above take, so the page keeps one rhythm; the cells' own
+    // 8 px inset is pulled back so the first column starts on the title's edge (council round 13, D1).
+    <section className="dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:pt-3.5 dshx:pb-2 dshx:@max-pane-narrow:px-3">
+      {/* The header line the Totals card has: the title, then the disclosure at its end (council round 17, D2). */}
+      <div className="dshx:mb-1 dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-3" data-usage-distribution-header>
+        <h3 className="dshx:text-sm dshx:font-semibold">Usage distribution</h3>
+        <Button aria-controls={tableId} aria-expanded={breakdown} className={STATS_MORE_LINK} onClick={toggleBreakdown} type="button" variant="link">
+          {breakdown ? 'Hide breakdown' : 'Show breakdown'}
+          <ChevronDownIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', breakdown && 'dshx:rotate-180')}
+          />
+        </Button>
+      </div>
+      <div className="dshx:-mx-2 dshx:overflow-x-auto" id={tableId}>
+        <table className="dshx:w-full dshx:text-sm">
+          <thead className="dshx:border-b dshx:border-border">
             <tr>
               {heading('group', props.groupBy === 'provider' ? 'Provider / account' : props.groupBy[0]?.toUpperCase() + props.groupBy.slice(1))}
-              {TABLE_COLUMNS.map(column => heading(column, columnLabels[column]))}
+              {columns.map(column => heading(column, columnLabels[column]))}
             </tr>
           </thead>
           <tbody className="dshx:divide-y dshx:divide-border/50">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={TABLE_COLUMNS.length + 1} className="dshx:p-5 dshx:text-center dshx:text-muted-foreground">
+                <td colSpan={columns.length + 1} className="dshx:p-5 dshx:text-center dshx:text-muted-foreground">
                   No usage recorded.
                 </td>
               </tr>
             ) : (
               sorted.map(row => {
-                const share = totalCost === null || totalCost <= 0 ? null : row.cost / totalCost
-                const knownCostShare = totals > 0 ? row.cost / totals : null
+                // The group cell is the name alone: the Cost share column already states the share (council round 12, D1).
                 return (
                   <tr key={row.key}>
                     <td className="dshx:min-w-40 dshx:max-w-64 dshx:px-2 dshx:py-2">
                       <button
                         type="button"
                         onClick={() => props.onShowRequests(row.key, props.groupBy)}
-                        className="dshx:w-full dshx:text-left dshx:hover:underline"
+                        className="dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:text-left dshx:text-sm dshx:hover:underline"
                       >
-                        <span className="dshx:block dshx:truncate">{row.key}</span>
-                        <span className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
-                          <span className="dshx:h-1.5 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-                            <span
-                              className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1"
-                              style={{ width: `${Math.min(100, (knownCostShare ?? 0) * 100)}%` }}
-                            />
-                          </span>
-                          {share === null ? 'priced share*' : UsageFormattingModel.formatPercent(share)}
-                        </span>
+                        {marked ? <ModelMark modelId={row.key} /> : null}
+                        <span className="dshx:min-w-0 dshx:truncate">{row.key}</span>
                       </button>
                     </td>
-                    {TABLE_COLUMNS.map(column => (
+                    {columns.map(column => (
                       <td key={column} className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:tabular-nums">
                         {cellValue(row, column, totalCost)}
                       </td>
@@ -150,10 +207,17 @@ export const UsageBreakdownTable = (props: {
   )
 }
 
-const calendarClasses = ['dshx:bg-muted', 'dshx:bg-chart-1/25', 'dshx:bg-chart-1/45', 'dshx:bg-chart-1/70', 'dshx:bg-chart-1'] as const
+const calendarClasses = ['dshx:bg-muted', 'dshx:bg-data-1/25', 'dshx:bg-data-1/45', 'dshx:bg-data-1/70', 'dshx:bg-data-1'] as const
 
-export const UsageCalendar = (props: { readonly view: ChartView; readonly range: { readonly from: number; readonly to: number } }): JSX.Element => {
-  const [metric, setMetric] = useState<CalendarMetric>('tokens')
+const calendarMetricLabels = { tokens: 'Tokens', cost: 'Estimated cost', requests: 'Requests' } satisfies Record<CalendarMetric, string>
+
+/** The daily heatmap of the measure the chart above shows: the page keeps one metric switch (council round 2, D1). */
+export const UsageCalendar = (props: {
+  readonly view: ChartView
+  readonly metric: CalendarMetric
+  readonly range: { readonly from: number; readonly to: number }
+}): JSX.Element => {
+  const metric = props.metric
   const grouped = new Map<number, { tokens: number; requests: number; cost: number; missingUsage: number | null; unpriced: number | null }>()
   for (const bucket of props.view.buckets) {
     const day = grouped.get(bucket.start) ?? { tokens: 0, requests: 0, cost: 0, missingUsage: 0, unpriced: 0 }
@@ -184,22 +248,9 @@ export const UsageCalendar = (props: { readonly view: ChartView; readonly range:
   const suffix = metric === 'cost' ? 'estimated USD' : metric === 'tokens' ? 'tokens' : 'requests'
   return (
     <section className="dshx:border-t dshx:border-border dshx:pt-4">
-      <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+      <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2">
         <h3 className="dshx:text-sm dshx:font-semibold">Daily calendar</h3>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          aria-label="Calendar metric"
-          value={metric}
-          onValueChange={value => {
-            if (value === 'tokens' || value === 'cost' || value === 'requests') setMetric(value)
-          }}
-        >
-          <ToggleGroupItem value="tokens">Tokens</ToggleGroupItem>
-          <ToggleGroupItem value="cost">Cost</ToggleGroupItem>
-          <ToggleGroupItem value="requests">Requests</ToggleGroupItem>
-        </ToggleGroup>
+        <span className="dshx:text-xs dshx:text-muted-foreground">{calendarMetricLabels[metric]}</span>
       </header>
       <div className="dshx:overflow-x-auto">
         <div role="img" aria-label={`Daily ${suffix} over ${days.length} days`} className="dshx:grid dshx:w-max dshx:grid-flow-col dshx:grid-rows-7 dshx:gap-1">

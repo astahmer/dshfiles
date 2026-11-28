@@ -288,10 +288,30 @@ const reachSchema = Schema.Array(Schema.String.check(Schema.makeFilter(step => p
   Schema.makeFilter(steps => steps.at(-1)?.startsWith('expect ') === true || 'reach must end with an expect step that proves the feature is on screen'),
 )
 
+/** Longest summary Getting started shows in its two-line clamp; engineering detail belongs in `details`. */
+export const DSHX_SUMMARY_MAX_LENGTH = 160
+
+const summarySchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.makeFilter(
+    text =>
+      text.length <= DSHX_SUMMARY_MAX_LENGTH ||
+      `a summary is one plain sentence of at most ${String(DSHX_SUMMARY_MAX_LENGTH)} characters (this one has ${String(text.length)}); move the rest to details`,
+  ),
+  Schema.makeFilter(text => !text.includes(';') || 'a summary has no semicolon: split the clause off into details'),
+  Schema.makeFilter(text => !text.includes('`') || 'a summary has no backticked identifier: name the thing in plain words and keep the identifier in details'),
+)
+
 export const DshxFeatureSchema = strictStruct({
   id: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)),
   title: Schema.String.check(Schema.isMinLength(1)),
-  summary: Schema.String.check(Schema.isMinLength(1)),
+  /** One plain sentence for the person using the feature; Getting started, packs and the onboarding agent tools show it. */
+  summary: summarySchema,
+  /**
+   * Engineering notes for developers and reviewers: how the feature works, its limits and edge cases. No UI renders it;
+   * keep anything a user needs in `summary`.
+   */
+  details: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   surfaces: Schema.Array(DshxFeatureSurfaceSchema).check(Schema.isMinLength(1)),
   configuration: Schema.Array(configurationOptionSchema),
   states: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),

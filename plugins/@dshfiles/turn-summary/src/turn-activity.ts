@@ -1,4 +1,5 @@
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { EditLines, type LineCounts } from './edit-lines.js'
 
 export interface ToolCallRecord {
@@ -61,9 +62,13 @@ export interface TurnActivitySummary {
 
 /** One part of the footer and the list it opens (`files` and `commands` open lists; the others are counts). */
 export interface TurnSegment {
-  readonly key: 'files' | 'commands' | 'tests' | 'reads' | 'searches' | 'other'
+  readonly key: 'files' | 'commands' | 'tests' | 'reads' | 'searches'
   readonly text: string
   readonly failed?: boolean
+  /** Set on the tests part when every test passed: the line draws the green check of a verified result before it. */
+  readonly passed?: boolean
+  /** Set on the failed-tests part while commands failed: it is the one red part, and opens the failures list. */
+  readonly opensFailures?: boolean
 }
 
 type Category = 'command' | 'edit' | 'read' | 'search' | 'other'
@@ -189,14 +194,14 @@ export class TurnActivity {
       summary.editedFiles.length > 0 ? `edited ${plural(summary.editedFiles.length, 'file', 'files')}` : undefined,
       options.includeReads && summary.readFiles > 0 ? `read ${plural(summary.readFiles, 'file', 'files')}` : undefined,
       options.includeReads && summary.searches > 0 ? plural(summary.searches, 'search', 'searches') : undefined,
-      summary.otherCalls > 0 ? plural(summary.otherCalls, 'other tool call', 'other tool calls') : undefined,
     ].filter(part => part !== undefined)
   }
 
   /**
-   * The footer's parts, each naming the list it opens: "Edited 3 files +42 −7 · ran 6 commands · tests 40/42 · read 4
-   * files". Line counts and tests are left out when their option is off or nothing was counted; `editedFiles: false`
-   * leaves the edits to the walkthrough and the native changed-files card, which already summarize them.
+   * The footer's parts, each naming the list it opens: "Edited 3 files +42 −7 · ran 6 commands · 2 of 42 tests failed ·
+   * read 4 files". Line counts and tests are left out when their option is off or nothing was counted; `editedFiles: false`
+   * leaves the edits to the file chips, which already name them. Calls that are neither a command, an edit, a read nor
+   * a search get no part: "1 other tool call" says nothing a reader can act on.
    */
   static segments(
     summary: TurnActivitySummary,
@@ -211,21 +216,60 @@ export class TurnActivity {
         ? { key: 'files', text: `edited ${plural(summary.editedFiles.length, 'file', 'files')}${counted}` }
         : undefined,
       summary.commands > 0 ? { key: 'commands', text: `ran ${plural(summary.commands, 'command', 'commands')}` } : undefined,
-      tests === undefined ? undefined : { key: 'tests', text: `tests ${tests.passed}/${tests.total}`, failed: tests.failed > 0 },
+      tests === undefined ? undefined : TurnActivity.testsSegment(summary, tests),
       options.includeReads && summary.readFiles > 0 ? { key: 'reads', text: `read ${plural(summary.readFiles, 'file', 'files')}` } : undefined,
       options.includeReads && summary.searches > 0 ? { key: 'searches', text: plural(summary.searches, 'search', 'searches') } : undefined,
-      summary.otherCalls > 0 ? { key: 'other', text: plural(summary.otherCalls, 'other tool call', 'other tool calls') } : undefined,
     ]
     return segments.filter(segment => segment !== undefined)
   }
 
-  /** "1m 12s" for a finished turn's wall time. */
+  /** The one test outcome: "2 of 42 tests failed" in red, opening the failed commands; else "40 tests passed". */
+  private static testsSegment(summary: TurnActivitySummary, tests: TestCounts): TurnSegment {
+    if (tests.failed === 0) return { key: 'tests', text: `${tests.passed} ${tests.passed === 1 ? 'test' : 'tests'} passed`, passed: true }
+    return {
+      key: 'tests',
+      text: `${tests.failed} of ${tests.total} ${tests.total === 1 ? 'test' : 'tests'} failed`,
+      failed: true,
+      opensFailures: summary.failedCommands.length > 0,
+    }
+  }
+
+  /**
+   * Failed commands the footer counts as a part of their own. While the test outcome reads "N of M tests failed", that
+   * part is the turn's one red word and opens every failed command, so a second red "1 command failed" beside it would
+   * spend two warnings on one failure. Without failed tests (or with test results off) the count stands alone.
+   */
+  static failedCommandsBeyondTests(summary: TurnActivitySummary, options: { readonly testResults: boolean }): number {
+    const testsFailed = options.testResults && summary.tests !== undefined && summary.tests.failed > 0
+    return testsFailed ? 0 : summary.failedCommands.length
+  }
+
+  /**
+   * Whether each footer part draws "·" before it: every part but the first (round six C6). A chevron belongs to the
+   * part it opens and never stands in for the separator, so "ran 2 commands › · read 1 file" reads by the same rule as
+   * "+3 −3 · ran 2 commands": skipping it after a chevron made that one pair run together.
+   * @param endsWithChevron - for each part in reading order, whether it ends in a disclosure chevron.
+   */
+  static separators(endsWithChevron: readonly boolean[]): readonly boolean[] {
+    return endsWithChevron.map((_chevron, index) => index > 0)
+  }
+
+  /** "1m 12s" for a finished turn's wall time: the kit's grammar (DESIGN.md › Durations). */
   static duration(ms: number): string {
-    const seconds = Math.max(0, Math.round(ms / 1000))
-    if (seconds < 60) return `${seconds}s`
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
-    return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
+    return formatElapsed(ms)
+  }
+
+  /** The footer's duration, or undefined for a turn under a second: "0s" is not a duration worth a part. */
+  static shownDuration(ms: number): string | undefined {
+    return ms < 1_000 ? undefined : TurnActivity.duration(ms)
+  }
+
+  /**
+   * Whether the footer says the turn's total itself. Chat's "Worked for" row already says it for a turn that ended
+   * normally, and a total is said once; a stopped or failed turn has no such row, so the footer keeps it there.
+   */
+  static saysOwnTotal(endReason: string | undefined): boolean {
+    return endReason === 'aborted' || endReason === 'interrupted' || endReason === 'error'
   }
 
   static isEmpty(summary: TurnActivitySummary): boolean {

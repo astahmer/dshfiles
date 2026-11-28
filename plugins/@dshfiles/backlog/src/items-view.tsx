@@ -275,7 +275,7 @@ const Row = (props: {
               )}
             />
           )}
-          {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
+          {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-foreground" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
           <WorkGlyphs.ProgressBadge progress={item.children} />
           <WorkGlyphs.CriteriaBadge progress={item.criteriaProgress} />
@@ -309,6 +309,7 @@ const Row = (props: {
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
               withLabel
               onPick={status => actions.update.mutate({ id: item.id, status })}
             />
@@ -317,6 +318,7 @@ const Row = (props: {
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
               onPick={status => actions.update.mutate({ id: item.id, status })}
             />
           </span>
@@ -419,7 +421,8 @@ export const ItemsView = (props: {
     clearSelection()
   }
   const filtering = props.statuses.length > 0
-  const visibleGroups = props.groupBy === 'status' && !filtering ? groups : groups.filter(group => group.items.length > 0)
+  // A zero is not drawn (DESIGN.md › Layout, counts): an empty group, status groups included, has no header.
+  const visibleGroups = groups.filter(group => group.items.length > 0)
   const entries = useMemo(
     (): Entry[] =>
       visibleGroups.flatMap(group => {
@@ -496,12 +499,7 @@ export const ItemsView = (props: {
           <span className={roomyOnly}>People</span>
           <span className="dshx:text-right">{props.sort === 'updated' ? 'Updated' : 'Created'}</span>
         </div>
-        {entries.length === 0 && props.ready === true && !filtering ? (
-          <EmptyState className="dshx:py-20">
-            Nothing is ready. Ready items are in the Inbox or Todo, not snoozed, wait on no open item, have no open sub-issue and nobody has claimed them. If
-            open work should be here, the running DSH Host may predate the ready queue: restart the DSH Host process.
-          </EmptyState>
-        ) : null}
+        {entries.length === 0 && props.ready === true && !filtering ? <EmptyState className="dshx:py-20">Nothing is ready to start.</EmptyState> : null}
         {entries.length === 0 && filtering ? (
           <EmptyState className="dshx:py-20" action={{ label: 'Show all statuses', onSelect: props.clearStatuses }}>
             No items match this status filter. Pick another status above, or clear the filter to see everything.

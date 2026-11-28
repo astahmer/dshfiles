@@ -116,6 +116,16 @@ export const settingsShellApi = defineApi({
     documentPath: method({ input: Schema.Void, output: Schema.Struct({ path: Schema.NullOr(Schema.String), exists: Schema.Boolean }) }),
     /** Each Loader row's manifest title and description, cached on the Host until the rows change. */
     bundleLabels: method({ input: Schema.Void, output: Schema.Array(bundleLabelSchema).check(Schema.isMaxLength(2000)) }),
+    /**
+     * The same labels for one reader: only the languages of its fallback chain (English always), without the package
+     * description and the descriptions Settings never shows. A page load reads this instead of `bundleLabels`.
+     */
+    namespaceLabels: method({
+      input: Schema.Struct({
+        languages: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(35))).check(Schema.isMaxLength(16)),
+      }),
+      output: Schema.Array(bundleLabelSchema).check(Schema.isMaxLength(2000)),
+    }),
     /** The native Settings package version the running DSH ships, against the version this shell was ported from. */
     upstream: method({
       input: Schema.Void,

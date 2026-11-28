@@ -60,6 +60,15 @@ test('remote threads share view groups by default and can be separated', () => {
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, separateRemoteThreads: true })?.separateRemoteThreads, true)
 })
 
+test('project names are coloured by default, and a saved choice of plain names is kept', () => {
+  const { threadRowProjectColor, ...older } = DEFAULT_PREFERENCES
+  assert.equal(threadRowProjectColor, true)
+  assert.equal(threadSidebarSettings.schema({}).threadRowProjectColor, true)
+  assert.equal(SidebarPreferencesModel.decode(older)?.threadRowProjectColor, true)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, threadRowProjectColor: false })?.threadRowProjectColor, false)
+  assert.equal(threadSidebarSettings.schema({ threadRowProjectColor: false }).threadRowProjectColor, false)
+})
+
 test('older preferences without group collapse default to no collapsed groups', () => {
   const { collapsedGroups, ...older } = DEFAULT_PREFERENCES
   assert.ok(collapsedGroups.length === 0)
@@ -287,10 +296,13 @@ test('legacy local alert settings migrate into Host preferences without overridi
   assert.equal(migrated.desktopNotificationsEnabled, false)
 })
 
-test('older preferences show every thread-row hover action', () => {
+test('a row hovers one verb by default, and a saved choice of hover actions is kept', () => {
   const { hiddenRowActions, ...older } = DEFAULT_PREFERENCES
-  assert.deepEqual(hiddenRowActions, [])
-  assert.deepEqual(SidebarPreferencesModel.decode(older)?.hiddenRowActions, [])
+  // Done stays (with the recovery pair and Restore, which only their own rows draw); the rest wait in the row menu.
+  assert.deepEqual(hiddenRowActions, ['aside', 'pin', 'park', 'mute', 'archive'])
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.hiddenRowActions, hiddenRowActions)
+  // Someone who chose to show every action keeps them all.
+  assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: [] })?.hiddenRowActions, [])
   assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'mute'] })?.hiddenRowActions, ['aside', 'mute'])
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'nope'] }), null)
 })

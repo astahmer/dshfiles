@@ -2,6 +2,7 @@ import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { Effect, FileSystem, Layer, Option } from 'effect'
 import { FetchHttpClient } from 'effect/http'
+import { LabelLanguages } from './bundle-labels.js'
 import { BundleLabels } from './bundle-labels-promise.js'
 import { InstalledVersions } from './installed-versions.js'
 import { NativeSettings } from './native-settings-promise.js'
@@ -56,6 +57,7 @@ export default DshxPlugin.make({
     Api.bind(settingsShellApi, {
       documentPath,
       bundleLabels: () => BundleLabels.use(labels => labels.read),
+      namespaceLabels: input => BundleLabels.use(labels => Effect.map(labels.read, rows => LabelLanguages.trim(rows, input.languages))),
       upstream: () =>
         InstalledVersions.use(versions =>
           Effect.succeed({

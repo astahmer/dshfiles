@@ -36,6 +36,7 @@ import { AGENT_TEMPLATES, AgentEditor, type AgentFix, type AgentTemplate } from 
 import { AgentEditorForm, agentFieldId } from './agent-editor-form.js'
 import { AgentSavePlans, type AgentSavePlan, type ProjectDefaults } from './agent-save-plan.js'
 import { AgentList, AgentName, AgentTemplates } from './agent-list.js'
+import { AgentTone } from './agent-tone.js'
 import { AgentStartDialog } from './agent-start-dialog.js'
 import { agentLimits, Agents, AGENTS_QUERY_ROOT, type Agent, type AgentDraft, type AgentThread } from './agent.js'
 import { agentsApi, type AgentPresetRow } from './api.js'
@@ -99,6 +100,8 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const catalog = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'catalog'], queryFn: () => props.loadCatalog(), staleTime: 60_000 })
   const agents = useMemo(() => list.data?.agents ?? [], [list.data])
   const options = useMemo(() => catalog.data?.options ?? [], [catalog.data])
+  // The chips elsewhere on the page repaint with a colour saved here without waiting for their own refetch.
+  useEffect(() => AgentTone.setAgents(agents), [agents])
   const projectDefaults = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'project-defaults'], queryFn: ({ signal }) => api.projectDefaults(undefined, { signal }) })
   const defaults: ProjectDefaults = useMemo(
     () => new Map((projectDefaults.data?.projects ?? []).map(project => [project.projectId, project.handle])),
@@ -243,7 +246,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     },
     onError: async error => {
       await Promise.all([invalidateList(), client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'project-defaults'] })])
-      setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here; save again.` })
+      setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here. Save again.` })
     },
   })
   const saveDraft = (): void => {
@@ -467,7 +470,13 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                 All agents
               </Button>
               <PageSection
-                heading={<AgentName glyph={draft.glyph} name={creating ? (draft.name.trim() === '' ? 'New agent' : draft.name) : (current?.name ?? 'Agent')} />}
+                heading={
+                  <AgentName
+                    glyph={draft.glyph}
+                    name={creating ? (draft.name.trim() === '' ? 'New agent' : draft.name) : (current?.name ?? 'Agent')}
+                    slot={AgentTone.slotOf({ handle: review.handle, tone: draft.tone })}
+                  />
+                }
                 description={
                   creating
                     ? `@${review.handle} · not saved yet`

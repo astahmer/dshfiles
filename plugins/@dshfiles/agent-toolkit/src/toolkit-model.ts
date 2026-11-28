@@ -128,7 +128,14 @@ const packageNameOf = (moduleName: string): string => {
   return (moduleName.startsWith('@') ? parts.slice(0, 2) : parts.slice(0, 1)).join('/')
 }
 
+/** A person's name for the plugin that owns a row: "@dshfiles/agent-communication" → "Agent communication". */
+const featureName = (owner: string): string => {
+  const words = owner.replace(/^@[^/]+\//u, '').replaceAll(/[-_]+/gu, ' ').trim()
+  return words === '' ? owner : words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 export class AgentToolkit {
+  static readonly featureName = featureName
   static readonly filters = ['all', 'native', 'plugin', 'mcp', 'memory', 'skills'] as const satisfies readonly ToolkitFilter[]
 
   /** Decodes a listing from any dshx leader; an older one lacks fields, which take neutral defaults. */

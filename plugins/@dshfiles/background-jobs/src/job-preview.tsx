@@ -2,21 +2,21 @@ import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
-import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
-import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
-import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
+import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import type { ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { JobPreviewModel, type JobPreviewView, type JobsClient } from './job-preview-model.js'
-import type { BackgroundJobsTranslate } from './locales.js'
-import { STATUS_KEY, statusVariant } from './panel.js'
+import { JobTitles } from './job-titles.js'
+import type { BackgroundJobsKey, BackgroundJobsTranslate } from './locales.js'
+import { STATUS_KEY } from './panel.js'
 
 /** What the card reads from its plugin, bound once in the client entry. */
 export interface JobPreviewBindings {
@@ -53,15 +53,31 @@ const useJobView = (input: { readonly jobs: JobsClient; readonly sessionId: stri
   return useSyncExternalStore(useJobsSubscribe(jobs), read)
 }
 
-const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: number | undefined; readonly live: boolean }): JSX.Element => {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!props.live) return undefined
-    const timer = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [props.live])
-  return <span className="dshx:shrink-0 dshx:tabular-nums">{formatDurationMs((props.finishedAt ?? now) - props.startedAt)}</span>
-}
+/** The job's one clock: ticking on the page's shared second while it runs, its total once it ends. */
+const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: number | undefined; readonly live: boolean }): JSX.Element =>
+  props.live || props.finishedAt === undefined ? (
+    <LiveElapsed since={props.startedAt} active={props.live} className="dshx:shrink-0 dshx:tabular-nums" />
+  ) : (
+    <span className="dshx:shrink-0 dshx:tabular-nums">{formatElapsed(props.finishedAt - props.startedAt)}</span>
+  )
+
+/** The registry's lifecycle on the six-status glyph: a stopped job is Stopped, not Failed. */
+const GLYPH = {
+  running: 'working',
+  stopping: 'working',
+  completed: 'done',
+  failed: 'failed',
+  killed: 'stopped',
+} as const satisfies Record<JobPreviewView['status'], StatusGlyphState>
+
+/** The word an untitled job's dock row leads with (council round 8 C3); only live jobs sit in the dock. */
+const DOCK_LABEL_KEY = {
+  running: 'previewStateRunning',
+  stopping: 'previewStateStopping',
+  completed: undefined,
+  failed: undefined,
+  killed: undefined,
+} as const satisfies Record<JobPreviewView['status'], BackgroundJobsKey | undefined>
 
 /** Mounted only while the card is open: collapsing stops the stream, and the Host coalesces its frames. */
 const JobOutput = (props: {
@@ -142,14 +158,25 @@ const JobPreviewCard = (
 ) => {
   const { jobs, t, sessionId, jobId, disclosure } = props
   const view = useJobView({ jobs, sessionId, jobId })
+  const readTitle = useCallback(() => JobTitles.titleOf(jobId), [jobId])
+  const title = useSyncExternalStore(JobTitles.subscribe, readTitle)
   const threadLabel = props.useThreadLabel()
   // A job the registry no longer holds (an earlier DSH process, or retention) has nothing live to show.
   if (view === undefined) return null
   const live = JobPreviewModel.isLive(view.status)
+  // One home at a time (DESIGN.md, live work row): the dock above the composer while the job runs, this transcript
+  // card once it has finished.
+  if (props.seat === 'tool-card' && live) return null
   const open = disclosure.expanded
+  // The call's description titles the job; the shell command it ran is the second line.
+  const name = title ?? view.label
+  const dock = props.seat === 'dock'
+  // Council round 8 C3: in the dock an untitled job reads like a subagent row, a 13/500 state word ("Working", its glyph's name) then the command
+  // in regular mono, so both rows share one grammar.
+  const stateWord = dock && title === undefined ? DOCK_LABEL_KEY[view.status] : undefined
   return (
     <section
-      aria-label={`${t('previewKind')}: ${view.label}`}
+      aria-label={`${t('previewKind')}: ${name}`}
       className={cn(
         'dshx-root dshx:@container dshx:my-1 dshx:text-xs',
         props.seat === 'tool-card' && 'dshx:ml-1 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background',
@@ -159,25 +186,49 @@ const JobPreviewCard = (
       data-job-id={view.id}
       data-state={view.status}
     >
+      {/* glyph · description · muted command · elapsed · › (DESIGN.md, live work row) */}
       <ComposerRow
-        icon={<SquareTerminalIcon />}
-        label={<span className="dshx:font-mono!">{view.label}</span>}
+        icon={<StatusGlyph status={GLYPH[view.status]} decorative />}
+        label={
+          stateWord !== undefined ? (
+            <span data-job-state="">{t(stateWord)}</span>
+          ) : title === undefined ? (
+            <span className="dshx:font-mono!">{view.label}</span>
+          ) : (
+            <span data-job-title="">{title}</span>
+          )
+        }
         meta={
           <>
-            <span className="dshx:shrink-0 dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
-            {view.progress === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>}
-            <span role="status" className="dshx:shrink-0">
-              <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
-            </span>
+            {title === undefined && stateWord === undefined ? null : (
+              <span
+                className={cn('dshx:min-w-0 dshx:truncate dshx:font-mono!', stateWord === undefined && 'dshx:@max-pane-narrow:hidden')}
+                data-job-command=""
+              >
+                {view.label}
+              </span>
+            )}
+            <span className="dshx:flex-1" />
+            {/* The glyph says the state; assistive technology hears it as a word (the label already says it in the dock). */}
+            {stateWord === undefined ? <span role="status" className="dshx:sr-only">{t(STATUS_KEY[view.status])}</span> : null}
             <Elapsed startedAt={view.startedAt} finishedAt={view.finishedAt} live={live} />
             <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:transition-transform', open && 'dshx:rotate-90')} />
           </>
         }
         expanded={open}
         onSelect={disclosure.toggle}
-        selectLabel={t('previewToggle', { label: view.label })}
-        variant={props.seat === 'dock' ? 'card' : 'plain'}
-      />
+        selectLabel={t('previewToggle', { label: name })}
+        variant={dock ? 'card' : 'plain'}
+        // Council round 8 C3: the dock row ends like a subagent row's, with a worded link out and its arrow.
+        actions={
+          dock ? (
+            <Button size="xs" variant="ghost" className="dshx:min-w-34 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0" data-job-open-processes="" data-live-work-action="" onClick={props.openProcesses}>
+              <span className="dshx:@max-pane-narrow:sr-only">{t('previewOpenProcesses')}</span>
+              <ArrowUpRightIcon aria-hidden="true" />
+            </Button>
+          ) : undefined
+        }
+      >
       {open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">
           {view.detail === undefined ? null : <p className="dshx:text-muted-foreground">{view.detail}</p>}
@@ -198,6 +249,7 @@ const JobPreviewCard = (
           </div>
         </div>
       ) : null}
+      </ComposerRow>
     </section>
   )
 }
@@ -206,6 +258,11 @@ const JobPreviewCard = (
 export const JobPreviewSection = (props: ToolCallSectionProps & JobPreviewBindings): JSX.Element | null => {
   const text = textOfResult(props.owner)
   const jobId = text === undefined ? undefined : JobPreviewModel.jobIdOfResult({ toolName: props.owner.toolName, text })
+  const description = props.owner.phase === 'result' ? JobTitles.descriptionOf(props.owner.block.call?.argsRaw) : undefined
+  // The native registry keeps only the command; this card sees the call, so it names the job for the strip too.
+  useEffect(() => {
+    if (jobId !== undefined && description !== undefined) JobTitles.remember(jobId, description)
+  }, [jobId, description])
   return jobId === undefined ? null : <ToolCardPreview {...props} jobId={jobId} />
 }
 

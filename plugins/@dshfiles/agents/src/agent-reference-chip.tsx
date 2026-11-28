@@ -4,22 +4,24 @@ import { useRef, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { previewAgentReference } from './agent-reference-links.js'
 import { AgentReference } from './agent-reference.js'
+import { AGENT_TONE_INK, AgentTone } from './agent-tone.js'
 
 /** One agent reference: the same chip in the composer, a sent message and an answer, with the shared card on hover. */
 export const AgentReferenceChip = (props: { readonly handle: string; readonly interactive?: boolean }): JSX.Element => {
   const chip = useRef<HTMLButtonElement | null>(null)
   const label = AgentReference.label(props.handle)
+  const slot = AgentTone.useSlot(props.handle)
+  // The agent's colour on its own wash, like a project chip; icon and handle take the ink that holds AA on it.
   const content = (
     <>
-      <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
-      <span className="dshx:min-w-0 dshx:truncate">{label}</span>
+      <BotIcon aria-hidden className={`${AGENT_TONE_INK} dshx:size-3.5 dshx:shrink-0`} />
+      <span className={`${AGENT_TONE_INK} dshx:min-w-0 dshx:truncate`}>{label}</span>
     </>
   )
-  const chipClassName =
-    'dshx:inline-flex dshx:min-w-0 dshx:max-w-60 dshx:items-center dshx:gap-1 dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:align-middle dshx:text-xs dshx:text-foreground'
+  const chipClassName = `dshx:inline-flex dshx:min-w-0 dshx:max-w-60 dshx:items-center dshx:gap-1 dshx:rounded dshx:border dshx:border-transparent dshx:bg-current/18 dshx:px-1.5 dshx:py-0.5 dshx:align-middle dshx:text-xs ${AgentTone.toneClass(slot)}`
   if (props.interactive === false)
     return (
-      <span className={chipClassName} data-ref-chip="agent">
+      <span className={chipClassName} data-ref-chip="agent" data-agent-chip data-tone={slot}>
         {content}
       </span>
     )
@@ -46,7 +48,9 @@ export const AgentReferenceChip = (props: { readonly handle: string; readonly in
           ref={chip}
           type="button"
         >
-          <span className={chipClassName}>{content}</span>
+          <span className={chipClassName} data-agent-chip data-tone={slot}>
+            {content}
+          </span>
         </button>
       </span>
     </ReferencePreviewAnchor>

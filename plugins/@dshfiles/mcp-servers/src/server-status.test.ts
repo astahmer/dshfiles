@@ -33,12 +33,18 @@ describe('MCP server status model', () => {
   it('maps lifecycle and local process states to labels and a status dot', () => {
     const running = serverView()
     expect(McpServerStatusModel.lifecycleText({ server: running, t: translate })).toBe('clientLoaded')
-    expect(McpServerStatusModel.lifecycleDotClassName(running)).toBe('dshx:bg-success')
+    // A server is a resource that is up or down: one health dot, and the working spinner only while it starts.
+    expect(McpServerStatusModel.lifecycleMark(running)).toBe('ok')
+    expect(McpServerStatusModel.lifecycleMark(serverView({ clientLifecycle: 'starting' }))).toBe('working')
+    expect(McpServerStatusModel.lifecycleMark(serverView({ clientLifecycle: 'start-failed' }))).toBe('down')
+    expect(McpServerStatusModel.lifecycleMark(serverView({ enabled: false, clientLifecycle: 'inactive' }))).toBe('off')
+    expect(McpServerStatusModel.lifecycleMark(serverView({ clientLifecycle: 'manually-disconnected' }))).toBe('off')
+    expect(McpServerStatusModel.lifecycleMark(serverView({ clientLifecycle: 'inactive', configuration: 'needs-credentials' }))).toBe('limited')
     expect(McpServerStatusModel.localProcessText({ server: running, t: translate })).toBe('localProcess: localRunning')
 
     const inactive = serverView({ clientLifecycle: 'inactive', localProcess: 'not-configured' })
     expect(McpServerStatusModel.lifecycleText({ server: inactive, t: translate })).toBe('clientStopped')
-    expect(McpServerStatusModel.lifecycleDotClassName(inactive)).toBe('dshx:bg-muted-foreground/50')
+    expect(McpServerStatusModel.lifecycleMark(inactive)).toBe('off')
     expect(McpServerStatusModel.localProcessText({ server: inactive, t: translate })).toBeUndefined()
   })
 

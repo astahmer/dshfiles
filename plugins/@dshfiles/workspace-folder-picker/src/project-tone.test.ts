@@ -40,6 +40,11 @@ describe('project colours', () => {
     expect(ProjectTone.isCustomColor('')).toBe(false)
   })
 
+  it('names each tone after the hue the kit paints at that index', () => {
+    // plugin-ui's --dshx-project-balanced-0..5: hues 225, 110, 55, 305, 340, 195 (status-safe identity hues).
+    expect(ProjectTone.names).toEqual(['azure', 'olive', 'copper', 'violet', 'magenta', 'teal'])
+  })
+
   it('names the palette class and colour variable of a tone', () => {
     expect(ProjectTone.toneClass(3)).toBe('project-tone-balanced-3')
     expect(ProjectTone.toneClass(7)).toBe('project-tone-balanced-1')

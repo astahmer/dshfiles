@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/dom'
 import { act, cleanup, render } from '@testing-library/react'
@@ -68,12 +70,30 @@ describe('WorkStatus', () => {
       expect(glyph.getAttribute('data-status')).toBe(status)
     }
     const classOf = (status: WorkStatus): string => view.getByRole('img', { name: WorkStatusModel.label(status) }).className
-    expect(classOf('working')).toContain('text-muted-foreground')
     expect(classOf('needs-you')).toContain('text-info')
     expect(classOf('failed')).toContain('text-destructive')
     expect(classOf('idle')).toContain('label-tertiary')
-    // Colour is a signal: only the two attention states carry a hue.
-    expect(classOf('ready')).not.toMatch(/text-(info|destructive|success|warning)/)
+    // DESIGN.md › Colour roles: Ready is the green result dot; Working is motion in ink, never a hue.
+    expect(classOf('ready')).toContain('dshx:text-status-ready')
+    expect(classOf('working')).toContain('dshx:text-status-working')
+    expect(classOf('working')).not.toMatch(/text-(info|destructive|success|warning|muted-foreground)/)
+  })
+
+  it('cross-fades the mark only when the status changes while mounted', () => {
+    const mark = (container: HTMLElement): Element | null => container.querySelector('[data-slot="status-glyph"] > [data-glyph-mark]')
+    const enter = ['dshx:animate-in', 'dshx:fade-in-0', 'dshx:zoom-in-80', 'dshx:duration-(--dshx-duration-fade)']
+    const view = render(<StatusGlyph status="working" />)
+    // A first mount (a virtualised row scrolling in) never replays a change it did not see.
+    expect(mark(view.container)?.className ?? '').not.toContain('animate-in')
+    view.rerender(<StatusGlyph status="ready" />)
+    const changed = mark(view.container)
+    for (const token of enter) expect(changed?.className.split(' ')).toContain(token)
+    // Re-rendering the same status keeps the node, so the 120ms fade does not run again.
+    view.rerender(<StatusGlyph status="ready" className="dshx:ml-1" />)
+    expect(mark(view.container)).toBe(changed)
+    cleanup()
+    const remounted = render(<StatusGlyph status="ready" />)
+    expect(mark(remounted.container)?.className ?? '').not.toContain('animate-in')
   })
 
   it('draws the glyph-only stale and stopped states and phase-locks the working spinner', () => {
@@ -148,6 +168,23 @@ describe('Page', () => {
     { id: 'export', label: 'Export', onSelect: vi.fn(), placement: 'overflow' as const },
   ]
 
+  it('hides its h1 visually, not from screen readers, under the phone top bar that already names the page (unslop phone 25)', () => {
+    const view = render(<Page heading="Usage" meta={<span>0 logs indexed</span>} primaryAction={{ id: 'add', label: 'Add', onSelect: vi.fn() }} />)
+    // Still the page's one h1 for assistive technology.
+    const title = view.getByRole('heading', { level: 1, name: 'Usage' })
+    expect(title.closest('[data-slot="page-header"]')).not.toBeNull()
+    const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
+    const rule = /html:has\(\[data-phone-top-bar\]:not\(\[data-phone-stage='thread'\]\)\) :where\(\[data-slot='page-header'\] h1, \[data-slot='page-header'\] \[data-slot='page-count'\]\) \{([^}]*)\}/u.exec(styles)
+    expect(rule).not.toBeNull()
+    for (const declaration of ['position: absolute', 'width: 1px', 'height: 1px', 'overflow: hidden', 'clip-path: inset(50%)', 'white-space: nowrap']) {
+      expect(rule?.[1]).toContain(declaration)
+    }
+    expect(rule?.[1]).not.toMatch(/display:\s*none/u)
+    // Meta and the primary action keep their seats in the header row.
+    expect(view.getByText('0 logs indexed').closest('[data-slot="page-header"]')).not.toBeNull()
+    expect(view.getByRole('button', { name: 'Add' }).closest('[data-slot="page-header"]')).not.toBeNull()
+  })
+
   it('renders one h1, the description, count and at most one primary action', () => {
     const add = vi.fn()
     const view = render(
@@ -212,6 +249,17 @@ describe('Page', () => {
     fireEvent.mouseDown(view.getByRole('tab', { name: 'Threads' }), { button: 0 })
     expect(onValueChange).toHaveBeenCalledWith('threads')
     expect(view.getByText('body')).toBeTruthy()
+  })
+
+  it('scrolls the tab strip sideways only, so WebKit draws no vertical scrollbar beside it', () => {
+    const view = render(
+      <Page heading="Inbox" tabs={{ label: 'Inbox views', value: 'needs-you', onValueChange: () => {}, items: [{ value: 'needs-you', label: 'Needs you' }] }}>
+        <p>body</p>
+      </Page>,
+    )
+    // overflow-x: auto alone computes overflow-y to auto too; the triggers' touch hit areas overflow by a few pixels.
+    const strip = view.getByRole('tablist', { name: 'Inbox views' }).closest('[data-slot="page-tab-strip"]')
+    expect(strip?.className.split(/\s+/)).toEqual(expect.arrayContaining(['dshx:overflow-x-auto', 'dshx:overflow-y-hidden']))
   })
 
   it('fills the pane height and hands the rest to the active tab in fill mode', () => {

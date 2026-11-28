@@ -27,10 +27,21 @@ describe('theme block', () => {
     expect(generated).not.toMatch(/--dsh-[a-z-]*font-size|--dsh-content-font-delta|--dsh-code-font-delta|font-size:/u)
   })
 
+  it('draws native menus opaque, on the fill kit popovers use, in both schemes', () => {
+    // The Host material (a 70% fill over a 40px blur) reads the transcript through the composer's @, / and + lists.
+    const [, light = '', dark = ''] = generated.split(/\n(?:html body|body\[data-ds-dark-theme\]\[data-ds-dark-theme\]) \{\n/u)
+    for (const block of [light, dark]) {
+      const popover = /--dsw-alias-bg-layer-2: (var\(--dshx-tone-\d+\));/u.exec(block)?.[1]
+      expect(popover).toBeDefined()
+      expect(block).toContain(`--dsw-menu-surface-fill: ${popover};`)
+      expect(block).toContain('--dsw-menu-backdrop-filter: none;')
+    }
+  })
+
   it('keeps Shiki token colours readable on the code block', () => {
     for (const scheme of ['light', 'dark'] as const) {
       const code = PaletteMath.palette({ ...WARM_STONE, scheme }).neutral[1]!
-      for (const hue of [20, 245, 55, 300, 210]) expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
+      for (const hue of Object.values(ThemeCss.SYNTAX_HUES)) expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
     }
   })
 })

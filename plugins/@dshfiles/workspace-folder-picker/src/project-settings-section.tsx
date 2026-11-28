@@ -106,7 +106,7 @@ const ProjectConfigDetail = (props: { readonly path: string }): JSX.Element => {
     return (
       <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
         <p className="dshx:m-0">
-          {errorMessage(query.error, 'The Host did not read this project folder. Retry, and restart DSH if the plugin was just installed.')}
+          {errorMessage(query.error, 'DSH did not read this project folder. Retry, and restart DSH if the plugin was just installed.')}
         </p>
         <Button type="button" size="sm" variant="outline" onClick={() => void query.refetch()}>
           Retry
@@ -175,7 +175,7 @@ export const ProjectSettingsSection = (): JSX.Element => {
         <h2 className="dshx:m-0 dshx:text-lg dshx:font-semibold">Projects</h2>
         <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
           <p className="dshx:m-0">
-            {errorMessage(query.error, 'The Host did not list your projects. Restart DSH if the workspace plugin was just installed, then retry.')}
+            {errorMessage(query.error, 'DSH did not list your projects. Restart DSH if the workspace plugin was just installed, then retry.')}
           </p>
           <Button type="button" size="sm" variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
             Retry

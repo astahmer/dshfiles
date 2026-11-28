@@ -22,23 +22,9 @@ import { SuggestionsWindow } from './suggestions-window.js'
 import { TryItDialog, type TryItDialogProps, type TryItTarget } from './try-it-dialog.js'
 import { WhatsNewSection, type WhatsNewSectionProps } from './whats-new-section.js'
 import { WhatsNewStore } from './whats-new-store.js'
+import { destinationLabel } from './destination-labels.js'
 
-const DESTINATION_LABELS = {
-  threads: 'Threads',
-  inbox: 'Inbox',
-  land: 'Land',
-  work: 'Work',
-  agents: 'Agents',
-  observe: 'Observe',
-  knowledge: 'Knowledge',
-  settings: 'Settings',
-  'thread-panel': 'Thread panel',
-  composer: 'Composer',
-  transcript: 'Transcript',
-  none: 'Agent tools',
-} as const satisfies Record<(typeof DESTINATION_ORDER)[number], string>
-const destinationLabels = new Map<string, string>(Object.entries(DESTINATION_LABELS))
-export const destinationLabel = (id: string): string => destinationLabels.get(id) ?? id
+export { destinationLabel } from './destination-labels.js'
 
 /** The All chip's value: a single toggle group needs a value for every item. */
 const ALL = 'all'
@@ -304,8 +290,9 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
         scroll
       >
         {overview.isError && data === undefined ? (
-          <EmptyState action={{ label: 'Try again', onSelect: () => void overview.refetch() }}>
-            The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH from the bottom of the rail.
+          <EmptyState action={{ label: 'Retry', onSelect: () => void overview.refetch() }}>
+            The checklist, packs and features could not be loaded. Try again; if it keeps failing, restart DSH: choose Restart DSH in the command palette, or
+            stop DSH in its terminal and start it again.
           </EmptyState>
         ) : null}
         {props.settings.checklist && checklist !== null ? (

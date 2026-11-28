@@ -5,7 +5,8 @@
     {
       "id": "phone-sign-in-qr",
       "title": "Print a phone sign-in QR for a trusted HTTPS origin",
-      "summary": "At startup the Host runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve) can reach the native listener without a trustedHosts setting, detects the tailnet hostname, points Serve at that proxy, and prints one scannable sign-in QR. Configured https origins skip detection.",
+      "summary": "At startup DSH prints a QR code that signs a phone in over your tailnet's HTTPS address.",
+      "details": "At startup the Host runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve) can reach the native listener without a trustedHosts setting, detects the tailnet hostname, points Serve at that proxy, and prints one scannable sign-in QR. Configured https origins skip detection.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
@@ -85,8 +86,9 @@
     },
     {
       "id": "phone-edge-routes",
-      "title": "Share the phone origin with other Host plugins",
-      "summary": "The edge API (`@dshfiles/phone-access/edge-api`) reports whether the proxy listens and which public origins reach it, and lets a Host plugin claim paths and a cookie on that origin. Claimed requests go to the claimer's loopback port unchanged; the rest still reach the native listener. Phone pairing uses it to serve /pair and paired devices on the same tailnet address instead of repointing Tailscale.",
+      "title": "Share the phone address with other plugins",
+      "summary": "Other features can serve their own paths on the phone's HTTPS address.",
+      "details": "The edge API (`@dshfiles/phone-access/edge-api`) reports whether the proxy listens and which public origins reach it, and lets a Host plugin claim paths and a cookie on that origin. Claimed requests go to the claimer's loopback port unchanged; the rest still reach the native listener. Phone pairing uses it to serve /pair and paired devices on the same tailnet address instead of repointing Tailscale.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

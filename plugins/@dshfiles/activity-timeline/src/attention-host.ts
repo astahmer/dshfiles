@@ -137,6 +137,8 @@ const make = Effect.gen(function* () {
     DshxPlugin.detached,
     Effect.forkScoped,
   )
+  // A timed snooze ending writes nothing; announce it so readers see the item return without a fast poll.
+  yield* inbox.announceSnoozeEnds.pipe(DshxPlugin.detached, Effect.forkScoped)
   // Ready items unseen for 72 hours close by themselves (plan E2), once at start and then on a slow timer.
   yield* inbox.expireUnseen.pipe(
     Effect.catch(error => Effect.logWarning('attention: unseen items were not expired', error.message)),

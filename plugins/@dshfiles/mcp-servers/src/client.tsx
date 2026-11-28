@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityKinds } from '@dshfiles/input-trigger/entity-registry'
@@ -12,10 +13,12 @@ import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { MCP_LOCALE_NAMESPACE, mcpServersLocale, type McpServersTranslate } from './locales.js'
 import { mcpServersApi } from './api.js'
-import { ManagerView } from './manager-view.js'
 import { McpMentionModel, createMcpMentionSource } from './mcp-mentions.js'
-import { McpQuickPanel } from './mcp-quick-panel.js'
 import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState } from './quick-panel.js'
+import { McpQuickPanel } from './mcp-quick-panel.js'
+
+/** The MCP servers manager loads when it first opens, not at page boot. */
+const ManagerView = lazyView(() => import('./manager-view.js').then(module => module.ManagerView), { label: 'MCP servers' })
 
 const PANEL_ID = 'mcp-servers'
 

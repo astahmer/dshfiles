@@ -475,3 +475,27 @@ describe('saved-view preference updates', () => {
     expect(saved.views).toEqual(DEFAULT_THREAD_VIEW_SETTINGS.views)
   })
 })
+
+// Council round 27, item 8: Reset covers the filters above it, not the Display section below it.
+describe('resetting the Filter panel (round 28, item 8)', () => {
+  it('returns to All threads with no filter on and keeps the grouping the list shows', () => {
+    const onWorking = ThreadViewPreferencesModel.selectThreadView(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID)
+    const regrouped = ThreadViewPreferencesModel.editThreadViewFilters(onWorking, { groupBy: 'date' })
+    const reset = ThreadViewPreferencesModel.resetThreadViewFilters(regrouped).settings
+    expect(reset.activeViewId).toBe(ALL_THREADS_VIEW_ID)
+    expect(ThreadViewPreferencesModel.currentThreadViewFilters(reset)).toEqual({ groupBy: 'date', statusFilters: [], sourceFilter: 'all' })
+  })
+
+  it("leaves no draft when the list already groups as All threads does", () => {
+    const onWorking = ThreadViewPreferencesModel.selectThreadView(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID)
+    const reset = ThreadViewPreferencesModel.resetThreadViewFilters(ThreadViewPreferencesModel.editThreadViewFilters(onWorking, { groupBy: 'state' })).settings
+    expect(reset.draft).toBeUndefined()
+    expect(reset.activeViewId).toBe(ALL_THREADS_VIEW_ID)
+  })
+
+  it('clears the filters in place with presets off', () => {
+    const off = { ...ThreadViewPreferencesModel.selectThreadView(DEFAULT_THREAD_VIEW_SETTINGS, WORKING_VIEW_ID), showPresets: false }
+    const reset = ThreadViewPreferencesModel.resetThreadViewFilters(off).settings
+    expect(ThreadViewPreferencesModel.currentThreadViewFilters(reset)).toMatchObject({ statusFilters: [], sourceFilter: 'all', groupBy: 'status' })
+  })
+})

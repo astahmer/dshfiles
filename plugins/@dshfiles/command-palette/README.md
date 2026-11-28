@@ -70,6 +70,8 @@ IDs must begin with the registering plugin's scope (`@scope/plugin/...`); a row 
 
 Rows wait in the dshx registry while the palette loads, so contributors never wait for it. To open, close or size the palette, follow its `CommandPalette` contract: `api.use(CommandPalette)` is `active` while the palette runs and offers `open(mode)`, `close()`, `setRecentLimit(n)` and its `state`.
 
+Each thread row in the palette shows a project mark. The plugin that owns project colours adds one `PaletteProjectColors` source (`colorOf({ path, title })` returns a class that sets `color:`, or a CSS colour). The thread sidebar adds it, so a project has the same colour in the palette as in the thread list. Without a source the marks stay neutral, and a status hue is never used as a project colour.
+
 ## Build and verify
 
 ```sh

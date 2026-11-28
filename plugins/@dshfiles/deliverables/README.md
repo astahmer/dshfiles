@@ -30,6 +30,7 @@ the recorded delta.
 | [host.ts](src/host.ts)                                                                     | Registers `api/changes.image` ([changed-image-route.ts](src/changed-image-route.ts)).                            |
 | [FileDiff.tsx](src/native/FileDiff.tsx)                                                    | Optional `imageUrl`: a binary or oversized image renders [ChangedImage](src/native/ChangedImage.tsx).            |
 | [ChangedFiles.tsx](src/native/ChangedFiles.tsx), [ReviewTab.tsx](src/native/ReviewTab.tsx) | Pass the file's `api/changes.image` address to `FileDiff`.                                                       |
+| [ChangedFiles.module.css](src/native/ChangedFiles.module.css)                              | Unslop round five C2 (council round 4): the changed-files card hides itself in a turn tail whose turn-summary chips name every edited file (`data-dshfiles-turn-file-chips="all"`); the chips open the same review. |
 | [ReviewTab.tsx](src/native/ReviewTab.tsx)                                                  | The toolbar tooltips pass `portal`, so a Workbench pane (`contain: layout paint`) does not offset them (b:d5wg). |
 | [locales.ts](src/native/locales.ts)                                                        | `image.*` copy for the label and each refusal, in all eight dictionaries.                                        |
 

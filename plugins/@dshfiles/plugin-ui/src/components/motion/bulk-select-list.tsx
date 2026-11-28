@@ -357,7 +357,8 @@ function Row({
         className={cn(
           'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-2 dshx:transition-colors',
           compact ? 'dshx:size-4' : 'dshx:size-5',
-          selected ? 'dshx:border-foreground dshx:bg-foreground dshx:text-background' : 'dshx:border-border dshx:bg-card',
+          // The on state is the control-on ink (council round 9 A2, round 10 A7): L 0.82 in dark, not the near-white ink.
+          selected ? 'dshx:border-control-on dshx:bg-control-on dshx:text-control-on-foreground' : 'dshx:border-border dshx:bg-card',
         )}
       >
         {selected ? <CheckIcon className={compact ? 'dshx:size-3' : 'dshx:size-3.5'} strokeWidth={3} /> : null}

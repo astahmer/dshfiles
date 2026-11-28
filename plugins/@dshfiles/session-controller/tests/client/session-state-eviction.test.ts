@@ -144,4 +144,23 @@ describe('SessionManager list request', () => {
     expect(requests[0]).toEqual({ projections: expect.arrayContaining(['title', 'sessionListMetadata', 'promptedTurnCount']) })
     expect(requests[0]).not.toEqual({ projections: expect.arrayContaining(['turnOutline']) })
   })
+
+  it('asks only for the columns a rendered list row reads, not token totals', async () => {
+    const requests: { readonly projections?: readonly string[] }[] = []
+    const session = {
+      list: async (request: { readonly projections?: readonly string[] }): Promise<RemoteResult<{ items: readonly SessionSummary[] }>> => {
+        requests.push(request)
+        return { ok: true, value: { items: [] } }
+      },
+    }
+    // SAFETY: refreshList reads only session.list.
+    const manager = new SessionManager({ session } as unknown as SessionRemotes)
+    await manager.refreshList()
+
+    // Readers of list rows: the sidebar, its subagent lineage and run rows, the jj panel and the status item. The
+    // stock ui-subagent lineage, the one row reader of `tokenUsage`, is shadowed by thread-sidebar's (priority -1000).
+    expect(requests[0]).toEqual({
+      projections: ['title', 'sessionListMetadata', 'promptedTurnCount', 'userQuestions', 'subagentTiming', 'threadSidebarModelRoute', 'subagent'],
+    })
+  })
 })

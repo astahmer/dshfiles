@@ -1,4 +1,5 @@
 import { useApi } from '@dshfiles/dshx/client'
+import { identityToneClass, identityToneIndex } from '@dshfiles/plugin-ui/components/palette-picker'
 import { ImageIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -152,7 +153,7 @@ export const useMentionCompletion = (props: {
         insert: row.insert,
         label: (
           <>
-            <span aria-hidden>{agent?.glyph ?? '🤖'}</span>
+            <MentionAgentGlyph handle={row.handle} glyph={agent?.glyph} tone={agent?.tone} />
             <span className="dshx:truncate">{agent?.name ?? row.handle}</span>
           </>
         ),
@@ -164,6 +165,23 @@ export const useMentionCompletion = (props: {
 
   return { token, suggestions }
 }
+
+/**
+ * An agent row's glyph on the agent's identity tile, as `ProjectMark` draws a project (round eight): its colour on an
+ * 18 % wash, 20 px, 4 px radius. The colour is the agent's chosen slot, else the one hashed from its handle.
+ */
+export const MentionAgentGlyph = (props: { readonly handle: string; readonly glyph: string | undefined; readonly tone: number | undefined }): JSX.Element => (
+  <span
+    aria-hidden
+    data-agent-glyph=""
+    className={cn(
+      'dshx:inline-flex dshx:h-5 dshx:min-w-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-current/18 dshx:text-xs dshx:leading-none',
+      identityToneClass(props.tone ?? identityToneIndex(props.handle)),
+    )}
+  >
+    {props.glyph ?? '🤖'}
+  </span>
+)
 
 /** The suggestion popup: one row per completion, styled the same in every backlog text box. */
 export const MentionMenu = (props: {

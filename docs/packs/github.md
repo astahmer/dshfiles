@@ -27,24 +27,24 @@ From the onboarding feature catalog: 15 features, the 11 curated ones first.
 
 ### Curated
 
-1. **Review project and workspace changes by scope** (`diffs-review`, thread-panel) — Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff (or, in a git-only repository, its git diff from the merge base wit…
-2. **Summarize review scopes with the thread's own model** (`diffs-review`, thread-panel) — One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.
-3. **Mark a selection of changed files reviewed** (`diffs-review`, thread-panel) — The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.
-4. **Review a thread's changes in its Changes facet** (`diffs-review`, thread-panel) — A thread panel tab that follows the thread on screen and shows its changes in four scopes (this turn from DSH's own turn snapshot; whole thread from fork_point(bookmark | @); uncommitted @-..@; vs the target bookmark), with a file list, one diff view and per-file viewed marks ke…
-5. **See changed images in a review instead of a dropped binary file** (`diffs-review`, thread-panel) — The Changes facet, the Review page and the combined revisions review show each changed image: before and after side by side when both are known revisions (a jj or git range's base and head, a revision and its parent), else the one version there is, labelled (Current for the work…
-6. **Read package.json dependency changes as a table** (`diffs-review`, thread-panel) — In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row w…
-7. **Review several selected revisions together** (`diffs-review`, thread-panel) — Revisions selected in the graph open as one combined review: a small revision graph, newest first, with each revision's own files, state chips (working copy, conflict, divergent, empty, bookmarks) and viewed count, one revision's diff on screen with Previous and Next (j and k on…
-8. **A turn's Edited files card opens Changes on that turn** (`diffs-review`, thread-panel) — Claims the native per-turn review address (dsh-resource://changes-review/…) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the nat…
-9. **Land a thread from the top of its Changes facet** (`diffs-review`, thread-panel) — The Land card shows the target bookmark, how far the workspace is behind it, conflicts, undescribed revisions and the thread's project-check receipts, and offers one primary Land that previews the exact revisions in a confirm dialog and calls jj-integration's land with every Hos…
-10. **Comment on diff lines as chips in the next message** (`diffs-review`, thread-panel) — Selecting line numbers in a Changes diff opens a comment box; Add to next message queues the comment as a line-comment chip in the thread's composer through the public Composer contract (rich-composer serializes it as <comment path lines>).
-11. **Start threads in a project on a schedule** (`project-automations`, work) — Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model throug…
+1. **Review project and workspace changes by scope** (`diffs-review`, thread-panel) — Review a project's or workspace's changes, grouped into scopes, against a bookmark you choose.
+2. **Summarize review scopes with the thread's own model** (`diffs-review`, thread-panel) — One model call turns each review scope into a short line of prose.
+3. **Mark a selection of changed files reviewed** (`diffs-review`, thread-panel) — Select changed files across every scope and mark them reviewed at once.
+4. **Review a thread's changes in its Changes facet** (`diffs-review`, thread-panel) — The Changes tab shows this turn's, this thread's or uncommitted changes, with viewed marks per file.
+5. **See changed images in a review** (`diffs-review`, thread-panel) — Changed images show before and after side by side in Changes and Review.
+6. **Read package.json dependency changes as a table** (`diffs-review`, thread-panel) — A changed package.json shows its dependency changes as a table instead of a text diff.
+7. **Review several selected revisions together** (`diffs-review`, thread-panel) — Select several revisions in the graph to review them together, one diff at a time.
+8. **A turn's Edited files card opens Changes on that turn** (`diffs-review`, thread-panel) — A turn's Edited files card opens the Changes tab on that turn.
+9. **Land a thread from the top of its Changes facet** (`diffs-review`, thread-panel) — The Land card shows what will land and what blocks it, then lands the thread after one confirm.
+10. **Comment on diff lines as chips in the next message** (`diffs-review`, thread-panel) — Select lines in a diff to add a comment to your next message.
+11. **Start threads in a project on a schedule** (`project-automations`, work) — Start a thread in a project on a schedule, with its own prompt, agent and model.
 
 ### More
 
-1. **Link and watch GitHub pull requests from DSH threads** (`pull-requests`) — Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transition…
-2. **Create a GitHub pull request from a thread** (`pull-requests`) — Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create an…
-3. **Move the Review page's marks into the one viewed-marks store** (`diffs-review`) — On load, the Review page's earlier reviewed record (workspace, base, head → paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.
-4. **Start threads from signed webhooks** (`project-automations`) — A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request carries either x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>"), or GitHub's x-hub-signature-256 over the raw body with x-github…
+1. **Link and watch GitHub pull requests from DSH threads** (`pull-requests`) — Pull requests linked to a thread are watched, and their state changes are reported in the thread.
+2. **Create a GitHub pull request from a thread** (`pull-requests`) — Create a GitHub pull request from a thread after a preview with a drafted title and body.
+3. **Move the Review page's marks into the one viewed-marks store** (`diffs-review`) — Reviewed marks from the old Review page move into the shared viewed marks.
+4. **Start threads from signed webhooks** (`project-automations`) — Start a thread in a project when a signed webhook, such as one from GitHub, arrives.
 
 ## Enable it
 

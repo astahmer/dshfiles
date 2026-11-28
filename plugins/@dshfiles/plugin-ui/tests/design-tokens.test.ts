@@ -16,10 +16,17 @@ describe('kit design tokens (visual refresh T0.5)', () => {
     expect(Object.values(HOST_RADII)).toEqual([4, 6, 8, 12, 12, 16])
   })
 
-  it('keeps the desktop text steps at 12/13/14px so P0 moves no layout', () => {
-    expect(theme).toContain('--text-xs: 0.75rem;')
-    expect(theme).toContain('--text-sm: 0.8125rem;')
-    expect(theme).toContain('--text-base: 0.875rem;')
+  it('reads the text steps from the density tokens, keeping 12/13/14px on desktop', () => {
+    expect(theme).toContain('--text-xs: var(--dshx-density-text-meta, 0.75rem);')
+    expect(theme).toContain('--text-sm: var(--dshx-density-text-ui, 0.8125rem);')
+    expect(theme).toContain('--text-base: var(--dshx-density-text-prose, 0.875rem);')
+    const desktop = styles.slice(styles.indexOf('Density. Compact'), styles.indexOf('--dshx-density-target: 28px'))
+    for (const [name, px] of Object.entries({ ui: 13, prose: 14, meta: 12, min: 11 })) expect(desktop).toContain(`--dshx-density-text-${name}: ${px}px;`)
+  })
+
+  it('sizes plugin roots from the density token, so phone text reads 15px (U7)', () => {
+    const root = styles.slice(styles.indexOf('  .dshx-root {'))
+    expect(root).toMatch(/^ {2}\.dshx-root \{[^}]*font: var\(--dshx-density-text-ui, 0\.8125rem\) \/ 1\.45 /u)
   })
 
   it('names heights, elevation levels and the two easing curves', () => {
@@ -31,6 +38,14 @@ describe('kit design tokens (visual refresh T0.5)', () => {
     expect(styles).toContain('--dshx-motion-ease-enter: cubic-bezier(0.2, 0, 0, 1);')
     for (const [name, ms] of Object.entries({ hover: 80, fade: 120, menu: 160, panel: 220, sheet: 280, exit: 100 })) {
       expect(styles).toContain(`--dshx-duration-${name}: ${ms}ms;`)
+    }
+  })
+
+  it("draws Tailwind's default shadow steps from the elevation levels, not its grey defaults", () => {
+    expect(theme).toContain('--shadow-2xs: none;')
+    expect(theme).toContain('--shadow-xs: none;')
+    for (const [step, level] of Object.entries({ sm: 1, md: 2, lg: 2, xl: 3, '2xl': 3 })) {
+      expect(theme).toContain(`--shadow-${step}: var(--dshx-elevation-${level});`)
     }
   })
 

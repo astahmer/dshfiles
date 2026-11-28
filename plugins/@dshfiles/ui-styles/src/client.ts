@@ -4,6 +4,7 @@ import { AppearanceModel, type AppearanceSettings } from '@dshfiles/plugin-ui/th
 import type { Rgb } from '@dshfiles/plugin-ui/theme/readability'
 import { SceneCatalog } from '@dshfiles/plugin-ui/theme/scenes'
 import { columnOfSample, GPU_ATTRIBUTE, SCENE_SAMPLE, type SceneSource } from '@dshfiles/plugin-ui/theme/definition'
+import { PALETTE_NAMES_ATTRIBUTE } from '@dshfiles/plugin-ui/theme/identity'
 import { themeApi } from './api.js'
 import './client.css'
 import { RuntimeTheme, RUNTIME_STYLE_ID } from './runtime-theme.js'
@@ -75,6 +76,8 @@ export default defineClient({
       const snapshot = form.getSnapshot()
       if (snapshot.status === 'loading') return
       const value = snapshot.status === 'ready' ? snapshot.value : undefined
+      // The slot names follow the theme at once; the slot colours come with its CSS below.
+      RuntimeTheme.applyPaletteNames(document.documentElement, value === undefined ? {} : AppearanceModel.identityNames(value))
       const missing = AppearanceModel.scenesNeeded(value).filter(id => !scenes.has(id) && !failed.has(id))
       for (const id of missing) {
         if (loading.has(id)) continue
@@ -121,6 +124,7 @@ export default defineClient({
         stage.dispose()
         document.body.removeAttribute(GPU_ATTRIBUTE)
         document.getElementById(RUNTIME_STYLE_ID)?.remove()
+        document.documentElement.removeAttribute(PALETTE_NAMES_ATTRIBUTE)
       }
     }, 'dshfiles-ui-styles: apply the Appearance theme')
     // The phone sheet geometry lives in this bundle's sheet, so its drag gesture does too: one listener for every sheet.

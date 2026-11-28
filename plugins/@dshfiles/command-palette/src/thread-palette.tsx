@@ -3,20 +3,25 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import type { ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from 'react'
 import { useContentSearch, type ContentSearch } from './content-search-machine.js'
 import { PaletteFrecency, paletteFrecency } from './frecency.js'
 import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
-import { ProjectTone } from './project-tone.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
 import { PaletteApi } from './palette-api.js'
-import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
+import type { PaletteAction, PaletteActionContext, PaletteMode, PaletteProjectColor, PaletteThreadStatus } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
+import { recentTime } from './recent-time.js'
 
 export interface ThreadPaletteCopy {
   readonly title: string
@@ -84,6 +89,8 @@ export interface ThreadPaletteCopy {
   readonly askPending: string
   readonly askSend: string
   readonly askExit: string
+  /** The phone's way out of the full-screen search, at the trailing edge of its first row. */
+  readonly cancel: string
   readonly askFailed: string
 }
 
@@ -94,6 +101,10 @@ interface ThreadPaletteProps {
   readonly threads: readonly ThreadCandidate[]
   /** The current project's threads; when set, the Threads tab lists only these, while a session ID still finds any thread. */
   readonly projectThreads?: readonly ThreadCandidate[]
+  /** The colour the thread list gives a thread's project; without it, project marks stay neutral. */
+  readonly projectColorOf?: (thread: ThreadCandidate) => PaletteProjectColor | undefined
+  /** The thread list's status of a thread (glyph and word); without it a row says Working or Idle from its own turn. */
+  readonly threadStatusOf?: (thread: ThreadCandidate) => PaletteThreadStatus | undefined
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -141,6 +152,26 @@ const withoutRepeatedTitle = (snippet: string, title: string): string => {
     .slice(title.trim().length)
     .replace(/^[\s—–:-]+/u, '')
     .trim()
+}
+
+const neutralMark = 'dshx:bg-muted dshx:text-muted-foreground'
+
+type ProjectMarkPaint = Pick<ProjectMarkProps, 'tone' | 'color' | 'palette' | 'className' | 'style'>
+
+/**
+ * The project mark on a thread row's meta line (round five T6, council round 16 B1): the thread list's `ProjectMark`, in the tone or colour the list gives
+ * the project. A custom pick rides as --chip and is clamped per scheme (L <= 0.52 in light, L >= 0.78 in dark), so a
+ * pale or dark pick still reads. Without a colour source the tile stays neutral ink.
+ */
+const projectMarkPaint = (color: PaletteProjectColor | undefined): ProjectMarkPaint => {
+  if (color === undefined || (color.tone === undefined && color.color === undefined)) return { color: 'currentColor', className: neutralMark }
+  if (color.color === undefined) return { tone: color.tone, palette: color.palette }
+  const style: CSSProperties & Readonly<Record<'--chip' | '--chip-light' | '--chip-dark', string>> = {
+    '--chip': color.color,
+    '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
+    '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
+  }
+  return { color: 'var(--chip-clamped)', className: 'dshx:[--chip-clamped:var(--chip-light)] dshx:dark:[--chip-clamped:var(--chip-dark)]', style }
 }
 
 const projectLabel = (project: string): string => project.split(/[\\/]/u).filter(Boolean).at(-1) ?? project
@@ -198,7 +229,34 @@ const VIEW_BY_PREFIX = {
 /** Host shortcut commands that do what a differently labelled palette entry already does. */
 const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new', 'new thread']])
 
+/**
+ * The visible part of the screen while the palette is open, as `--palette-height` and `--palette-top`: with the
+ * software keyboard up the visual viewport is what is left above it, so the phone palette's results end at the
+ * keyboard instead of under it. Desktop rules ignore both variables.
+ */
+const usePaletteViewport = (): CSSProperties | undefined => {
+  const [box, setBox] = useState<{ readonly height: number; readonly top: number } | null>(null)
+  useEffect(() => {
+    const viewport = typeof window === 'undefined' ? undefined : window.visualViewport
+    if (viewport === undefined || viewport === null) return undefined
+    const update = (): void => setBox({ height: Math.round(viewport.height), top: Math.round(viewport.offsetTop) })
+    update()
+    viewport.addEventListener('resize', update)
+    viewport.addEventListener('scroll', update)
+    return () => {
+      viewport.removeEventListener('resize', update)
+      viewport.removeEventListener('scroll', update)
+    }
+  }, [])
+  return useMemo(
+    // SAFETY: both keys are CSS custom properties, which React passes through as style; CSSProperties has no `--*` names.
+    () => (box === null ? undefined : ({ '--palette-height': `${String(box.height)}px`, '--palette-top': `${String(box.top)}px` } as CSSProperties)),
+    [box],
+  )
+}
+
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
+  const phoneViewport = usePaletteViewport()
   const [navigationSnapshot, sendNavigation, navigationActor] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
   const { mode, query, backStack, notice, selected, ask } = navigationSnapshot.context
   const parsed = PaletteRules.parsePaletteQuery(query)
@@ -215,6 +273,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     const subscription = navigationActor.on('close', () => latestOnClose.current())
     return () => subscription.unsubscribe()
   }, [navigationActor])
+  // Read once per visit: the phone shell does not change while the palette is open.
+  const [phoneShell] = useState(() => matchesPhoneShell())
+  // Closing returns focus to what was focused when the palette opened (a list row, the composer), never to the page body.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement))
+  useEffect(
+    () => () => {
+      if (!(opener instanceof HTMLElement)) return
+      // After the dialog's own focus scope lets go, which happens in the same unmount.
+      requestAnimationFrame(() => {
+        if (opener.isConnected && (document.activeElement === null || document.activeElement === document.body)) opener.focus({ preventScroll: true })
+      })
+    },
+    [opener],
+  )
   // Ranking happens within one palette visit, so the instant it opened is the whole clock the memo needs.
   const [openedAt] = useState(() => Date.now())
   const latestOnAsk = useRef(props.onAsk)
@@ -296,17 +368,18 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   )
   const threadSearch = PaletteRules.parseThreadSearchInput(deferredQuery)
   const rankedThreadIndex = view === 'threads' && threadSearch.exactId === undefined ? (projectThreadIndex ?? threadIndex) : threadIndex
-  const threadRows = useMemo(
+  const rankedThreads = useMemo(
     () =>
       view === 'all' || view === 'threads'
-        ? PaletteRules.rankThreads({
+        ? PaletteRules.rankThreadsScored({
             index: rankedThreadIndex,
             query: threadSearch.query,
             limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT,
           })
-        : [],
+        : { rows: [], best: -Infinity },
     [props.recentLimit, rankedThreadIndex, threadSearch.query, view],
   )
+  const threadRows = rankedThreads.rows
   const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
@@ -375,38 +448,46 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     [props.copy.goToFile],
   )
   // The thread the user is on comes first: its own verbs, under "Actions for …" (plan Q2 T2.4).
-  const threadActionRows = useMemo(
+  const rankedThreadActions = useMemo(
     () =>
       view === 'all' || view === 'commands'
-        ? PaletteRules.rankActions({ actions: actionOptions.filter(action => action.group === 'thread'), query: deferredQuery, boost: () => 0 })
-        : [],
+        ? PaletteRules.rankActionsScored({ actions: actionOptions.filter(action => action.group === 'thread'), query: deferredQuery, boost: () => 0 })
+        : { rows: [], best: -Infinity },
     [actionOptions, deferredQuery, view],
   )
+  const threadActionRows = rankedThreadActions.rows
   const threadActionHeading = threadActionRows.find(action => action.heading !== undefined)?.heading
-  const destinationRows = useMemo(
+  const rankedDestinations = useMemo(
     () =>
       view === 'all' || view === 'commands'
-        ? PaletteRules.rankActions({
+        ? PaletteRules.rankActionsScored({
             actions: [goToFile, ...actionOptions.filter(action => action.group !== 'command' && action.group !== 'thread')],
             query: deferredQuery,
             boost: id => boosts.get(id) ?? 0,
           })
-        : [],
+        : { rows: [], best: -Infinity },
     [actionOptions, boosts, deferredQuery, goToFile, view],
   )
-  const commandRows = useMemo(() => {
-    if (view !== 'all' && view !== 'commands') return []
+  const destinationRows = rankedDestinations.rows
+  const rankedCommands = useMemo(() => {
+    if (view !== 'all' && view !== 'commands') return { rows: [], best: -Infinity }
     const commands = actionOptions.filter(action => action.group === 'command')
-    if (view === 'commands')
-      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
-    if (deferredQuery.trim().length > 0)
-      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
-    return PaletteRules.rankActions({
-      actions: commands.filter(command => boosts.has(command.id) || command.suggested === true),
-      query: '',
-      boost: id => boosts.get(id) ?? 0,
-    }).slice(0, FRECENT_COMMANDS_ON_EMPTY)
+    const ranked =
+      view === 'commands' || deferredQuery.trim().length > 0
+        ? PaletteRules.rankActionsScored({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 })
+        : PaletteRules.rankActionsScored({
+            actions: commands.filter(command => boosts.has(command.id) || command.suggested === true),
+            query: '',
+            boost: id => boosts.get(id) ?? 0,
+          })
+    const limit = view === 'commands' ? RESULT_LIMIT : deferredQuery.trim().length > 0 ? COMMAND_LIMIT : FRECENT_COMMANDS_ON_EMPTY
+    return { rows: ranked.rows.slice(0, limit), best: ranked.best }
   }, [actionOptions, boosts, deferredQuery, view])
+  const commandRows = rankedCommands.rows
+  // Groups go by their best match (F7): "fake" ranked Settings › Projects above three threads whose titles say fake. An
+  // empty search leads with recent threads (F26); the verbs of the thread the user is on follow them.
+  const threadsFirst =
+    threadRows.length > 0 && (emptyQuery || rankedThreads.best >= Math.max(rankedThreadActions.best, rankedDestinations.best, rankedCommands.best))
 
   const rows: PaletteRow[] = useMemo(
     () => [
@@ -415,13 +496,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
+      ...(threadsFirst ? threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })) : []),
       ...threadActionRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
-      ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
+      ...(threadsFirst ? [] : threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread }))),
     ],
-    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows, threadsFirst],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -503,28 +585,52 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     // A Host-registry row shows the binding the user has now, already presented by the Host (⌘ ⇧ P).
     const hostCaps =
       row.kind === 'destination' && keys.length === 0 && row.destination.shortcutId !== undefined ? (props.hostKeys?.(row.destination.shortcutId) ?? []) : []
-    if (index < 0 && keys.length === 0 && hostCaps.length === 0) return null
+    const hasHint = index >= 0 || keys.length > 0 || hostCaps.length > 0
+    // The hint seat (council round 12 B2): the active row shows an ink ↵ in place of its own hint, so the selection
+    // reads on rows that start with a glyph. Both share one grid cell, so the seat keeps the wider one's width; opacity, not
+    // visibility, keeps the row's own binding in its accessible name while it steps aside.
     return (
-      <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-        {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} className="dshx:opacity-70" /> : null}
-        {hostCaps.length > 0 ? (
-          <KbdGroup className="dshx:opacity-70">
-            {hostCaps.map(cap => (
-              <Kbd key={cap}>{cap}</Kbd>
-            ))}
-          </KbdGroup>
+      <span className="dshx:ml-auto dshx:grid dshx:shrink-0 dshx:items-center dshx:justify-items-end">
+        {hasHint ? (
+          <span
+            data-palette-hint=""
+            className="dshx:col-start-1 dshx:row-start-1 dshx:flex dshx:items-center dshx:gap-2 dshx:group-data-[selected=true]/item:opacity-0"
+          >
+            {/* The kit's one shortcut chip at full strength (council round 10 A5, B4): a 70% chip fell under AA. */}
+            {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} /> : null}
+            {hostCaps.length > 0 ? (
+              <KbdGroup>
+                {hostCaps.map(cap => (
+                  <Kbd key={cap}>{cap}</Kbd>
+                ))}
+              </KbdGroup>
+            ) : null}
+            {index < 0 ? null : (
+              // One keycap, under the pointer only (round five B6): a column of ⌘ 1…⌘ 8 on every row read as noise. It
+              // keeps its width while hidden, so nothing moves when it shows.
+              <Kbd
+                data-palette-number=""
+                className="dshx:opacity-0 dshx:transition-opacity dshx:duration-(--dshx-duration-hover) dshx:group-hover/item:opacity-100 dshx:group-data-[selected=true]/item:opacity-100"
+              >
+                {`${props.mac ? '⌘' : 'Ctrl+'}${String(index + 1)}`}
+              </Kbd>
+            )}
+          </span>
         ) : null}
-        {index < 0 ? null : (
-          <KbdGroup>
-            <Kbd>{props.mac ? '⌘' : 'Ctrl'}</Kbd>
-            <Kbd>{index + 1}</Kbd>
-          </KbdGroup>
-        )}
+        <Kbd
+          data-palette-enter=""
+          aria-hidden="true"
+          className="dshx:col-start-1 dshx:row-start-1 dshx:text-foreground dshx:opacity-0 dshx:group-data-[selected=true]/item:opacity-100"
+        >
+          ↵
+        </Kbd>
       </span>
     )
   }
 
-  const itemClass = 'dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
+  // Two-line rows at 56px (council round 4 A5/B7): the title, then its meta line, with room above and below. The active
+  // row is the wash and ↵ only (council round 17 B2.1): no outline; the palette's own wash is a step deeper (below).
+  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
@@ -539,16 +645,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const placeholder = viewCopy[view].placeholder
   const escapeLabel = escapeLabelFor({ ask, subview, hasQuery: query.length > 0, copy: props.copy })
   const showAskEntry = !ask && !subview && query.length === 0
-  const askStatus = ask ? (askPending ? props.copy.askPending : props.copy.askHint) : props.copy.prefixHint
+  const askStatus = ask ? (askPending ? props.copy.askPending : props.copy.askHint) : null
 
   const destinationItem = (destination: PaletteActionOption): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
     return (
       <CommandItem key={destination.id} value={rowValue(row)} className={itemClass} disabled={runningAction} onSelect={() => void activate(row)}>
-        <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+        <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
           {destination.icon ?? <CommandIcon className="dshx:size-4" />}
         </span>
-        <span className="dshx:truncate dshx:text-sm">{destination.label}</span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{destination.label}</span>
         {destination.isSelected?.(props.context) === true ? <CheckIcon className="dshx:ml-auto dshx:size-4 dshx:text-primary" aria-hidden="true" /> : null}
         {shortcut(row)}
       </CommandItem>
@@ -564,10 +670,65 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   else if (view === 'files' && (workspaceFiles.status === 'loading' || workspaceFiles.status === 'indexing')) filesStatus = props.copy.filesIndexing
   else if (view === 'files' && workspaceFiles.truncated) filesStatus = props.copy.filesTruncated
 
+  const hasActionRows = threadActionRows.length > 0 || destinationRows.length > 0 || commandRows.length > 0
+  const threadGroup =
+    threadRows.length === 0 ? null : (
+      <>
+        {!threadsFirst && (destinationRows.length > 0 || commandRows.length > 0) ? <CommandSeparator className="dshx:my-1" /> : null}
+        <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
+          {threadRows.map(thread => {
+            const row: PaletteRow = { kind: 'thread', thread }
+            // The list's status, rolled up: a thread that waits for an answer is Needs you here too, not Working.
+            const listed = props.threadStatusOf?.(thread)
+            // One row grammar, the thread list's (council round 16 B1): the rail is the status glyph on every row, and
+            // line 2 is the kit's AttentionMeta, `[mark] project · word · age`, the word from the one list (Working,
+            // Ready, Idle, Approval, Question, Turn failed). No status tail, no project tile in the rail. Without a status
+            // provider the thread's own running fact picks Working or Idle.
+            const status = listed?.status ?? (thread.running === true ? 'working' : 'idle')
+            const word = listed === undefined ? (thread.running === true ? props.copy.working : props.copy.idle) : (listed.kind ?? listed.label)
+            const age = thread.updatedAt > 0 ? recentTime(thread.updatedAt) : undefined
+            return (
+              <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                {/* The palette's 28px leading column keeps every row's title on one edge; inside it the glyph sits in the
+                    kit's 20px rail seat, the thread list's. */}
+                <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
+                  <span className="dshx:inline-flex dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:justify-center" data-palette-status-seat="">
+                    {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
+                    <StatusGlyph status={status} decorative className="dshx:[&_svg]:text-current!" />
+                  </span>
+                </span>
+                <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                  <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
+                  <AttentionMeta
+                    project={thread.project.length > 0 ? thread.project : undefined}
+                    kind={word}
+                    age={age}
+                    mark={thread.project.length > 0 ? { ...projectMarkPaint(props.projectColorOf?.(thread)), 'data-palette-project-mark': '' } : undefined}
+                  />
+                </span>
+                {shortcut(row)}
+              </CommandItem>
+            )
+          })}
+        </CommandGroup>
+        {threadsFirst && hasActionRows ? <CommandSeparator className="dshx:my-1" /> : null}
+      </>
+    )
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
       <DialogContent
-        className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+        className={cn(
+          // A 16px outer inset (council round 3 B5): the kit dialog's 24px read as a loose frame around the search. Important,
+          // to beat the kit's own sm: padding without a viewport variant here; the full-screen phone search keeps none.
+          // 640px wide (council round 10 B4): the rows and the footer read as one column, not a 672px sheet.
+          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-4! dshx:phone:p-0! dshx:sm:max-w-160',
+          // One frame: the kit dialog's floating surface (council round 3 B5, kit A8), so in dark the palette is a raised
+          // warm card with a faint edge and one deep shadow, not the brightest box on screen.
+          // A phone gets a full-screen search: the input at the top, results down to the software keyboard (the visual
+          // viewport, published below), no centred card.
+          'dshx:phone:top-[var(--palette-top,0px)] dshx:phone:left-0 dshx:phone:translate-x-0 dshx:phone:translate-y-0 dshx:phone:w-full dshx:phone:max-w-none! dshx:phone:h-[var(--palette-height,100dvh)] dshx:phone:max-h-none dshx:phone:flex dshx:phone:flex-col dshx:phone:rounded-none dshx:phone:border-0 dshx:phone:pt-[env(safe-area-inset-top,0px)] dshx:phone:shadow-none',
+        )}
+        style={phoneViewport}
         showCloseButton={false}
         onEscapeKeyDown={(event: KeyboardEvent) => {
           if (!ask && !subview && query.length === 0) return
@@ -583,13 +744,21 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           onValueChange={value => sendNavigation({ type: 'selection.change', value })}
           onKeyDown={onKeyDown}
           loop
-          className="dshx:rounded-none"
+          // The palette's selection wash (council round 17 B2.1): with no edge, the active row needs a clearly visible
+          // fill, so the dialog wash is capped at L 0.925 in light (0.935 → 0.925). In dark it lifts to L 0.33, about
+          // #393532 (council round 18 B2.2): the dialog's 0.30 sat too close to its 0.27 fill.
+          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1 dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)] dshx:dark:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_max(l,0.33)_c_h)]"
         >
-          <div className="dshx:relative">
+          {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). A 48px
+              search lane with no rule of its own: the one rule sits under the filters, above the results (council round 4
+              B7). */}
+          <div className="dshx:relative dshx:[&_[data-slot=command-input-wrapper]]:h-12! dshx:[&_[data-slot=command-input-wrapper]]:border-b-0! dshx:[&_[data-slot=command-input-wrapper]]:outline-none!">
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
-              className={cn('dshx:h-11 dshx:text-ellipsis', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16')}
+              // The query reads at the kit's 16px query step (council round 3 B5, round 4 B7), the size of what you type,
+              // above 14px results.
+              className={cn('dshx:h-12 dshx:text-query dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
               value={query}
               onValueChange={next => {
                 sendNavigation({ type: 'query.change', query: next })
@@ -604,7 +773,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 title={props.copy.ask}
                 onMouseDown={event => event.preventDefault()}
                 onClick={() => sendNavigation({ type: 'ask.enter' })}
-                className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
+                className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground dshx:phone:hidden"
               >
                 <span>{props.copy.ask}</span>
                 <KbdGroup className="dshx:pointer-coarse:hidden">
@@ -612,8 +781,19 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 </KbdGroup>
               </button>
             ) : null}
+            {/* A full-screen surface on a phone has a visible way out in its first row (DESIGN.md Density). */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="dshx:absolute dshx:right-1 dshx:top-0.5 dshx:hidden dshx:h-11 dshx:min-w-11 dshx:px-3 dshx:phone:inline-flex"
+              data-palette-cancel=""
+              onClick={() => props.onClose()}
+            >
+              {props.copy.cancel}
+            </Button>
           </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+          {/* The filters at 13px, and under them the palette's one rule before the results (council round 4 B7). */}
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-0.5 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground dshx:phone:flex-wrap dshx:[&_[role=tab]]:text-sm">
             {ask || subview ? (
               <Button
                 type="button"
@@ -646,9 +826,26 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </Tabs>
             )}
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
+            {notice === null && !ask && !actionSnapshot.matches('failed') ? (
+              // One "? Prefixes" hint instead of a legend the row clipped (round five T6): it opens the prefix list. It is
+              // for a keyboard: the phone keeps this row for a notice or Ask DSH's status only.
+              <button
+                type="button"
+                data-palette-prefix-hint=""
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => sendNavigation({ type: 'query.change', query: '?' })}
+                className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:hover:text-foreground dshx:phone:hidden"
+              >
+                <Kbd>?</Kbd>
+                <span>{props.copy.prefixHint}</span>
+              </button>
+            ) : (
+              <span className="dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal">
+                {notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}
+              </span>
+            )}
           </div>
-          <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
+          <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1 dshx:phone:max-h-none dshx:phone:min-h-0 dshx:phone:flex-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
               {ask && emptyQuery
                 ? props.copy.askEmpty
@@ -656,11 +853,22 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
                   : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
+            {showAskEntry && phoneShell ? (
+              // On the phone the search row's trailing edge is Cancel, so Ask DSH leads the results instead.
+              <CommandGroup>
+                <CommandItem value="ask-dsh-entry" className={itemClass} onSelect={() => sendNavigation({ type: 'ask.enter' })}>
+                  <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
+                    <MessageSquareIcon className="dshx:size-4" />
+                  </span>
+                  <span className="dshx:truncate dshx:text-sm">{props.copy.ask}</span>
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
             {backlogRows.length > 0 ? (
               <CommandGroup heading={props.copy.backlog}>
                 {backlogRows.map(row => (
                   <CommandItem key={rowValue(row)} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                     <span className="dshx:truncate dshx:text-sm">
                       {row.kind === 'backlog' && row.text.length > 0 ? `${props.copy.backlogOpen}: ${row.text}` : props.copy.backlogOpen}
                     </span>
@@ -676,6 +884,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     <span
                       className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
                       aria-hidden="true"
+                      {...LEADING_GLYPH_ATTRIBUTE}
                     >
                       <MessageSquareIcon className="dshx:size-4" />
                     </span>
@@ -690,7 +899,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const row: PaletteRow = { kind: 'help', ...help }
                   return (
                     <CommandItem key={help.prefix} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <Kbd className="dshx:min-w-7 dshx:justify-center">{help.prefix === '' ? '∅' : help.prefix}</Kbd>
+                      {/* A prefix is typed, on a phone keyboard too: a chip, not a keycap (the kit hides keycaps on touch). */}
+                      <span
+                        className="dshx:inline-flex dshx:h-5 dshx:min-w-7 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground"
+                        {...LEADING_GLYPH_ATTRIBUTE}
+                      >
+                        {help.prefix === '' ? '∅' : help.prefix}
+                      </span>
                       <span className="dshx:truncate dshx:text-sm">{help.label}</span>
                       {shortcut(row)}
                     </CommandItem>
@@ -701,7 +916,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             {line === null ? null : (
               <CommandGroup heading={props.copy.viewLine}>
                 <CommandItem value={rowValue({ kind: 'line', line })} className={itemClass} onSelect={() => void activate({ kind: 'line', line })}>
-                  <ListOrderedIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                  <ListOrderedIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                   <span className="dshx:truncate dshx:text-sm">{`${props.copy.goToLine} ${line}`}</span>
                   {shortcut({ kind: 'line', line })}
                 </CommandItem>
@@ -717,7 +932,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const project = hit.thread.project.length === 0 ? props.copy.unassigned : projectLabel(hit.thread.project)
                   return (
                     <CommandItem key={hit.thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                      <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
                         <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground">
@@ -739,6 +954,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
+            {threadsFirst ? threadGroup : null}
             {threadActionRows.length > 0 ? (
               <>
                 <CommandGroup heading={threadActionHeading ?? props.copy.commands} data-palette-thread-actions="">
@@ -761,7 +977,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const slash = path.lastIndexOf('/')
                   return (
                     <CommandItem key={path} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <FileIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                      <FileIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-2">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{path.slice(slash + 1)}</span>
                         {slash > 0 ? (
@@ -774,56 +990,28 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
-            {(destinationRows.length > 0 || commandRows.length > 0) && threadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
-            {threadRows.length > 0 ? (
-              <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
-                {threadRows.map(thread => {
-                  const row: PaletteRow = { kind: 'thread', thread }
-                  const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
-                  return (
-                    <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <span
-                        className={cn(
-                          'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
-                          thread.project.length > 0 ? ProjectTone.glyph(project) : 'dshx:bg-muted dshx:text-muted-foreground',
-                        )}
-                        aria-hidden="true"
-                      >
-                        {thread.project.length > 0 ? project.slice(0, 2).toLocaleUpperCase() : <MessageSquareIcon className="dshx:size-3.5" />}
-                      </span>
-                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                        <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
-                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-                          {[
-                            project,
-                            thread.updatedAt > 0 ? new Date(thread.updatedAt).toLocaleDateString() : null,
-                            thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
-                          ]
-                            .filter(value => value !== null)
-                            .join(' · ')}
-                        </span>
-                      </span>
-                      {shortcut(row)}
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            ) : null}
+            {threadsFirst ? null : threadGroup}
           </CommandList>
         </Command>
-        <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+        <footer
+          className={cn(
+            'dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground',
+            // On touch the key legend goes (the kit hides `data-key-legend`); the bar stays only for a files note.
+            (filesStatus === null || fileRows.length === 0) && 'dshx:pointer-coarse:hidden',
+          )}
+        >
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <KbdGroup>
               <Kbd>↑</Kbd>
               <Kbd>↓</Kbd>
             </KbdGroup>
             {props.copy.navigate}
           </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Enter</Kbd>
             {ask ? props.copy.askSend : props.copy.open}
           </span>
-          <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+          <span data-key-legend="" className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Esc</Kbd>
             {escapeLabel}
           </span>

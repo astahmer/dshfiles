@@ -28,20 +28,20 @@ From the onboarding feature catalog: 14 features, the 0 curated ones first.
 
 ### More
 
-1. **Edit thread artifacts** (`editor`, thread-panel) — Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.
-2. **Browse and edit workspace files** (`editor`, thread-panel) — Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host fil…
-3. **Open file links in the editor** (`editor`, thread-panel) — A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a N…
-4. **Index workspace files with bounded traversal** (`editor`) — Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.
-5. **Session screen and workspace files for other plugins** (`editor`) — Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file s…
-6. **Project whiteboards** (`whiteboard`, knowledge) — Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.
-7. **Agent-drawn diagrams** (`whiteboard`) — whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.
-8. **xstate machine diagrams** (`whiteboard`) — The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.
-9. **Share a thread as a read-only link** (`thread-share`, settings) — Settings › Thread sharing creates a read-only share link for one thread: live (re-read and redacted on every view) or a snapshot frozen at creation; anyone with the unguessable link, or link plus a passphrase kept only as a salted scrypt hash; expiring in 1 hour, 1 day, 7 days o…
-10. **Freeze a snapshot or download a self-contained HTML export** (`thread-share`, settings) — A snapshot share stores the redacted transcript at creation (chunked under the 256 KiB storage value limit) and keeps showing it after the thread changes; revoking deletes it. Download HTML (and the thread_share_export tool) renders the same redacted page as one self-contained f…
-11. **Publish share pages through a time-bounded tunnel** (`thread-share`, settings) — Settings › Thread sharing detects tailscale and cloudflared and, only after the user confirms, runs one foreground `cloudflared tunnel --url` quick tunnel or `tailscale funnel --https=8443` for 15 minutes, 1 hour or 4 hours. The tunnel targets a separate loopback listener that a…
-12. **Export a thread to a portable .dshthread bundle** (`thread-transfer`, threads) — A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the…
-13. **Import a .dshthread bundle as a new thread** (`thread-transfer`) — Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the att…
-14. **Permanently clean up done or archived threads** (`conversation-cleanup`, settings) — Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, re…
+1. **Edit thread artifacts** (`editor`, thread-panel) — Create and edit Markdown and HTML documents that belong to a thread, which the agent can edit too.
+2. **Browse and edit workspace files** (`editor`, thread-panel) — Browse and edit the workspace's files in tabs, with search, go to line and Markdown preview.
+3. **Open file links in the editor** (`editor`, thread-panel) — A file link in a thread opens the file in the editor, reusing its tab when it is already open.
+4. **Index workspace files with bounded traversal** (`editor`) — The workspace's file list loads in steps and skips version control and dependency folders.
+5. **Open thread and workspace files for other plugins** (`editor`) — Other features can read which thread is on screen and list or search its workspace files.
+6. **Project whiteboards** (`whiteboard`, knowledge) — Draw on whiteboards kept per project, with autosave and a Recently deleted list.
+7. **Agent-drawn diagrams** (`whiteboard`) — The agent can draw diagrams on a whiteboard that you can then edit.
+8. **State machine diagrams** (`whiteboard`) — A state machine can be drawn as a diagram on a whiteboard or in Markdown.
+9. **Share a thread as a read-only link** (`thread-share`, settings) — Share a thread as a read-only link, live or frozen, with an optional passphrase and expiry.
+10. **Freeze a snapshot or download a self-contained HTML export** (`thread-share`, settings) — Freeze a shared thread as a snapshot, or download it as one HTML file.
+11. **Publish share pages through a time-bounded tunnel** (`thread-share`, settings) — Publish share pages outside your network through a tunnel that closes after a set time.
+12. **Export a thread to a file** (`thread-transfer`, threads) — Export a thread with its messages, tool calls and attachments to one file you can import elsewhere.
+13. **Import a thread from a file** (`thread-transfer`) — Import an exported thread file as a new thread after a preview of what it holds.
+14. **Permanently clean up done or archived threads** (`conversation-cleanup`, settings) — Preview done or archived threads and permanently delete their logs after you confirm.
 
 ## Enable it
 

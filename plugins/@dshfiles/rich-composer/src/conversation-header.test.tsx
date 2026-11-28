@@ -70,6 +70,20 @@ describe('producer-owned reusable conversation header', () => {
       await act(async () => root.render(<ConversationHeaderSurface renderSlot={renderSlot} reserveHostCorner />))
       expect(container.querySelector('button')?.textContent).toBe('Original thread actions')
       expect(container.firstElementChild?.className).toContain('dshx:pr-8')
+      // Round five B8: the reserved wrapper draws the header's rule across the whole pane, so it no longer stops 32px
+      // short of the right edge; the header inside draws none (ConversationRoot.module.css).
+      expect(container.firstElementChild?.hasAttribute('data-conversation-header-reserved')).toBe(true)
+      const { readFileSync } = await import('node:fs')
+      const { dirname, resolve } = await import('node:path')
+      const { fileURLToPath } = await import('node:url')
+      const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/ConversationRoot.module.css'), 'utf8')
+      expect(css).toMatch(/:global\(\[data-conversation-header-reserved\]\) \.header \{\s*border-bottom: none;/u)
+      // Only a header that draws a rule hands it over: the blank New thread header has none, and the phone shell hides
+      // the header row, so neither gets one from the wrapper.
+      expect(css).toMatch(
+        /:global\(\[data-conversation-header-reserved\]\):has\(\.header:not\(\.headerBlank\)\) \{\s*border-bottom: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l3\)\);/u,
+      )
+      expect(css).toMatch(/:global\(html\[data-shell-phone-nav\]\) :global\(\[data-conversation-header-reserved\]\):has\(\.header\) \{\s*border-bottom: none;/u)
     } finally {
       await act(async () => root.unmount())
     }

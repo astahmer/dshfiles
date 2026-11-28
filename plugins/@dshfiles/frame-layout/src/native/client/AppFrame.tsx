@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import type {
   HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT } from './columns.ts'
+import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT, SidebarDefaultModel } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import { StatusStrip } from './StatusStrip.tsx'
 import type { createLayoutStore } from './stores.ts'
@@ -27,6 +27,7 @@ import css from './AppFrame.module.css'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Minimize2Icon } from '@dshfiles/plugin-ui/icons'
+import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { MainSurfaceRendering } from '../../main-surface.ts'
 import { ZenMode } from '../../zen-mode.ts'
 import type { MainSurfaceMode, RightPanelMode } from '../../regions.ts'
@@ -203,6 +204,13 @@ function ZenExit({ leave }: { leave: () => void }) {
 /** Below this frame width the status strip collapses to one chip (the phone breakpoint of AppFrame.module.css). */
 const PHONE_STRIP_WIDTH = 640
 
+/**
+ * Local delta (dshfiles): the status strip is one chip under the phone width, and also on a phone turned sideways (the
+ * kit's phone shell rule: a coarse pointer under 500px tall), where the frame is wide but the phone shell is drawn.
+ */
+export const compactStatusStrip = (viewport: number, view?: Pick<Window, 'matchMedia'>): boolean =>
+  viewport < PHONE_STRIP_WIDTH || matchesPhoneShell(view)
+
 /** The three-column frame (see module doc). */
 export function AppFrame({
   useStore,
@@ -262,9 +270,10 @@ export function AppFrame({
   if (sidebarTransition.drawer !== drawer || sidebarTransition.collapsed !== sidebarCollapsed) {
     setSidebarTransition({ drawer, collapsed: sidebarCollapsed, instant: drawer && sidebarCollapsed && sidebarTransition.collapsed })
   }
+  // Local delta (dshfiles, round five B4): an untouched sidebar takes the frame's default for its width.
   const sidebarPreference = sidebarCollapsed
     ? 0
-    : layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : layoutInfo.sidebar
+    : layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : SidebarDefaultModel.preference({ custom: layoutInfo.sidebarCustom, sidebar: layoutInfo.sidebar, viewport })
   const rightbarPreference = layoutInfo.rightbar ?? viewport * RIGHTBAR_DEFAULT_RATIO
   // Desktop reopen controls occupy the frame's shell.leading seat (macOS) or
   // the Windows caption row; neither platform keeps an icon rail.
@@ -446,7 +455,7 @@ export function AppFrame({
         </div>
       )}
       {/* Local delta (dshfiles): the status strip row; empty until a plugin adds a StatusItems entry. */}
-      <StatusStrip narrow={viewport < PHONE_STRIP_WIDTH} useSessions={useSessions} />
+      <StatusStrip narrow={compactStatusStrip(viewport)} useSessions={useSessions} />
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
       </div>

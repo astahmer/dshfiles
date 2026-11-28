@@ -10,7 +10,7 @@ export const sidebarRightSettings = defineSettings({
       .step(1)
       .default(4)
       .description(
-        'Threads besides the one on screen whose side-panel tabs stay loaded: kept-mounted bodies (editor, Workbench), resource pins and their live Session. Older threads reload them when shown again. 0 keeps every visited thread loaded.',
+        'How many other threads keep their side-panel tabs loaded (0 keeps every visited thread).',
       ),
   }),
 })

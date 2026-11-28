@@ -54,7 +54,7 @@ When('the second Workbench conversation receives a long history message', async 
   await expect(
     conversation(page)
       .getByRole('status')
-      .filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ }),
+      .filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ }),
   ).toHaveCount(2, { timeout: 60_000 })
 })
 

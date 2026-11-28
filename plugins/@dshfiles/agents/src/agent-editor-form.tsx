@@ -1,3 +1,4 @@
+import { identityToneIndex, PalettePicker } from '@dshfiles/plugin-ui/components/palette-picker'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -11,6 +12,7 @@ import { useState, type ReactNode } from 'react'
 
 import { AGENT_GLYPHS, AgentEditor, type AgentField, type AgentFix, type AgentReview } from './agent-editor.js'
 import type { ProjectDefaults } from './agent-save-plan.js'
+import { AgentGlyph, AgentTone } from './agent-tone.js'
 import { AgentToolsTree } from './agent-tools-tree.js'
 import { agentLimits, Agents, type Agent, type AgentDraft, type AgentTools } from './agent.js'
 import type { AgentPresetRow, ToolCatalogView } from './api.js'
@@ -144,7 +146,7 @@ const ProjectDefaultsSection = (props: {
                   <Checkbox id={id} checked={on} onCheckedChange={() => toggle(project.id)} />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                     <span className="dshx:truncate dshx:text-sm">{project.title}</span>
-                    <span className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{project.path}</span>
+                    <span className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{project.path}</span>
                   </span>
                   <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:max-w-28 dshx:@max-pane-narrow:truncate">
                     {status}
@@ -252,7 +254,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
       keywords: [option.provider, option.model, option.providerName],
       group: option.providerName,
     })),
-    ...(draft.route !== null && routeOption === undefined ? [{ value: routeKey, label: draft.route.model, description: 'not offered by this Host' }] : []),
+    ...(draft.route !== null && routeOption === undefined ? [{ value: routeKey, label: draft.route.model, description: 'not offered by this DSH' }] : []),
   ]
   const effortOptions: readonly ComboboxOption[] = [
     { value: '', label: routeOption?.defaultEffort === undefined ? 'Model default' : `Model default (${routeOption.defaultEffort})` },
@@ -381,6 +383,21 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
         </div>
 
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label>Colour</Label>
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <PalettePicker label="Colour" value={draft.tone ?? undefined} defaultSlot={identityToneIndex(review.handle)} onChange={tone => patch({ tone })} />
+            {draft.tone === null || draft.tone === undefined ? null : (
+              <Button type="button" size="xs" variant="ghost" onClick={() => patch({ tone: null })}>
+                Use default
+              </Button>
+            )}
+          </div>
+          <p className="dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">
+            Marks its tile and mentions. The theme sets the colours, so a new theme recolours the agent.
+          </p>
+        </div>
+
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
           <Label htmlFor={DESCRIPTION_ID} aside={`${String(draft.description.length)}/${String(agentLimits.description)}`}>
             Description
           </Label>
@@ -461,7 +478,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
               hint={
                 props.catalogError === null
                   ? undefined
-                  : `The model list did not load (${props.catalogError}). Reopen the panel to retry; the saved route is kept.`
+                  : `The model list did not load (${props.catalogError}). Reopen the panel to retry. The saved route is kept.`
               }
             />
           </div>
@@ -579,7 +596,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
                     aria-pressed={draft.delegation.handles.includes(agent.handle)}
                     onClick={() => togglePeer(agent.handle)}
                   >
-                    <span aria-hidden>{agent.glyph}</span>@{agent.handle}
+                    <AgentGlyph glyph={agent.glyph} name={agent.name} slot={AgentTone.slotOf(agent)} size="dense" />@{agent.handle}
                   </Button>
                 ))}
               </div>
@@ -677,7 +694,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
                 ? subagents.allowed !== 'any' && subagents.allowed.length === 0
                   ? 'No agent is listed, so its subagents can only run as the default above.'
                   : 'A subagent started without an agent runs as the default.'
-                : 'Subagents are off above; these choices apply once they are on.'
+                : 'Subagents are off above. These choices apply once they are on.'
             }
           />
         </div>
@@ -726,7 +743,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
             field="routine"
             review={review}
             onFix={props.onFix}
-            hint="Optional. A thread started by this agent schedules it with its own reminder tools; there is no timer here."
+            hint="Optional. A thread started by this agent schedules it with its own reminder tools. There is no timer here."
           />
         </div>
       </Section>

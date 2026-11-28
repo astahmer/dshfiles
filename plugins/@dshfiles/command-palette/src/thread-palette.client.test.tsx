@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs'
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PaletteApi } from './palette-api.js'
-import type { PaletteActionContext } from './palette-contract.js'
+import type { PaletteActionContext, PaletteThreadStatus } from './palette-contract.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
+import { PaletteMath, WARM_STONE } from '@dshfiles/plugin-ui/theme/palette'
 
 const copy: ThreadPaletteCopy = {
   title: 'Command palette',
@@ -36,7 +38,7 @@ const copy: ThreadPaletteCopy = {
   unassigned: 'Unassigned',
   working: 'Working',
   idle: 'Idle',
-  prefixHint: 'Type ? for prefixes',
+  prefixHint: 'Prefixes',
   viewAll: 'Everything',
   viewCommands: 'Commands',
   viewContent: 'Thread content',
@@ -68,6 +70,7 @@ const copy: ThreadPaletteCopy = {
   askPending: 'Sending your question…',
   askSend: 'Send question',
   askExit: 'Back to search',
+  cancel: 'Cancel',
   askFailed: 'Ask DSH could not send that question.',
 }
 
@@ -202,6 +205,71 @@ describe('ThreadPalette navigation', () => {
     fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' })
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('ThreadPalette frame (council round 3 B5)', () => {
+  it('keeps a 16 px outer inset, a 16 px query line and the kit dialog surface', () => {
+    mount()
+    const dialog = screen.getByRole('dialog')
+    // The kit dialog's 24 px sm: padding read as a loose frame: 16 px on every side.
+    expect(dialog.className).toContain('dshx:p-4!')
+    expect(dialog.className).toContain('dshx:phone:p-0!')
+    // 640 px wide on a desktop (council round 10 B4).
+    expect(dialog.className).toContain('dshx:sm:max-w-160')
+    expect(dialog.className).not.toContain('dshx:sm:max-w-2xl')
+    // The kit's floating surface (kit A8) draws the fill, edge and shadow: the palette sets none of its own.
+    expect(dialog.className).toContain('dshx:surface-dialog')
+    expect(dialog.className).not.toContain('dshx:dark:bg-(--dshx-tone-raised)')
+    expect(dialog.className).not.toContain('dshx:shadow-s3')
+    const query = screen.getByRole('combobox')
+    // A 48px search lane with a 16px query (council round 4 B7).
+    expect(query.className).toContain('dshx:text-query')
+    expect(query.className).toContain('dshx:h-12')
+    expect(query.className).not.toContain('dshx:text-sm')
+    const lane = query.closest('[data-slot="command-input-wrapper"]')?.parentElement
+    expect(lane?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:h-12!')
+    // One rule between the search and filters and the results: under the filters, none under the search.
+    expect(lane?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:border-b-0!')
+    const filters = screen.getByRole('tablist').closest('.dshx\\:border-b')
+    expect(filters?.className).toContain('dshx:[&_[role=tab]]:text-sm')
+    // Two-line result rows at 56px.
+    for (const option of screen.queryAllByRole('option')) expect(option.className).toContain('dshx:min-h-14')
+  })
+})
+
+describe('ThreadPalette ways out', () => {
+  it('returns focus to what was focused when it opened', async () => {
+    const row = document.createElement('button')
+    row.textContent = 'A thread row'
+    document.body.append(row)
+    row.focus()
+    const view = render(
+      <ThreadPalette
+        mode="all"
+        threads={[]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    await waitFor(() => expect(document.activeElement).not.toBe(row))
+    view.unmount()
+    await waitFor(() => expect(document.activeElement).toBe(row))
+    row.remove()
+  })
+
+  it('offers Cancel in its first row, which closes it', () => {
+    const { onClose } = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -452,6 +520,89 @@ describe('Threads tab project scope', () => {
     expect(result.textContent).not.toContain('/dev/dshfiles')
   })
 
+  it('draws each project as the thread list\'s ProjectMark tile, in the colour the list gives that project', async () => {
+    const colorOf = vi.fn((thread: { readonly project: string }) =>
+      thread.project === 'dshfiles' ? { className: 'project-tone-balanced-3', tone: 3 } : { color: '#ffd400' },
+    )
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[here, elsewhere, { id: 'session-loose', title: 'Loose work', project: '', cwd: '', updatedAt: 0 }]}
+        projectColorOf={colorOf}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const markOf = async (name: RegExp) => (await screen.findByRole('option', { name })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    const tone = await markOf(/Here work/)
+    expect(tone?.getAttribute('data-slot')).toBe('project-mark')
+    expect(tone?.className).toContain('project-tone-balanced-3')
+    // The sidebar's letters: first letters of two words, else the first two letters.
+    expect(tone?.textContent).toBe('DS')
+    const custom = await markOf(/Elsewhere work/)
+    // A picked colour stays readable: the tile clamps its lightness per scheme instead of painting the raw pick.
+    expect(custom?.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(custom?.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(custom?.style.color).toBe('var(--chip-clamped)')
+    expect(custom?.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
+    // A thread with no project has no mark to draw: its status glyph leads, and line 2 names its word and age (round 16 B1).
+    expect(await markOf(/Loose work/)).toBeNull()
+    expect(colorOf).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'session-loose' }))
+  })
+
+  it('uses two-word letters the way the sidebar does (billing-api is BA, not BI)', async () => {
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[{ ...here, project: 'billing-api' }]}
+        projectColorOf={() => ({ tone: 0 })}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const mark = (await screen.findByRole('option', { name: /Here work/ })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    expect(mark?.textContent).toBe('BA')
+  })
+
+  it('keeps project marks neutral when nothing provides project colours', async () => {
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[here]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const mark = (await screen.findByRole('option', { name: /Here work/ })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    expect(mark?.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark?.className).not.toMatch(/project-tone-/u)
+    expect(mark?.style.color).toBe('currentcolor')
+  })
+
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(
@@ -536,5 +687,294 @@ describe('ThreadPalette thread actions and keycaps', () => {
     const newThread = options.find(option => option.textContent?.includes('New thread'))
     expect(newThread?.textContent).toContain('⌘⇧O')
     for (const dispose of disposers) dispose()
+  })
+})
+
+describe('ThreadPalette goes to threads', () => {
+  const fakeThreads = [
+    { id: 'session-fake-1', title: 'Fake provider seeds', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 3 },
+    { id: 'session-fake-2', title: 'Fake child run', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 },
+    { id: 'session-fake-3', title: 'Remove the fake clock', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 1 },
+  ]
+  const settingsAction = {
+    id: '@journey/test/settings-projects',
+    label: 'Settings: Projects',
+    aliases: ['fake projects', 'workspaces'],
+    group: 'destination' as const,
+    run: () => undefined,
+  }
+  const palette = (input: { readonly threadStatusOf?: Parameters<typeof ThreadPalette>[0]['threadStatusOf'] } = {}) => (
+    <ThreadPalette
+      mode="all"
+      threads={fakeThreads}
+      {...(input.threadStatusOf === undefined ? {} : { threadStatusOf: input.threadStatusOf })}
+      context={context}
+      additionalActions={[settingsAction]}
+      recentLimit={6}
+      mac
+      copy={copy}
+      searchContent={null}
+      onAsk={vi.fn(async () => {})}
+      onBacklogCapture={vi.fn(() => true)}
+      onOpenThread={vi.fn()}
+      onClose={vi.fn()}
+    />
+  )
+
+  it('orders groups by their best match, so a thread whose title matches comes before a command alias', async () => {
+    // "fake" ranked Settings: Projects above three matching threads, so Enter opened Settings (F7).
+    render(palette())
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fake' } })
+    await waitFor(() => expect(screen.getAllByRole('option')[0]?.textContent).toContain('Fake provider seeds'))
+    expect(screen.getAllByRole('option').some(option => option.textContent?.includes('Settings: Projects'))).toBe(true)
+  })
+
+  it('marks every row\'s leading glyph or tile, so the selected row shows one cue and no pill beside the tile (council round 11 B3)', async () => {
+    render(palette())
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fake' } })
+    await waitFor(() => expect(screen.getAllByRole('option').some(option => option.textContent?.includes('Settings: Projects'))).toBe(true))
+    const options = screen.getAllByRole('option')
+    expect(options.length).toBeGreaterThan(1)
+    for (const option of options) expect(option.firstElementChild?.hasAttribute('data-leading-glyph')).toBe(true)
+    // The prefix help and the other glyph-led rows reach the rule in the source as well.
+    const source = readFileSync('src/thread-palette.tsx', 'utf8')
+    expect(source.match(/\{\.\.\.LEADING_GLYPH_ATTRIBUTE\}/gu)?.length).toBeGreaterThanOrEqual(9)
+  })
+
+  it('leads with recent threads on an empty query', async () => {
+    // The empty palette led with Go to file, Export and Import (F26).
+    render(palette())
+    await waitFor(() => expect(screen.getAllByRole('option')[0]?.textContent).toContain('Fake provider seeds'))
+  })
+
+  it('draws one ⌘N keycap per recent, shown on the highlighted row and under the pointer only (round five B6)', async () => {
+    render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    const caps = row.querySelectorAll('[data-palette-hint] [data-slot="kbd"]')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]?.textContent).toBe('⌘1')
+    expect(caps[0]?.className).toContain('dshx:opacity-0')
+    expect(caps[0]?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
+    expect(caps[0]?.className).toContain('dshx:group-hover/item:opacity-100')
+    expect(row.className).toContain('dshx:group/item')
+  })
+
+  it('shows an ink ↵ in the active row’s hint seat, in place of its own hint (council round 12 B2)', async () => {
+    render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    const enter = row.querySelector<HTMLElement>('[data-palette-enter]')
+    expect(enter?.textContent).toBe('↵')
+    expect(enter?.getAttribute('aria-hidden')).toBe('true')
+    // Ink, not the chip's secondary face, and only on the active row.
+    expect(enter?.className).toContain('dshx:text-foreground')
+    expect(enter?.className).toContain('dshx:opacity-0')
+    expect(enter?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
+    // The row's own hint steps aside while active; both share one grid cell, so the seat keeps its width.
+    const hint = row.querySelector<HTMLElement>('[data-palette-hint]')
+    expect(hint?.textContent).toBe('⌘1')
+    expect(hint?.className).toContain('dshx:group-data-[selected=true]/item:opacity-0')
+    expect(enter?.parentElement).toBe(hint?.parentElement)
+    expect(enter?.parentElement?.className).toContain('dshx:grid')
+  })
+
+  it('marks the active row with a deeper wash and ↵ only, no edge (council round 17 B2.1)', async () => {
+    const view = render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    expect(row.className).not.toContain('selected-edge')
+    // The palette caps the dialog wash at L 0.925 in light (0.935 → 0.925), and lifts it to L 0.33 in dark (council
+    // round 18 B2.2: the dialog's 0.30 sat too close to its 0.27 fill), about #393532.
+    const root = view.baseElement.querySelector<HTMLElement>('[cmdk-root]')
+    expect(root?.className).toContain('dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)]')
+    expect(root?.className).toContain('dshx:dark:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_max(l,0.33)_c_h)]')
+  })
+
+  it.each(['light', 'dark'] as const)('keeps the row text at AA and the status glyphs at 3:1 on the palette wash (%s)', (scheme: 'light' | 'dark') => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    // The dialog wash: the page wash, lifted to 0.30 in dark (ui-styles surfaces.css); here capped at 0.925 in light
+    // and lifted to 0.33 in dark.
+    const dialog = scheme === 'dark' ? { ...p.selectedWash, l: Math.max(p.selectedWash.l, 0.3) } : p.selectedWash
+    const wash = scheme === 'dark' ? { ...dialog, l: Math.max(dialog.l, 0.33) } : { ...dialog, l: Math.min(dialog.l, 0.925) }
+    expect(wash.l).toBe(scheme === 'light' ? 0.925 : 0.33)
+    // Ink (title) and secondary (the AttentionMeta line, a destination's glyph); a row draws no faint text, its hints
+    // are kit chips on their own fill.
+    for (const step of [9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, wash), `step ${step}`).toBeGreaterThanOrEqual(4.5)
+    for (const key of ['accent', 'danger', 'success', 'warning'] as const) expect(PaletteMath.contrastRatio(p[key].fg, wash), key).toBeGreaterThanOrEqual(3)
+  })
+
+  it('draws every hint as the kit shortcut chip, unfaded and unrestyled (council round 10 A5, B4)', () => {
+    const source = readFileSync('src/thread-palette.tsx', 'utf8')
+    // A 70% chip read under AA; the kit chip carries its own fill, edge and face, so no hint overrides them.
+    expect(source).not.toContain('dshx:opacity-70')
+    for (const override of ['font-mono', 'dshx:bg-muted dshx:px-1.5'])
+      expect(source.match(new RegExp(`<Kbd[^>]*${override}`, 'u'))).toBeNull()
+  })
+
+  it("says a same-day recent's time in whole units, and draws the palette in one frame (round five B6)", async () => {
+    const today = [{ id: 'session-today', title: 'Today work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: Date.now() - 2 * 60_000 - 5_000 }]
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={today}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const row = await screen.findByRole('option', { name: /Today work/ })
+    expect(row.querySelector('[data-attention-meta-part="age"]')?.textContent).toBe('2m')
+    expect(row.textContent).not.toContain(new Date().toLocaleDateString())
+    const search = screen.getByRole('combobox').closest('[data-slot="command-input-wrapper"]')?.parentElement
+    expect(search?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:outline-none!')
+    const dialog = document.querySelector('[data-slot="dialog-content"]')
+    // One floating surface: the kit dialog's (council round 3 B5, kit A8).
+    expect(dialog?.className).toContain('dshx:surface-dialog')
+  })
+
+  it("draws a thread's status with the list's glyph and word", async () => {
+    // A thread that waits for an answer read "Working" here while the list said Needs you.
+    render(palette({ threadStatusOf: thread => (thread.id === 'session-fake-2' ? { status: 'needs-you', label: 'Needs you' } : undefined) }))
+    const row = await screen.findByRole('option', { name: /Fake child run/ })
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
+    expect(row.textContent).toContain('Needs you')
+    expect(row.textContent).not.toContain('Working')
+    // The row's muted-icon rule must not grey the glyph: Needs you keeps its indigo, Failed its red.
+    expect(row.querySelector('[data-slot="status-glyph"]')?.className).toContain('dshx:[&_svg]:text-current!')
+  })
+
+  it('reads an attention row through the kit AttentionMeta with the one word list, the status glyph leading (council round 15 B3)', async () => {
+    const kinds = new Map<string, PaletteThreadStatus>([
+      ['session-fake-1', { status: 'needs-you', label: 'Needs you', kind: 'Approval' }],
+      ['session-fake-2', { status: 'needs-you', label: 'Needs you', kind: 'Question' }],
+      ['session-fake-3', { status: 'failed', label: 'Failed', kind: 'Turn failed' }],
+    ])
+    render(palette({ threadStatusOf: thread => kinds.get(thread.id) }))
+    for (const [title, status, kind] of [
+      ['Fake provider seeds', 'needs-you', 'Approval'],
+      ['Fake child run', 'needs-you', 'Question'],
+      ['Remove the fake clock', 'failed', 'Turn failed'],
+    ] as const) {
+      const row = await screen.findByRole('option', { name: new RegExp(title, 'u') })
+      const meta = row.querySelector<HTMLElement>('[data-slot="attention-meta"]')
+      expect(meta?.getAttribute('data-mark-seat')).toBe('inline')
+      // `[mark] project · kind · age`, the Inbox card's and the list row's grammar.
+      const parts = Array.from(meta?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+      expect(parts).toEqual(['mark', 'name', 'sep', 'kind', 'sep', 'age'])
+      expect(meta?.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe('dshfiles')
+      expect(meta?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe(kind)
+      // The status word gives way to the kind; the project mark is drawn once, in the line.
+      expect(row.querySelector('[data-palette-thread-status]')).toBeNull()
+      expect(row.querySelectorAll('[data-slot="project-mark"]')).toHaveLength(1)
+      // The status glyph leads the row in its hue, as on the list.
+      const lead = row.firstElementChild
+      expect(lead?.hasAttribute('data-leading-glyph')).toBe(true)
+      const glyph = lead?.querySelector('[data-slot="status-glyph"]')
+      expect(glyph?.getAttribute('data-status')).toBe(status)
+      expect(glyph?.className).toContain('dshx:[&_svg]:text-current!')
+    }
+  })
+
+  // One row grammar (council round 16 B1): every thread row's rail is its status glyph in the kit's 20px rail seat, and
+  // line 2 is always AttentionMeta, `[mark] project · word · age`; no status tail, no project tile in the rail.
+  const expectListGrammar = (row: HTMLElement, status: string, word: string, project: string | null): void => {
+    const lead = row.firstElementChild
+    expect(lead?.hasAttribute('data-leading-glyph')).toBe(true)
+    const seat = lead?.querySelector<HTMLElement>('[data-palette-status-seat]')
+    expect(seat?.className).toContain('dshx:w-[var(--attention-meta-rail-seat,20px)]')
+    const glyph = seat?.querySelector('[data-slot="status-glyph"]')
+    expect(glyph?.getAttribute('data-status')).toBe(status)
+    expect(glyph?.className).toContain('dshx:[&_svg]:text-current!')
+    expect(lead?.querySelector('[data-slot="project-mark"]')).toBeNull()
+    const meta = row.querySelector<HTMLElement>('[data-slot="attention-meta"]')
+    expect(meta?.getAttribute('data-mark-seat')).toBe('inline')
+    const parts = Array.from(meta?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+    expect(parts).toEqual(project === null ? ['kind', 'sep', 'age'] : ['mark', 'name', 'sep', 'kind', 'sep', 'age'])
+    if (project !== null) expect(meta?.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe(project)
+    expect(meta?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe(word)
+    expect(row.querySelector('[data-palette-thread-status]')).toBeNull()
+    expect(row.querySelectorAll('[data-slot="status-glyph"]')).toHaveLength(1)
+    expect(row.querySelectorAll('[data-slot="project-mark"]')).toHaveLength(project === null ? 0 : 1)
+  }
+
+  it('reads every thread row in the list grammar: glyph rail, AttentionMeta with the status word (council round 16 B1)', async () => {
+    const statuses = new Map<string, PaletteThreadStatus>([
+      ['session-fake-1', { status: 'working', label: 'Working' }],
+      ['session-fake-2', { status: 'ready', label: 'Ready' }],
+      ['session-fake-3', { status: 'idle', label: 'Idle' }],
+    ])
+    render(palette({ threadStatusOf: thread => statuses.get(thread.id) }))
+    for (const [title, status, word] of [
+      ['Fake provider seeds', 'working', 'Working'],
+      ['Fake child run', 'ready', 'Ready'],
+      ['Remove the fake clock', 'idle', 'Idle'],
+    ] as const)
+      expectListGrammar(await screen.findByRole('option', { name: new RegExp(title, 'u') }), status, word, 'dshfiles')
+  })
+
+  it('keeps the list grammar without a status provider: the running fact picks the glyph and word (council round 16 B1)', async () => {
+    const threads = [
+      { id: 'session-run', title: 'Running one', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 3, running: true },
+      { id: 'session-rest', title: 'Resting one', project: '', cwd: '/tmp', updatedAt: 2, running: false },
+    ]
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={threads}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expectListGrammar(await screen.findByRole('option', { name: /Running one/u }), 'working', 'Working', 'dshfiles')
+    expectListGrammar(await screen.findByRole('option', { name: /Resting one/u }), 'idle', 'Idle', null)
+  })
+
+  it('replaces the clipped prefix legend with one "? Prefixes" hint that opens the prefix list', async () => {
+    render(palette())
+    const hint = await screen.findByRole('button', { name: /Prefixes/u })
+    expect(hint.querySelector('[data-slot="kbd"]')?.textContent).toBe('?')
+    fireEvent.click(hint)
+    expect(screen.getByRole<HTMLInputElement>('combobox').value).toBe('?')
+  })
+})
+
+describe('ThreadPalette on a phone (unslop phone 27)', () => {
+  it('is a full-screen search sized to the visual viewport, with no key legend', async () => {
+    // The software keyboard leaves 508px of an 844px screen; the palette ends where it starts.
+    const listeners = new Map<string, () => void>()
+    const viewport = {
+      height: 508,
+      offsetTop: 0,
+      addEventListener: (type: string, listener: () => void) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+    }
+    vi.stubGlobal('visualViewport', viewport)
+    mount()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.style.getPropertyValue('--palette-height')).toBe('508px')
+    for (const phoneClass of ['dshx:phone:top-[var(--palette-top,0px)]', 'dshx:phone:h-[var(--palette-height,100dvh)]', 'dshx:phone:max-w-none!', 'dshx:phone:rounded-none']) {
+      expect(dialog.className).toContain(phoneClass)
+    }
+    expect(dialog.querySelector('[data-slot="command-list"]')?.className).toContain('dshx:phone:max-h-none')
+    viewport.height = 420
+    act(() => listeners.get('resize')?.())
+    expect(dialog.style.getPropertyValue('--palette-height')).toBe('420px')
+    // The ↑ ↓ / Enter / Esc legend is marked for the kit's touch rule, which hides it on a coarse pointer.
+    expect(screen.getByText('Navigate').closest('[data-key-legend]')).not.toBeNull()
+    // The prefix hint is for a keyboard: a phone keeps that row for a notice or Ask DSH's status only.
+    expect(screen.getByRole('button', { name: /Prefixes/u }).className).toContain('dshx:phone:hidden')
   })
 })

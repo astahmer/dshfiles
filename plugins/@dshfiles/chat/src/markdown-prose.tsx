@@ -40,16 +40,29 @@ const childList = (children: ReactNode): readonly ReactNode[] => (Array.isArray(
 /** Elements a code card never sits inside: links, controls, math, inline code, a code block's own `pre`. */
 const SKIPPED = new Set(['a', 'button', 'code', 'kbd', 'samp', 'script', 'style', 'textarea', 'svg', 'math', 'input', 'select', 'pre'])
 
+/** The native fence preset (`FenceCodeBlock`): a hook-free component that returns one `CodeBlock` element. */
+export type FencePreset = (props: never) => ReactNode
+
 export interface MarkdownProseState {
   /** The component the native renderer draws a fence with (`CodeBlock`); only its identity is compared. */
   readonly codeBlock: JSXElementConstructor<never>
+  /**
+   * The preset a fence goes through on its way to `codeBlock` (DSH 0.2.2-rc.2's `FenceCodeBlock`): unwrapped, so the
+   * card inside it is the one {@link CodeFold} receives (round five C2).
+   */
+  readonly fencePreset: FencePreset | undefined
   /** Transformed elements by identity; replaced when the message's file names change. */
   cache: WeakMap<object, ReactNode>
   /** File names more than one reference in the message shares, joined; the cache belongs to this value. */
   collisions: string
 }
 
-const createState = (codeBlock: JSXElementConstructor<never>): MarkdownProseState => ({ codeBlock, cache: new WeakMap(), collisions: '' })
+const createState = (codeBlock: JSXElementConstructor<never>, fencePreset?: FencePreset): MarkdownProseState => ({
+  codeBlock,
+  fencePreset,
+  cache: new WeakMap(),
+  collisions: '',
+})
 
 /** A file reference as written: a path with an optional `:24`, `:24:3`, `#L24` or `#L24-L30` line suffix. */
 const FILE_REFERENCE = /^(.*?)(?::(\d+)(?:[:-]\d+)?|#L(\d+)(?:-L?\d+)?)?$/
@@ -300,6 +313,15 @@ const transformNode = (node: ReactNode, state: MarkdownProseState): ReactNode =>
   if (!isValidElement<ElementProps>(node)) return node
   const cached = state.cache.get(node)
   if (cached !== undefined) return cached
+  if (state.fencePreset !== undefined && node.type === state.fencePreset) {
+    // The preset only forwards its props to one CodeBlock element and holds no hooks, so calling it here is what React
+    // would render; the card it returns then takes the branch below.
+    // SAFETY: the node's type is the fence preset itself, so its props are the preset's own props.
+    const card = transformNode((state.fencePreset as (props: ElementProps) => ReactNode)(node.props), state)
+    const result = isValidElement(card) ? cloneElement(card, { key: node.key }) : card
+    state.cache.set(node, result)
+    return result
+  }
   if (node.type === state.codeBlock) {
     // SAFETY: the node's type is the native code card component the renderer draws fences with, so its props are that
     // component's FoldableCodeBlockProps.
@@ -359,7 +381,8 @@ const transform = (tree: ReactNode, state: MarkdownProseState, surface: Markdown
 }
 
 /** One state per rendering component, rebuilt only when the native code card component changes. */
-const useProseState = (codeBlock: JSXElementConstructor<never>): MarkdownProseState => useMemo(() => createState(codeBlock), [codeBlock])
+const useProseState = (codeBlock: JSXElementConstructor<never>, fencePreset?: FencePreset): MarkdownProseState =>
+  useMemo(() => createState(codeBlock, fencePreset), [codeBlock, fencePreset])
 
 export class MarkdownProse {
   static readonly state = createState

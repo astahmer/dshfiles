@@ -1,6 +1,6 @@
 # Workspace Folder Picker
 
-![Add workspaces from the folder browser](docs/screenshots/workspace-folder-add-flow.png)
+![Add projects from the folder browser](docs/screenshots/workspace-folder-add-flow.png)
 
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in
@@ -227,7 +227,7 @@ any other one yields a `directory` selection, and a JJ workspace is never a rece
 **No folder**). `initialTab` overrides the default.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
-`canonicalPath`; `removable: false` hides the remove control for special entries.
+`canonicalPath`; `removable: false` hides the remove control for special entries. `mark: 'folder'` draws a neutral folder mark instead of the coloured project letters, for an entry that is not a project folder (jj-integration's No folder).
 Selection is a discriminated union:
 
 - `{ kind: 'workspace', workspaceId, canonicalPath, title }`

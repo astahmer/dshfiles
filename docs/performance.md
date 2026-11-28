@@ -3,6 +3,48 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Client JavaScript parsed at page boot (2026-11-27)
+
+Complaint: the phone over Tailscale was "very very slow"; the live page parsed ~25 MB of decoded client JavaScript
+at every load and the phone probe was CPU-bound (RTT 100 and 250 ms gave the same numbers).
+
+**Cause.** The shell loads every plugin's `client.js` in two concatenated boot bundles. DSH's module loader already
+serves per-plugin lazy chunks (`require.async("./client.<name>.<hash>.js")`, fetched alone and cached immutable), and
+dshx emitted them for `import()` targets, but only for a target that shared no module with its entry; every real view
+shares the dshx client runtime, an API contract or a kit component, so it was silently inlined. On top, the kit
+(`@dshfiles/plugin-ui`) was copied into each bundle (button 56 times, 1.6 MB of copies), and tool-meta parsed the diff
+renderer and shiki for edit cards that start collapsed.
+
+**Fix.** dshx: a chunk reads the modules it shares with its entry from the entry's `__dshxLazyShared` table through
+`require(<owner id>)` (one instance; the table binds only the names chunks read, so the entry stays tree-shaken); a
+chunk's own `import()` targets become sibling chunks unless they share that chunk's modules. The kit's
+`lazyView(() => import(...), { label })` shows nothing for 150 ms, then one quiet loading line, and LoadError with
+Retry when a chunk fails. 18 plugins moved pages, facets and dialogs a page load does not show behind it (each pinned
+by a `bootImports` test); the shared runtime serves the 90 kit modules that two or more boot bundles copied (dshx
+names TypeScript-source modules from its own build and routes the kit's relative imports to the shared copy);
+tool-meta counts lines with the parse-only `diff-parse` and loads the renderer when a hunk opens; component-gallery
+left the `profiles/web` seed.
+
+Same seeded scratch (capture.mjs data), same probes, base `3e5a3324` vs this change:
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Decoded JS at boot | 25.43 MB | 18.07 MB (−29 %) |
+| Transferred (gzip) JS at boot | 7.9 MB | 5.55 MB (−30 %) |
+| Page heap after load | 141–150 MB | 104–111 MB |
+| Boot long tasks, desktop | 9 / 1,912 ms (max 856) | 7 / 1,532 ms (max 596) |
+| Boot long tasks, phone 4× CPU | 28 / 10,354 ms (max 4,309) | 16 / 7,576 ms (max 2,732) |
+| Phone load (RTT 100, 4× CPU) | 13.3 s | 11.9 s |
+| Phone open: title / first message p50 | 1,646 / 2,699 ms | 1,392 / 2,468 ms |
+| Phone open long tasks p50 | 3,460 ms | 3,183 ms |
+| Phone Back: list p50 / long tasks p50 | 2,032 / 2,790 ms | 1,813 / 2,155 ms |
+
+The remaining boot JS: native DSH clients and the shell (~5.7 MB), the shared runtime (2.2 MB: effect, zod, radix,
+the kit), ui-styles' sheet (0.6 MB) and the boot UI of thread-sidebar, rich-composer, chat and workbench. Still
+inlined: schedule and settings-models, whose pages import CSS modules (dshx keeps a chunk that emits CSS in the entry).
+A kit component change now reaches an open page after a refresh: the shared runtime reloads, but consumers keep the
+copies they read from it (class-only changes still hot-reload through ui-styles).
+
 ## Backdrop scenes (2026-11-15)
 
 Complaint: an animated theme (Snow Pines and others) drove the CPU very high.
@@ -2237,3 +2279,149 @@ dominated by rendering the opened thread, so the saved listener time is below it
 ```sh
 pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/workbench-palette.test.ts src/sidebar-catalog.client.test.tsx
 ```
+
+## Start-up data: labels, settled threads, list columns and event re-reads (2026-11-27)
+
+Round nine, lane D. The live page load (spec measurements, Host PID 56335, read-only) received ~3 MB of start-up API
+data: `session/list` 1.27 MB, `settings/describe` 786 KB in two calls, `settings-shell/bundleLabels` 474 KB,
+`attention/list` 193 KB over 4 calls. Each owner was measured on a scratch DSH built from the branch (`dshx dev up`, all
+owned bundles) with a synthetic corpus shaped like the live one (1,545 Sessions: 280 blank, 1,025 subagent children, 240
+top-level threads; no private text), plus read-only aggregate sizes of the live projection cache and profile.
+
+| Read (page load)                     | Owner and cause                                                                                                   | Before                                         | After                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| `settings-shell/bundleLabels`        | every Loader row's title and description in all eight manifest languages, plus the never-shown package description | 1 call, 480.6 KB, 1.6 s (scratch); 474 KB live | `namespaceLabels`: 1 call, 75.5 KB, 10 ms (scratch, English) |
+| `settings/describe` (core, ×2)       | thread-sidebar kept 1,192 settled ids live (1,025 scratch) in its settings namespace, sent as value and user layer | 2 × 391.5 KB (scratch); 2 × 393 KB live        | 2 × 175.3 KB + one `thread-sidebar-settled/read` 108.2 KB    |
+| `session/list`                       | `tokenUsage` listed for every row; its only row reader (stock ui-subagent lineage) is shadowed by thread-sidebar's  | 1.27 MB live (tokenUsage ~163 KB of it)        | ~1.11 MB live estimate (column dropped)                      |
+| `attention/list`                     | a key read before its event stream connected was read again when it went live (dshx resource store)               | 4 calls, 193 KB live                           | 2 calls expected live; scratch never showed the re-read      |
+
+- **Labels.** The page resolves one fallback chain (core `LocaleRuntime.resolveText`: the active locale's chain, then
+  `en`), so `namespaceLabels({ languages })` keeps those languages and drops the package description and every
+  description `namespaceLabelOf` would not show. Each row resolves to the same title and description per chain
+  (`bundle-labels.test.ts`), and on the scratch the base `bundleLabels` answer (404 rows, 417,682 B) and the new
+  `namespaceLabels` answer (77,196 B) resolve, through `namespaceLabelOf`, to the same 404 rows in order and the same
+  363-entry label map the page installs. A language change reads the new chain (the old snapshot kept the previous
+  language's text).
+- **Settled threads.** They now live in a `thread_settled` storage domain (one record per thread) behind the unchanged
+  `SidebarSettings` service; the page reads them through `thread-sidebar-settled` and `usePreferences` merges them, so
+  the list, the dock and the header read the same set. The legacy fields move once, verified by read-back before they
+  are cleared. The status is one record in a `single`-layout domain: a first per-record version took ~2.5 min to write
+  the scratch scan's 1,025 settles (one file each, machine load 10–30) and held the store's lock meanwhile. Scratch, same
+  1,025 settled threads: 783 KB → 459 KB per load. Live estimate: `settings/describe` drops by ~260 KB per call (~520 KB
+  per load) for one ~110 KB settled read, and no settings write re-sends the settled ids again.
+- **`session/list` columns.** Live projection cache, 1,545 records, state bytes of the eight listed columns: tokenUsage
+  163 KB, userQuestions 172 KB, subagentTiming 112 KB, threadSidebarModelRoute 105 KB, subagent 104 KB,
+  sessionListMetadata 97 KB, promptedTurnCount 67 KB, title 50 KB. Only `tokenUsage` had no rendered row reader. The
+  scratch corpus has no projection checkpoints (cold rows list no columns), so the cut is a live estimate.
+- **Event re-reads.** A first read now waits while one of its push sources is still connecting (at most 1 s from the
+  store's subscription; a source reporting it will not connect releases it at once), so going live performs that read
+  instead of repeating it.
+
+Phone probe on the same scratch (`RTT=100 CPU=4 ROWS=4`, four taps each; before at load 15–25 on 10 cores, after at
+8–11, so the page load difference is mostly the machine):
+
+| Phone probe            | Before   | After    |
+| ---------------------- | -------- | -------- |
+| page load              | 23.2 s   | 14.7 s   |
+| tap → title (p50)      | 1,497 ms | 1,341 ms |
+| tap → first message    | 2,551 ms | 2,413 ms |
+| Back → list (p50)      | 1,663 ms | 1,767 ms |
+| calls per Back (p50)   | 8        | 8        |
+
+Still core (Host gap 99): the second `settings/describe`, `permissionPresets/catalog`, `session/modelCatalog` and
+`web/listProviders` reads after the first `connection/reset`; the schemastery `refs` schema is 141 KB of each
+describe answer. Live after-numbers need a build in the canonical checkout and a user restart (Host halves of
+settings-shell and thread-sidebar).
+
+```sh
+pnpm --dir plugins/@dshfiles/settings-shell exec vitest run src/bundle-labels.test.ts
+pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/settled-store.test.ts src/settled-preferences.client.test.tsx
+pnpm --dir plugins/@dshfiles/session-controller exec vitest run tests/client/session-state-eviction.test.ts
+pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/resource-store.spec.ts tests/resource-react.spec.ts
+```
+
+## Round nine combined (2026-11-27)
+
+Round nine as a whole: `3e5a3324` (the branch before it) against `8dd06c5c` (lazy plugin chunks, the kit served once,
+settled ids out of Settings, lighter start-up data, the Filters panel, lane S's palette fix, upstream merges up to
+`019f6bcf`). Both revisions were built in one JJ workspace
+(`pnpm exec turbo run build --filter='./plugins/@dshfiles/*' --filter=@dshfiles/dshx`). Each leg ran on a fresh scratch
+DSH seeded with the round-five capture fixture (`capture.mjs --skip-build --keep`: three projects, eight threads in
+every state, six Backlog items) and the same probe copies, alternating A1 B1 A2 B2 A3 B3 (2026-11-28, 01:13–01:49).
+Load is the 1-minute `uptime` average on 10 cores before each run.
+
+| Measure                                            | BEFORE `3e5a3324`            | AFTER `8dd06c5c`             | Median pair delta     |
+| -------------------------------------------------- | ---------------------------- | ---------------------------- | --------------------- |
+| Client JS at boot, decoded (5 scripts)             | 25.43 MB (load 6.9)          | 18.23 MB (load 15.7)         | −7.20 MB (−28 %)      |
+| Client JS at boot, transferred                     | 7.93 MB                      | 5.60 MB                      | −2.33 MB (−29 %)      |
+| Page heap after load (GC, 15 s settle) / DOM nodes | 88.5 MB / 2,273              | 68.4 MB / 2,273              | −20.1 MB (−23 %)      |
+| Desktop switch, composer p50 (6 clicks per leg)    | 468, 475, 471 ms             | 455, 469, 456 ms             | −14 ms                |
+| Desktop switch, history p50                        | 489, 499, 500 ms             | 482, 502, 482 ms             | −12 ms                |
+| Desktop switch, long tasks per click p50           | 139, 121, 119 ms             | 123, 118, 119 ms             | −9 ms                 |
+| Palette group `set` calls per desktop click        | 0                            | 0                            | = (546 at `08d1c0aa`) |
+| Phone page load, better of 3 (spread)              | 13.7 s (13.7–14.4)           | 10.9 s (10.9–11.6)           | −2.35 s               |
+| Phone tap → title p50                              | 1,772 ms (1,772–1,835)       | 919 ms (919–950)             | −861 ms               |
+| Phone tap → first message p50                      | 2,627 ms (2,627–3,052)       | 1,944 ms (1,944–2,157)       | −748 ms               |
+| Phone Back → list p50                              | 2,077 ms (2,077–2,563)       | 1,418 ms (1,418–1,569)       | −659 ms               |
+| Phone long tasks per open / per Back p50           | 3,521–3,902 / 2,519–3,153 ms | 2,612–2,648 / 1,765–1,971 ms | −1,106 / −813 ms      |
+| API received in 45 s (`har-capture --seconds 45`)  | 956 KB (load 6.3)            | 553 KB (load 14.0)           | −403 KB (−42 %)       |
+| API calls (POSTs; batches; calls inside)           | 93 (62; 14; 45)              | 94 (61; 13; 46)              | +1                    |
+| Duplicate calls (same method and body; within 1 s) | 21 (7)                       | 21 (6)                       | =                     |
+| `session/list`                                     | 1 call, 7.1 KB               | 1 call, 6.2 KB               | −0.9 KB               |
+| `settings/describe`                                | 2 calls, 351.7 KB            | 2 calls, 353.1 KB            | ≈ (no settled ids)    |
+| `settings-shell/bundleLabels` → `namespaceLabels`  | 1 call, 480.6 KB             | 1 call, 75.3 KB              | −405 KB (−84 %)       |
+| `thread-sidebar-settled/read`                      | (none)                       | 1 call, 0.1 KB               | new                   |
+| `attention/list`                                   | 2 calls, 2.4 KB              | 2 calls, 3.0 KB              | =                     |
+
+Byte, heap and HAR rows were taken once per revision (BEFORE in the first session, 2026-11-27 22:50; AFTER at 01:13);
+they do not depend on load. Timing rows are three legs per revision; the delta column is the median over adjacent
+B/A pairs whose loads are within about 2:
+
+| Pair  | Desktop load B / A               | Phone load B / A | Composer | History | Long tasks | Phone load | Title | First message | Back |
+| ----- | -------------------------------- | ---------------- | -------- | ------- | ---------- | ---------- | ----- | ------------- | ---- |
+| B1/A1 | 11.9 / 13.2                      | 12.0 / 11.1      | −13      | −7      | −16        | −2,817     | −861  | −553          | −605 |
+| B1/A2 | 11.9 / 10.8                      | 12.0 / 10.0      | +1       | +13     | −20        | −2,125     | −853  | −683          | −659 |
+| B2/A2 | 5.8 / 10.8 (dropped for desktop) | 8.7 / 10.0       | (−5)     | (+3)    | (−3)       | −2,231     | −908  | −961          | −758 |
+| B2/A3 | 5.8 / 7.6                        | 8.7 / 7.9        | −19      | −17     | −2         | −2,352     | −885  | −748          | −607 |
+| B3/A3 | 8.9 / 7.6                        | 9.6 / 7.9        | −15      | −17     | 0          | −2,923     | −822  | −895          | −994 |
+
+Desktop runs: `MATCH='^(?!Publish preview|Reconcile Stripe)' switch-probe.mjs 6`. The approval and question threads have
+no composer textbox, so they are skipped. The first session's desktop numbers (BEFORE 818–834 ms) visited them first and
+waited the probe's 30 s timeout on each, so its absolute desktop values do not compare with these. Phone runs:
+`RTT=100 CPU=4 ROWS=6 phone-switch-probe.mjs`, one per leg. No click on AFTER fetched a script.
+
+### The timing regression at `08d1c0aa`: palette actions re-registered on every click (fixed in `8dd06c5c`)
+
+At `08d1c0aa` each desktop click was about 220 ms slower than BEFORE (composer 937–1,072 against 818–834 ms in the
+first session's legs) and phone opens 200–350 ms slower. A counting conditional breakpoint on the command palette's group
+`set` (it never pauses) gave 546 calls (79,989 rows) per click there, against 0 on BEFORE.
+
+- `usePreferences` (`thread-sidebar/src/sidebar-state.tsx`) built `updatePreferences` on `settledStore`, and
+  `useSettledStore()` returned a new `{ api, read }` object on every render, so `updatePreferences` got a new
+  identity on every render.
+- `updatePreferences` is a dependency of `paletteActions` (`sidebar-shell.tsx`), so every SidebarShell render ran
+  `PaletteBridge.addActions(paletteActions)` again. It adds and removes each action as its own broker registry entry, and
+  each one republished the list: 2N full `set` passes per re-registration.
+- CPU profile of three phone thread opens (CPU 4×), self time in that `set`: 600 ms BEFORE, 1,026–1,063 ms at `08d1c0aa`.
+
+Lane S's fix (a stable `updatePreferences`, content-keyed palette registration and one dshx publish per batch) brings
+it to 0 calls per desktop click. On a phone-width resize (390 px and back), the path that already re-registered on
+BEFORE, it takes 284 calls (6,838 rows) against 1,252 (142,714 rows) on BEFORE. That is where most of the phone gain
+above comes from.
+
+### Caveats and what only shows at live scale
+
+- The scratch seed is far smaller than the live profile: 8 threads against 1,545 Sessions, 1,192 settled ids and a
+  1.27 MB `session/list` live. Savings that grow with data cannot show here:
+  - `settings/describe`: about −520 KB per live load (two calls of about −260 KB each, lane D's estimate) for one
+    ~110 KB settled read. Flat on the scratch, which settles nothing.
+  - `session/list`: the dropped `tokenUsage` column is about −163 KB live (1.27 → ~1.11 MB).
+  - `attention/list`: 4 calls live should become 2. The scratch already makes 2 on both revisions.
+- The byte-count savings carry to a live load with the same bundle set: boot JS −7.2 MB decoded and −2.3 MB
+  transferred, and `namespaceLabels` −400 KB (474 KB live). A live profile that still lists component-gallery keeps its
+  share of the JS, because the scratch composes from the `profiles/web` seed.
+- The palette re-registration cost grows with the number of palette actions; the live profile has more of them, so
+  the live gain should be at least the scratch's.
+- The page heap (88.5 → 68.4 MB) is a scratch number; the live page held 179 MB.
+- Loads: timing legs ran at 5.8–13.2; every counted pair is within 2.0 of each other. B2/A2's desktop leg (5.8 / 10.8)
+  is outside that and left out of the desktop medians.

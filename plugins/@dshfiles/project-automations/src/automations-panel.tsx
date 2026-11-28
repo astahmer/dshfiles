@@ -12,8 +12,7 @@ import {
 import { RoutineList, type Routine, type RoutineRunStatus } from '@dshfiles/plugin-ui/components/motion/routine-list'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
+import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { ClockIcon, FolderIcon, PencilIcon, PlusIcon, Trash2Icon, WebhookIcon } from '@dshfiles/plugin-ui/icons'
@@ -28,7 +27,7 @@ const keys = { all: ['project-automations'] as const, list: ['project-automation
 const decodeViews = Schema.decodeUnknownSync(Schema.Struct({ automations: Schema.Array(automationViewSchema) }))
 const decodeRuns = Schema.decodeUnknownSync(Schema.Struct({ runs: Schema.Array(runRecordSchema) }))
 const decodeRun = Schema.decodeUnknownSync(runRecordSchema)
-const HOST_DOWN = 'The automations Host plugin did not answer. Restart DSH after installing @dshfiles/project-automations, then retry.'
+const HOST_DOWN = 'Automations did not answer. Restart DSH, then retry.'
 
 const when = (value: string | number | null | undefined): string => {
   if (value === null || value === undefined) return '—'
@@ -155,6 +154,8 @@ export const AutomationsPanel = (props: {
   readonly projects: () => readonly ProjectChoice[]
   readonly threads: () => readonly { readonly sessionId: string; readonly title: string }[]
   readonly openThread: (sessionId: string) => void
+  /** Opens Schedules (a prompt sent into an existing thread); absent while that page is not registered. */
+  readonly openSchedules?: (() => void) | undefined
 }): JSX.Element => {
   const api = useApi(automationsApi)
   const queryClient = useQueryClient()
@@ -200,15 +201,25 @@ export const AutomationsPanel = (props: {
 
   return (
     <TooltipProvider>
-      <main
-        aria-label="Automations"
-        className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3"
-      >
-        <PageHeader heading="Automations" description="Schedules and signed webhooks that start a new thread in a project.">
-          <Button type="button" size="sm" onClick={openNew}>
-            <PlusIcon /> New automation
-          </Button>
-        </PageHeader>
+      <main aria-label="Automations" className="dshx-root dshx:h-full dshx:min-w-0">
+        <Page
+          scroll
+          heading="Automations"
+          description={
+            <>
+              Start a new thread on a schedule or from a webhook. For a prompt in an existing thread, use{' '}
+              {props.openSchedules === undefined ? (
+                'Schedules'
+              ) : (
+                <Button type="button" variant="link" className="dshx:h-auto dshx:p-0 dshx:text-sm dshx:text-muted-foreground dshx:underline" onClick={props.openSchedules}>
+                  Schedules
+                </Button>
+              )}
+              .
+            </>
+          }
+          primaryAction={{ id: 'new-automation', label: 'New automation', icon: <PlusIcon />, onSelect: openNew }}
+        >
         {list.isError ? (
           <div role="alert" className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-2 dshx:text-sm dshx:text-muted-foreground">
             <p className="dshx:m-0">{HOST_DOWN}</p>
@@ -218,12 +229,9 @@ export const AutomationsPanel = (props: {
           </div>
         ) : null}
         {list.data?.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No automations yet</EmptyTitle>
-              <EmptyDescription>Create one to start a thread on a schedule or when a signed webhook arrives, such as a failed CI run.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">
+            No automations yet. Create one to start a thread on a schedule or a signed webhook.
+          </EmptyState>
         ) : null}
         {list.data === undefined || list.data.length === 0 ? null : (
           <RoutineList
@@ -252,18 +260,20 @@ export const AutomationsPanel = (props: {
             {errorMessage(failure, HOST_DOWN)}
           </p>
         )}
-        <section aria-label="Recent runs" className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2">
-          <h2 className="dshx:m-0 dshx:text-sm dshx:font-semibold">Recent runs</h2>
-          {runs.data === undefined || runs.data.length === 0 ? (
-            <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">No run yet. Use Run now to try an automation.</p>
-          ) : (
-            <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-2 dshx:p-0">
-              {runs.data.map(run => (
-                <RunLine key={run.id} run={run} showTitle openThread={props.openThread} />
-              ))}
-            </ul>
-          )}
-        </section>
+        {/* Runs belong to automations: with none saved, the empty state above is the page's one sentence. */}
+        {list.data === undefined || list.data.length === 0 ? null : (
+          <PageSection heading="Recent runs">
+            {runs.data === undefined || runs.data.length === 0 ? (
+              <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">No run yet. Use Run now to try an automation.</p>
+            ) : (
+              <ul className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-2 dshx:p-0">
+                {runs.data.map(run => (
+                  <RunLine key={run.id} run={run} showTitle openThread={props.openThread} />
+                ))}
+              </ul>
+            )}
+          </PageSection>
+        )}
         {dialog === null ? null : (
           <AutomationDialog
             open
@@ -294,6 +304,7 @@ export const AutomationsPanel = (props: {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </Page>
       </main>
     </TooltipProvider>
   )

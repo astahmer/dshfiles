@@ -6,6 +6,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createApiClient, type PluginContext } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { AgentMentionTones, type AgentMentionToneSource } from '@dshfiles/rich-composer/agent-mention-tones'
 import { ComposerSendPreparers } from '@dshfiles/rich-composer/composer-send'
 import type { SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { useSyncExternalStore, type ReactNode } from 'react'
@@ -59,7 +60,7 @@ export const createComposerAgentPorts = (ctx: Context): ComposerAgentPorts => {
       const local = drafts()
       if (local?.list.getSnapshot()[sessionId]?.local === true && local.stagePreset(id, preset)) return null
       const presets = ctx.get('remote.agentPresets')
-      if (presets === undefined) return 'this Host composes no Agent preset roster'
+      if (presets === undefined) return 'this DSH loads no Agent preset roster'
       const result = await presets.select(id, preset)
       return result.ok ? null : result.error.message
     },
@@ -81,6 +82,17 @@ export const createComposerAgentPorts = (ctx: Context): ComposerAgentPorts => {
   }
 }
 
+/** rich-composer's mention colours from the registry: each agent's chosen slot; null when the list did not load. */
+export const createAgentMentionToneSource = (
+  list: () => Promise<readonly { readonly handle: string; readonly tone?: number | undefined }[] | null>,
+): AgentMentionToneSource => ({
+  id: '@dshfiles/agents.tones',
+  load: async () => {
+    const agents = await list()
+    return agents === null ? null : new Map(agents.flatMap(agent => (agent.tone === undefined ? [] : [[agent.handle, agent.tone] as const])))
+  },
+})
+
 /**
  * The composer side of agents: the agent chip of a new thread, the Tools control of a running one (both in the
  * composer's left tool row) and the first-send step that starts a new thread as its agent (rich-composer's
@@ -98,6 +110,14 @@ export const registerComposerAgent = (input: {
   const loadAgents = async (signal: AbortSignal) => (await api.list(undefined, { signal })).agents
   const loadProjectDefaults = async (signal: AbortSignal) => (await api.projectDefaults(undefined, { signal })).projects
   input.plugin?.add(ComposerSendPreparers, createComposerAgentPreparer(createComposerAgentPorts(ctx)))
+  // A mention in the draft wears the colour the agent chose; agents without one keep their hashed slot.
+  input.plugin?.add(
+    AgentMentionTones,
+    createAgentMentionToneSource(async () => {
+      const listed = await api.safe.list()
+      return listed.ok ? listed.value.agents : null
+    }),
+  )
 
   const Entry = (props: PropsRuntime<'conversation.input.left'>): ReactNode => {
     const sessionId = String(props.sessionId)

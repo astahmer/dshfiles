@@ -1,3 +1,4 @@
+import { OpenSidebarButton } from './open-sidebar-button.js'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
@@ -15,18 +16,19 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { BellIcon, LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon } from '@dshfiles/plugin-ui/icons'
 import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, plural, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
 import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
-import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
+import { WORKING_STATUS_ORDER, WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { RestartStatusItem } from './restart-status-item.js'
-import { openUpdateDshSettings, UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
+import { UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -47,10 +49,16 @@ import { HeaderThreadActions } from './header-actions.js'
 import { HeaderLiveActivity } from './header-live-activity.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { subagentCountWords } from './subagent-provenance/subagent-count.js'
 import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
+import { SubagentFailedTurns } from './subagent-provenance/subagent-failed-turns.js'
 import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
+import { ThreadWorkStatusSources } from './thread-status-client.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { PaletteThreadStatuses } from '@dshfiles/command-palette/palette-contract'
+import { PaletteThreadStatusesModel, STATUS_WORD_KEYS } from './palette-thread-statuses.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -312,16 +320,16 @@ export default defineClient({
         },
       })
     if (plugin !== undefined) {
-      // The status strip's "N working" item; frame-layout owns the strip and renders nothing when it is not the frame.
+      // The status strip's "N threads working" item; frame-layout owns the strip and renders nothing when it is not the frame.
       const WorkingItem = (props: StatusItemProps): JSX.Element | null => (
-        <WorkingStatusItem {...props} label={count => translate('threadSidebarWorkingCount', { count })} />
+        <WorkingStatusItem {...props} label={WorkingStatusModel.label(translate)} />
       )
       ctx.effect(
         () =>
           plugin.add(StatusItems, {
             id: '@dshfiles/thread-sidebar',
             side: 'global',
-            order: 10,
+            order: WORKING_STATUS_ORDER,
             label: 'Working',
             component: plugin.bind(WorkingItem),
             open: WorkingStatusModel.open,
@@ -333,6 +341,8 @@ export default defineClient({
       const RestartItem = (props: StatusItemProps): JSX.Element | null => (
         <RestartStatusItem
           {...props}
+          // Update DSH (E3) shares this seat: an update and the restart that loads it are one flow, so one item.
+          fallback={<UpdateStatusItem {...props} />}
           text={{
             pending: count => (count === 1 ? translate('threadSidebarRestartPendingOne') : translate('threadSidebarRestartPendingCount', { count })),
             applied: translate('threadSidebarUpdatesApplied'),
@@ -360,20 +370,6 @@ export default defineClient({
           }),
         'thread-sidebar: restart status item',
       )
-      // Update DSH (E3): the section and strip item live beside the restart verbs they end with; the Host half is
-      // jj-integration's checkout sync, so this plugin only reads and calls it.
-      ctx.effect(
-        () =>
-          plugin.add(StatusItems, {
-            id: '@dshfiles/thread-sidebar.update-dsh',
-            side: 'global',
-            order: 85,
-            label: 'Update',
-            component: plugin.bind(UpdateStatusItem),
-            open: openUpdateDshSettings,
-          }),
-        'thread-sidebar: update status item',
-      )
     }
     const skillMentions = createSkillMentionSource({
       isSubagent: sessionId => ctx.sessions.subagentAddress(sessionId) !== undefined,
@@ -381,7 +377,7 @@ export default defineClient({
       list: async (sessionId, signal) => {
         const result = await ctx.remote.skills.list({ sessionId }, signal)
         signal.throwIfAborted()
-        if (!result.ok) throw new Error('Skill catalog is unavailable.')
+        if (!result.ok) throw new Error('Skills did not load. Retry.')
         return result.value.skills
       },
       section: translate('threadSidebarSkillSource'),
@@ -905,6 +901,13 @@ export default defineClient({
       )
     }
 
+    // Below 1024 px the frame hides the sidebar as a drawer; this is the visible way to open it (A-F4).
+    ctx.slots.inject('shell.leading', () =>
+      ctx.slots.register(
+        { name: 'shell.leading' },
+        decorate(() => <OpenSidebarButton label={translate('threadSidebarOpenSidebar')} onOpen={() => ctx.layout.toggleSidebar()} />),
+      ),
+    )
     ctx.slots.inject('conversation.input.overlay', () =>
       ctx.slots.register(
         {
@@ -950,6 +953,16 @@ export default defineClient({
       const result = await ctx.remote.session.rename({ sessionId, title })
       if (!result.ok) throw new Error(result.error.message)
     }
+    // The header chip and its popover speak this plugin's words, never core's count beside an English word (C5).
+    const subagentCatalogCopy: SubagentCatalogInjected['copy'] = {
+      count: count => plural(translate, 'subagentCount', count),
+      summary: subagentCountWords(translate, { settled: true }),
+      working: translate('subagentPreviewWorking'),
+      needsYou: translate('threadSidebarStateNeedsYou'),
+      done: translate('subagentPreviewFinished'),
+      stopped: translate('subagentPreviewInterrupted'),
+      failed: translate('subagentPreviewFailed'),
+    }
     const subagentCatalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
       openChild(address: SubagentAddress) {
         ctx.uiWorkspace.openSession(address)
@@ -963,6 +976,7 @@ export default defineClient({
       refreshProjection(parentSessionId: SessionId) {
         void ctx.sessions.refreshProjections(parentSessionId)
       },
+      copy: subagentCatalogCopy,
     })
     ctx.slots.inject('conversation.session.header.lineage', () =>
       ctx.slots.register(
@@ -1003,8 +1017,7 @@ export default defineClient({
       },
       canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
     }
-    const subagentCopy = ctx.locale.bind(SUBAGENT_LOCALE_NAMESPACE)
-    const subagentCount = (count: number): string => subagentCopy(count === 1 ? 'count.total.one' : 'count.total.other', { count })
+    const subagentCount = (count: number): string => plural(translate, 'subagentCount', count)
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
@@ -1018,7 +1031,7 @@ export default defineClient({
               sessionId={props.sessionId}
               preview={subagentPreview}
               runCards={runCards}
-              count={subagentCount}
+              foldLabel={count => plural(translate, 'subagentsWorking', count)}
             />
           )
         }),
@@ -1026,7 +1039,13 @@ export default defineClient({
     )
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
     // Two or more consecutive subagent rows fold into one transcript row (b:7rv2).
+    // Every subagent surface reads a child's failed turn through this one client, the fold included (round 21 D4).
+    ctx.effect(() => SubagentFailedTurns.bind(ctx), 'thread-sidebar: subagent failed turns')
     plugin?.add(TranscriptRunFolds, subagentRunFold({ t: translate, count: subagentCount }))
+    // The list's one status per thread, for the tab, the header and the palette (thread-status-client).
+    plugin?.add(ThreadWorkStatusSources, { getSnapshot: threadWorkStatusStore.getSnapshot, subscribe: threadWorkStatusStore.subscribe })
+    // The palette's thread rows draw the same glyph and word as the list (command-palette's PaletteThreadStatuses).
+    plugin?.add(PaletteThreadStatuses, PaletteThreadStatusesModel.sourceOf(threadWorkStatusStore, status => translate(STATUS_WORD_KEYS[status])))
     for (const key of ['subagent', 'subagent_fork'])
       ctx.slots.inject('tool.call.toolview', () =>
         ctx.slots.register(
@@ -1047,6 +1066,15 @@ export default defineClient({
     }
 
     // The new-thread hero's Resume / Review / Inbox cards (visual refresh T3.4), from the statuses this list computes.
+    // A Land from the thread list or Inbox › Waiting threads opens the thread header's confirmation (jj-integration),
+    // read at the click so a provider that arrives or leaves later counts. Without it nothing here can confirm.
+    const confirmLand = (sessionId: string): boolean => {
+      const land = plugin?.use(ThreadHeaderLand).get()
+      // An older jj-integration client (before a reload) provides the contract without `confirm`.
+      if (land?.status !== 'active' || typeof land.value.confirm !== 'function') return false
+      land.value.confirm(sessionId)
+      return true
+    }
     const heroActions: HeroSuggestionActions = {
       open: sessionId => openThread(SessionId(sessionId)),
       review: input => {
@@ -1259,6 +1287,7 @@ export default defineClient({
       },
       renameSession,
       startFollowUp,
+      confirmLand,
       drafts: ctx.get('sessionDrafts')?.list,
       startProjectSession: (projectId: string) => {
         // Recheck at the click: deleted or remote projects must never fall back to the current project.
@@ -1342,7 +1371,12 @@ export default defineClient({
         { name: 'main', key: WAITING_THREADS_PANEL_ID, locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
         decorate(({ t }: { readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => (
           <PluginQueryProvider>
-            <WaitingThreadsPanel t={t} sessions={ctx.sessions} openThread={sessionId => openThread(SessionId(sessionId))} />
+            <WaitingThreadsPanel
+              t={t}
+              sessions={ctx.sessions}
+              openThread={sessionId => openThread(SessionId(sessionId))}
+              confirmLand={confirmLand}
+            />
           </PluginQueryProvider>
         )),
       ),
@@ -1359,12 +1393,15 @@ export default defineClient({
         WaitingThreadsGlyph,
       ),
     )
+    // The Inbox lists the same threads (its items are what this page groups by thread), so the Inbox list does not
+    // offer both: this page opens from the palette and the New tab page, and can be filed in any folder.
     metadata?.plugin?.add(DestinationSections, {
       panelId: WAITING_THREADS_PANEL_ID,
       destination: 'inbox',
       label: translate('waitingThreadsSectionLabel'),
       description: translate('waitingThreadsDescription'),
       order: 2,
+      unlisted: true,
     })
     ctx.effect(
       () =>
@@ -1376,15 +1413,6 @@ export default defineClient({
             group: 'action',
             suggested: true,
             run: context => PaletteBridge.openFanOut(context.workspace?.id ?? null),
-          },
-          {
-            id: '@dshfiles/thread-sidebar/open-board',
-            label: () => translate('threadSidebarBoardTitle'),
-            aliases: ['thread board', 'board', 'kanban', 'columns'],
-            icon: <LayoutGridIcon className="dshx:size-4" />,
-            group: 'destination',
-            // SAFETY: BOARD_PANEL_ID names the board panel this plugin registers.
-            run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
           },
         ]),
       'thread-sidebar: open the thread board',

@@ -15,8 +15,24 @@
 @source './';
 @source '../..';
 @import 'tw-animate-css' prefix(dshx);
+@import './color-roles.css';
+@import './motion-utilities.css';
+@import './field-look.css';
+@import './surfaces.css';
+@import './settings-rows.css';
+@import './disclosure.css';
 
 @custom-variant dark (&:where(body[data-ds-dark-theme] *));
+/*
+ * `dshx:phone:` is the phone shell's media rule (lib/phone-shell: under 640px wide, or a coarse pointer under 500px
+ * tall), for the few viewport-level overlays that become full-screen on a phone (the command palette). Panes keep using
+ * container queries.
+ */
+@custom-variant phone {
+  @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+    @slot;
+  }
+}
 
 @theme inline {
   --font-sans: var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
@@ -28,11 +44,15 @@
    */
   --text-2xs: var(--dshx-density-text-min, 11px);
   --text-2xs--line-height: 1.35;
-  --text-xs: 0.75rem;
+  /*
+   * Meta, UI and prose follow the density tokens too, so the same class reads 12/13/14px on desktop and 13/15/15px
+   * on a coarse-pointer phone or a narrow pane (DESIGN.md › Density). The fallbacks are the desktop values.
+   */
+  --text-xs: var(--dshx-density-text-meta, 0.75rem);
   --text-xs--line-height: 1.35;
-  --text-sm: 0.8125rem;
+  --text-sm: var(--dshx-density-text-ui, 0.8125rem);
   --text-sm--line-height: 1.45;
-  --text-base: 0.875rem;
+  --text-base: var(--dshx-density-text-prose, 0.875rem);
   --text-base--line-height: 1.45;
 
   --color-background: var(--dsw-alias-bg-base);
@@ -43,6 +63,8 @@
   --color-popover-foreground: var(--dsw-alias-label-primary);
   --color-primary: var(--dsw-alias-brand-primary);
   --color-primary-foreground: var(--dsw-alias-label-primary-foreground);
+  /* The primary's hover (council round 4 A2): darker in light, toward the page in dark. */
+  --color-primary-hover: var(--dshx-primary-hover);
   --color-secondary: var(--dsw-alias-bg-module-platform);
   --color-secondary-foreground: var(--dsw-alias-label-primary);
   --color-muted: var(--dsw-alias-bg-module-platform);
@@ -53,6 +75,11 @@
   --color-border: var(--dsw-alias-border-l2);
   --color-input: var(--dsw-alias-border-l3);
   --color-ring: var(--dsw-alias-state-business-primary);
+  /* Tertiary ink (palette step 8, AA on bg, panel, raised and every row wash): a page count, a placeholder. */
+  --color-faint-foreground: var(--dsw-alias-label-tertiary);
+  /* Surface roles (council round 5 A4, surfaces.css): `bg-surface-nav` for navigation columns, `bg-surface-stage` for pages. */
+  --color-surface-nav: var(--dshx-surface-nav);
+  --color-surface-stage: var(--dshx-surface-stage);
   --color-info: var(--dsw-alias-state-business-primary);
   --color-success: var(--dsw-alias-state-success-primary);
   --color-warning: var(--dsw-alias-state-warn-primary);
@@ -89,21 +116,47 @@
   --spacing-row: var(--dshx-size-row);
   --spacing-bar: var(--dshx-size-bar);
   --spacing-touch: var(--dshx-size-touch);
+  /* The one control height (council round 5 A1): `dshx:h-control-h`, 32px, 44px on a coarse pointer. */
+  --spacing-control-h: var(--dshx-control-h);
 
   /* Elevation: s0 resting (none) · s1 composer and sticky · s2 menus and popovers · s3 modals and sheets. */
   --shadow-s0: none;
   --shadow-s1: var(--dshx-elevation-1);
   --shadow-s2: var(--dshx-elevation-2);
   --shadow-s3: var(--dshx-elevation-3);
+  /*
+   * Tailwind's own steps, which shadcn components and older plugin code still name, draw the same levels instead of
+   * Tailwind's grey defaults: xs (bordered controls at rest) is s0, sm s1, md/lg (menus, popovers, dialogs) s2, xl/2xl
+   * s3. `check:design-tokens` still counts the names (default-shadow) so new code writes the s-steps.
+   */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: var(--dshx-elevation-1);
+  --shadow-md: var(--dshx-elevation-2);
+  --shadow-lg: var(--dshx-elevation-2);
+  --shadow-xl: var(--dshx-elevation-3);
+  --shadow-2xl: var(--dshx-elevation-3);
 
   /* One enter curve and one exit curve for every animated surface. */
   --ease-enter: var(--dshx-motion-ease-enter);
   --ease-exit: var(--dshx-motion-ease-exit);
 
-  /* Headings (weight 600, tight tracking): 20/28 section title, 26/32 page or hero title. */
-  --text-title: 1.25rem;
-  --text-title--line-height: 1.4;
+  /*
+   * Headings, tight tracking: the page `h1` 22/28 at 650 (council round 3 A5: `text-title font-title`; px, since the
+   * Host's root font is about 12.5px), 26/32 hero title. `text-heading` is the contextual heading (council round 4 A4):
+   * 15/20 at 600 for an in-page section heading (a Settings category's sections, an Inbox card title), one step above
+   * the 13px section title and below the page `h1`; it carries its own weight.
+   */
+  --text-title: 22px;
+  --text-title--line-height: 28px;
   --text-title--letter-spacing: -0.01em;
+  --font-weight-title: 650;
+  --text-heading: 15px;
+  --text-heading--line-height: 20px;
+  --text-heading--font-weight: 600;
+  /* The palette query (council round 4 B7): 16/22 at the body weight, the one field that reads larger than the UI. */
+  --text-query: 16px;
+  --text-query--line-height: 22px;
   --text-display: 1.625rem;
   --text-display--line-height: 1.2308;
   --text-display--letter-spacing: -0.02em;
@@ -117,22 +170,49 @@
 @theme {
   --container-pane-narrow: 28rem;
   --container-pane-compact: 42rem;
+  /*
+   * Page frames (council round 5 A2): two frames, not four widths. `max-w-lane` (880px) for lists and forms (Inbox,
+   * Backlog, Plugins, Settings), `max-w-wide` (min(100%, 1200px)) for data (Usage, Review, AI accounts). Both start at
+   * the same pane inset. `max-w-page` (1080px) stays for older callers. Full bleed is for a diff, chart or table only.
+   * In px, not rem, so the caps hold whatever the Host's root font is.
+   */
+  --container-page: 1080px;
+  /*
+   * The lane caps its CONTENT box (council round 6 A3): 880px, 960px once the pane is 1280px or wider
+   * (`@min-pane-wide`), with the page padding outside the cap, so a Page lane and core-plugins.css end on one edge.
+   */
+  --container-lane: 880px;
+  --container-lane-wide: 960px;
+  --container-pane-wide: 1280px;
+  /*
+   * The form frame (council round 9 A5): 720px of content for a page of label/control rows (Settings), so labels and
+   * values sit close and the header actions share the controls' trailing edge. The lane's inset rules: content box,
+   * the page padding outside, start-aligned; it does not widen on a wide pane.
+   */
+  --container-form: 720px;
+  --container-wide: 1200px;
 }
 
 @layer base {
   :root {
-    --dshx-project-balanced-0: #0369a1;
-    --dshx-project-balanced-1: #15803d;
-    --dshx-project-balanced-2: #b45309;
-    --dshx-project-balanced-3: #7e22ce;
-    --dshx-project-balanced-4: #be123c;
-    --dshx-project-balanced-5: #4338ca;
-    --dshx-project-cool-0: #0369a1;
-    --dshx-project-cool-1: #4338ca;
-    --dshx-project-cool-2: #7e22ce;
-    --dshx-project-cool-3: #be123c;
-    --dshx-project-cool-4: #0f766e;
-    --dshx-project-cool-5: #15803d;
+    /*
+     * Project identity tones (DESIGN.md › Colour roles 5; round five K4): six hues kept at least 25° away from the
+     * status hues (danger 25, warning 80, success 150, accent 270), text-safe at L 0.50 light and 0.78 dark, so a
+     * project never reads as a state. `ProjectMark` paints them at 18% behind two letters in the tone itself.
+     * Index order keeps each slot near its former hue: azure, olive, copper, violet, magenta, teal.
+     */
+    --dshx-project-balanced-0: oklch(0.5 0.11 225);
+    --dshx-project-balanced-1: oklch(0.5 0.11 110);
+    --dshx-project-balanced-2: oklch(0.5 0.11 55);
+    --dshx-project-balanced-3: oklch(0.5 0.11 305);
+    --dshx-project-balanced-4: oklch(0.5 0.11 340);
+    --dshx-project-balanced-5: oklch(0.5 0.11 195);
+    --dshx-project-cool-0: oklch(0.5 0.11 225);
+    --dshx-project-cool-1: oklch(0.5 0.11 195);
+    --dshx-project-cool-2: oklch(0.5 0.11 305);
+    --dshx-project-cool-3: oklch(0.5 0.11 340);
+    --dshx-project-cool-4: oklch(0.5 0.11 110);
+    --dshx-project-cool-5: oklch(0.5 0.11 55);
     --dshx-kit-teal: oklch(0.58 0.1 185);
     --dshx-kit-violet: oklch(0.55 0.19 295);
     --dshx-kit-graph-1: oklch(0.6 0.11 185);
@@ -148,6 +228,17 @@
     --dshx-size-row: 32px;
     --dshx-size-bar: 36px;
     --dshx-size-touch: 44px;
+    /*
+     * The leading glyph column a list row's second line shares with its first (council round 15 A1): AttentionMeta's
+     * rail seat and the thread list's status-glyph column. 20px, as wide as the widest dense project mark ("WA"), so
+     * the mark is never cut and glyph and mark share one centre axis.
+     */
+    --attention-meta-rail-seat: 20px;
+    /*
+     * The one control height (council round 5 A1): Input, InputGroup, Combobox, the default Select trigger, the segmented
+     * root and default-size Buttons, all at the 8px radius. 44px on a coarse pointer (below).
+     */
+    --dshx-control-h: 32px;
 
     /* Elevation, light: soft ambient shadows; only s2/s3 layers may add a backdrop blur. */
     --dshx-elevation-1: 0 1px 2px oklch(0.2 0.01 65 / 0.05), 0 4px 12px -6px oklch(0.2 0.01 65 / 0.1);
@@ -170,7 +261,7 @@
 
     /*
      * Density. Compact (desktop): UI 13px, meta 12px, minimum 11px, inputs 13px. Comfortable values switch in below
-     * on a coarse pointer. P0 only defines them; surfaces adopt them phase by phase, so nothing moves yet.
+     * on a coarse pointer. `.dshx-root` and the `text-2xs|xs|sm|base` steps read them.
      */
     --dshx-density-text-ui: 13px;
     --dshx-density-text-prose: 14px;
@@ -222,18 +313,18 @@
     color: var(--dshx-project-cool-5);
   }
   body[data-ds-dark-theme] {
-    --dshx-project-balanced-0: #7dd3fc;
-    --dshx-project-balanced-1: #86efac;
-    --dshx-project-balanced-2: #fcd34d;
-    --dshx-project-balanced-3: #d8b4fe;
-    --dshx-project-balanced-4: #fda4af;
-    --dshx-project-balanced-5: #a5b4fc;
-    --dshx-project-cool-0: #7dd3fc;
-    --dshx-project-cool-1: #a5b4fc;
-    --dshx-project-cool-2: #d8b4fe;
-    --dshx-project-cool-3: #fda4af;
-    --dshx-project-cool-4: #5eead4;
-    --dshx-project-cool-5: #86efac;
+    --dshx-project-balanced-0: oklch(0.78 0.1 225);
+    --dshx-project-balanced-1: oklch(0.78 0.1 110);
+    --dshx-project-balanced-2: oklch(0.78 0.1 55);
+    --dshx-project-balanced-3: oklch(0.78 0.1 305);
+    --dshx-project-balanced-4: oklch(0.78 0.1 340);
+    --dshx-project-balanced-5: oklch(0.78 0.1 195);
+    --dshx-project-cool-0: oklch(0.78 0.1 225);
+    --dshx-project-cool-1: oklch(0.78 0.1 195);
+    --dshx-project-cool-2: oklch(0.78 0.1 305);
+    --dshx-project-cool-3: oklch(0.78 0.1 340);
+    --dshx-project-cool-4: oklch(0.78 0.1 110);
+    --dshx-project-cool-5: oklch(0.78 0.1 55);
     --dshx-kit-teal: oklch(0.76 0.11 182);
     --dshx-kit-violet: oklch(0.72 0.15 300);
     --dshx-kit-graph-1: oklch(0.76 0.11 182);
@@ -251,17 +342,19 @@
 
   /*
    * Comfortable density on touch (visual refresh phone rules), by pointer and width, never by user agent:
-   * every coarse pointer gets 44px targets and 16px inputs (no Safari zoom on focus); phone-width viewports and
-   * narrow panes (`@max-pane-narrow`) also get the 15/13/12px text steps.
+   * every coarse pointer gets 44px targets and 16px inputs (no Safari zoom on focus); phone-width viewports, a phone
+   * turned sideways (a coarse pointer under 500px tall, lib/phone-shell) and narrow panes (`@max-pane-narrow`) also
+   * get the 15/13/12px text steps.
    */
   @media (pointer: coarse) {
     :root {
       --dshx-density-text-input: 16px;
       --dshx-density-target: 44px;
+      --dshx-control-h: 44px;
     }
   }
 
-  @media (pointer: coarse) and (max-width: 28rem) {
+  @media (pointer: coarse) and (max-width: 28rem), (pointer: coarse) and (max-height: 500px) {
     :root {
       --dshx-density-text-ui: 15px;
       --dshx-density-text-prose: 15px;
@@ -513,8 +606,38 @@
 
   .dshx-root {
     color: var(--dsw-alias-label-primary);
-    font: 0.8125rem/1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
+    font: var(--dshx-density-text-ui, 0.8125rem) / 1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+   * A nav glyph seat's tone reaches a panel glyph that brings its own root (council round 17 A3). The Inbox glyph is a
+   * panel icon in its own `.dshx-root`, whose ink overrode the seat: the rail drew it in ink beside toned glyphs and the
+   * phone tab bar in ink beside tertiary ones. In a rail seat that is not current, and in every phone tab seat, the root
+   * takes the seat's colour: secondary on the rail, tertiary on a resting tab, ink on the current tab.
+   */
+  :where([role='tab']:not([aria-selected='true']) > [data-rail-icon], [data-phone-tab-seat]) .dshx-root {
+    color: inherit;
+  }
+}
+
+/*
+ * One title on a phone (unslop phone 25). While thread-sidebar's phone top bar names the page on the stage ("‹ Observe
+ * Usage"), a kit `Page` (its `page-header` slot) keeps its `h1` for screen readers but hides it visually, and its count
+ * goes with it (a bare "5" names nothing, DESIGN.md Layout); meta chips and actions keep their row. A thread stage is
+ * left alone: pages in its panel sheet are not what the bar names.
+ */
+@layer base {
+  html:has([data-phone-top-bar]:not([data-phone-stage='thread'])) :where([data-slot='page-header'] h1, [data-slot='page-header'] [data-slot='page-count']) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 }
 
@@ -571,6 +694,21 @@
       inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
     }
 
+    /*
+     * The same 44px hit area as a plain class, for a control the kit does not draw: a native-fork CSS-module button,
+     * a chip, a row's `⋯` (DESIGN.md Density). It draws with ::after, so it does not suit an element whose ::after
+     * already draws something.
+     */
+    :where(.dshx-hit-44) {
+      position: relative;
+    }
+
+    :where(.dshx-hit-44)::after {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+    }
+
     /* Page tabs draw their active underline with ::after, so their hit area uses ::before. */
     :where([data-slot='tabs-trigger']) {
       position: relative;
@@ -580,6 +718,25 @@
       content: '';
       position: absolute;
       inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+    }
+
+    /*
+     * Keyboard hints mean nothing on touch (unslop phone 4): the kit keycaps (`Kbd`, `KbdGroup`, `KeyHint`), every
+     * menu, context-menu and command row's shortcut slot, the Host menu's keycaps (`<kbd>` inside a menu row) and any
+     * legend marked `data-key-legend` go. `!important` in the base layer outranks the keycaps' own display utilities.
+     * Keycaps in content (a `<kbd>` in Markdown) stay: only kit slots and menu rows are matched.
+     */
+    :where(
+      [data-slot='kbd'],
+      [data-slot='kbd-group'],
+      [data-slot='key-hint'],
+      [data-slot='dropdown-menu-shortcut'],
+      [data-slot='context-menu-shortcut'],
+      [data-slot='command-shortcut'],
+      [data-key-legend],
+      :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='option']) [aria-hidden='true']:has(kbd)
+    ) {
+      display: none !important;
     }
 
     /* Menu rows are full width already; give them a 44px row instead of the 28px desktop row. */
@@ -600,7 +757,7 @@
   }
 
   /* Phone-width text fields are 44pt tall too (comfortable density): a field cannot widen its hit area with ::after. */
-  @media (pointer: coarse) and (max-width: 639.98px) {
+  @media (pointer: coarse) and (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
     :where(input[data-slot='input']:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden'])) {
       min-height: 44px;
     }
@@ -610,6 +767,68 @@
       min-height: 44px;
     }
   }
+}
+
+/*
+ * One focus ring (DESIGN.md Focus ring, round four D15): a 2px solid accent outline 1px outside the control, on
+ * :focus-visible only, for every control inside a kit root or a kit portal and every kit control slot. Unlayered, so it
+ * beats each component's `focus-visible:ring-[3px] ring-ring/50` halo (cleared here through Tailwind's ring variables)
+ * and its `outline-none` without editing them. An invalid field keeps its destructive ring; menu and listbox rows keep
+ * their highlight, and a popover or dialog panel that takes focus itself draws nothing.
+ */
+:where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot='toggle-group-item'],
+    [data-slot='radio-group-item'],
+    [data-slot='palette-swatch'],
+    [data-slot='disclosure-link'],
+    [data-slot$='-trigger']
+  ):focus-visible:not([aria-invalid='true']):not([role^='menuitem'], [role='option'], [data-slot$='-content']) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+  --tw-ring-shadow: 0 0 transparent;
+  --tw-ring-offset-shadow: 0 0 transparent;
+}
+
+/*
+ * Inside a clipping list (`data-focus-inset` on the list or the row) or a tab strip (a dock strip clips) the ring draws
+ * inward. Same selector weight as the ring rule above, so this later rule wins.
+ */
+:where([data-focus-inset], [data-focus-inset] *, [role='tablist'], [role='tablist'] *, [role='tab']):focus-visible:not([aria-invalid='true']):not([role^='menuitem'], [role='option'], [data-slot$='-content']) {
+  outline-offset: -2px;
+}
+
+/*
+ * Compound fields (round five K7): an input group or a command input is one box, so it draws one ring, on the wrapper
+ * that carries the border, while the field inside has focus; the field itself draws none (a higher-specificity rule
+ * after the ring rule above). The command input sits on the top edge of a clipping palette or list, so its ring draws
+ * 2px inside; an input group inside a clipping list (`data-focus-inset`) does too.
+ */
+:where([data-slot='input-group']):has(:is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true'])) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+:where([data-slot='command-input-wrapper']):has(input[data-slot]:focus-visible) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+:where([data-focus-inset] [data-slot='input-group'], [data-slot='input-group'][data-focus-inset]):has(:is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true'])) {
+  outline-offset: -2px;
+}
+
+:where([data-slot='input-group'], [data-slot='command-input-wrapper']) :is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true']) {
+  outline: none;
 }
 
 /*
@@ -760,6 +979,15 @@
 }
 
 /*
+ * While DSH is away (DESIGN.md Connection: settings-shell sets `html[data-host-connection]` through
+ * lib/host-connection) nothing on the page may look like work in progress: the StatusGlyph spinner, the native StateDot
+ * spinner and the working shimmer stop where they are, as `LiveElapsed` stops its text.
+ */
+html[data-host-connection] :where([data-glyph-spinner], .dshx-live-shimmer-sweep, .dshx-live-shimmer-copy, [class*='_spinnerMotion_']) {
+  animation-play-state: paused !important;
+}
+
+/*
  * The native StateDot "ongoing" spinner (@deepseek-ai/dsh-client-ui-primitives StateDot.module.css) rotates its glyph
  * and also breathes its arc's `stroke-dasharray`: that second animation repaints the SVG on every display frame, in
  * every working row, header and subagent lineage. The arc keeps the length the native reduced-motion rule gives it and
@@ -774,7 +1002,7 @@ svg [class*='_spinnerArc_'] {
 
 /*
  * Phone: every menu and picker is a bottom sheet (visual refresh T5.2, plan phone rules "Sheets, not popovers").
- * Under the phone shell (`html[data-shell-phone-nav]`, thread-sidebar, < 640px) a kit dropdown or context menu,
+ * Under the phone shell (`html[data-shell-phone-nav]`, thread-sidebar, lib/phone-shell) a kit dropdown or context menu,
  * select, popover or combobox (through its positioning wrapper, the content's parent), and the Host's native menu,
  * leave their anchor and present as a 16px-radius sheet on
  * the bottom edge with a grabber over a dim scrim. Owners keep their contents, keyboard handling and dismissal (a tap
@@ -782,7 +1010,7 @@ svg [class*='_spinnerArc_'] {
  * cards stay anchored. While the software keyboard is open the anchored layer stays (a sheet would cover the field the
  * user types in). The composer's own pickers already did this (rich-composer, T3.5); this is the same rule for all.
  */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   html[data-shell-phone-nav]:not([data-phone-keyboard])
     :where(div):has(
       > [data-slot='dropdown-menu-content'],
@@ -833,15 +1061,115 @@ svg [class*='_spinnerArc_'] {
     padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
     border-width: 1px 0 0 !important;
     border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
-    background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
+    /* The popover's own fill (council round 27, item 7): the sheet is the surface it replaces, so its tokens mean the same. */
+    background: var(--dsw-alias-bg-layer-2) !important;
     backdrop-filter: none !important;
+    /* The kit scrim (council round 30, item 3): a mix of the text ink brightened the page in dark, where the ink is near-white. */
     box-shadow:
       var(--dshx-elevation-3),
-      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+      0 0 0 100vmax var(--dshx-scrim, rgb(0 0 0 / 0.4)) !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     transform-origin: 50% 100% !important;
-    animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) both !important;
+    /* `backwards`, not `both`: a fill that outlives the animation keeps an (identity) transform, which makes this sheet
+       the containing block of a submenu's fixed sheet rendered inside it, so a taller submenu was clipped to it. */
+    animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) backwards !important;
+  }
+
+  /*
+   * A sheet opened from a sheet scrims its parent (council round 34 A5): the child keeps its scrim, over the parent and
+   * the page, and the parent drops its own while the child is open, so the page is still dimmed once (council round 30,
+   * item 3) and the parent reads as the layer below. Nested is either a submenu Radix renders inside its parent sheet,
+   * or a sheet in a later top-level layer (a menu portaled to the body while the app holds an open sheet, or a
+   * body-level sheet after another).
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ):has(:is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    )),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body > :has(~ * :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ))
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ) {
+    box-shadow: var(--dshx-elevation-3) !important;
+  }
+
+  /*
+   * In dark a nested sheet shares the fill of the sheet under it, so its top edge vanished (council round 31, item 7): it
+   * takes the strong border step there (#423F3C). Light keeps its edge, which already reads against the scrim.
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body[data-ds-dark-theme] :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    )
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body[data-ds-dark-theme] > :has(:is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ))
+    ~ * :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ) {
+    border-top-color: var(--dshx-tone-border-strong, var(--dsw-alias-border-l4)) !important;
   }
 
   html[data-shell-phone-nav]:not([data-phone-keyboard])
@@ -877,6 +1205,24 @@ svg [class*='_spinnerArc_'] {
     margin-left: -18px;
     border-radius: 999px;
     background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+  }
+
+  /*
+   * One sheet surface (unslop phone 33): a kit `Command` inside a sheet (a searchable picker such as the project
+   * picker) is the sheet's own list, not a white card inset in the grey sheet.
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard])
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content']
+    )
+    [data-slot='command'] {
+    background: transparent;
+    border-radius: 0;
   }
 
   /* Rows in a sheet read at the comfortable size (15px) with 44pt rows (the touch rule above sets the height). */
@@ -1049,7 +1395,7 @@ html[data-phone-stack-motion='pop']::view-transition-new(root) {
  * shortcut hint costs a row of width and names keys that cannot be pressed; the
  * phone sheet keeps the labels and actions.
  */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   html[data-shell-phone-nav]
     :is([data-slot='key-hint'], [data-slot='dropdown-menu-shortcut'], [data-slot='context-menu-shortcut'], [data-slot='command-shortcut']) {
     display: none;

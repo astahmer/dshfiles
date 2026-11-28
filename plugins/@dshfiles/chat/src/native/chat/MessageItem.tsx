@@ -4,17 +4,20 @@ import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/
 import type { PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UserTextFacts } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { JsonBlock, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import type {
   ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, UserContentAttachment, UserContentData, UserContentInput,
 } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
+import { failureDetails, failureSentence } from './failure-copy.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
 import { formatMessageClock } from './message-chrome.ts'
 import { needsTimeDivider, previousTurnTime } from './time-divider.ts'
 import { ResumeInterrupted } from '../../resume-interrupted.tsx'
+import { TurnFailure } from '../../turn-error-action.ts'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
 
@@ -51,16 +54,28 @@ interface RetryCountdown {
   seconds: number
 }
 
+/** Codes whose sentence the Host's own catalog already words. */
+function codedFailureMessage(code: unknown, t: ChatViewSlotProps['t']): string | undefined {
+  if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
+  if (code === 'INTERRUPTED') return t('message.failure.interrupted')
+  if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
+  // dshfiles (round four D5): `AUTH` is a credential failure, worded by `failureSentence` with the account as the way out.
+  return code === 'QUOTA' || code === 'ACCOUNT_QUOTA' ? t('message.failure.quota') : undefined
+}
+
+/** dshfiles (unslop T8, T9): one plain sentence instead of the provider's raw payload or a library string. */
 function failureMessage(
   message: string,
   code: unknown,
   t: ChatViewSlotProps['t'],
 ): string {
-  if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
-  if (code === 'INTERRUPTED') return t('message.failure.interrupted')
-  if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
-  if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
-  return code === 'AUTH' ? t('message.failure.auth') : message
+  const coded = codedFailureMessage(code, t)
+  if (coded !== undefined) return coded
+  const sentence = failureSentence(message, typeof code === 'string' ? code : undefined)
+  if (sentence.kind === 'stalled') return t('message.failure.stalled', { minutes: sentence.minutes })
+  if (sentence.kind === 'tooLong') return t('message.failure.tooLong')
+  if (sentence.kind === 'credential') return t('message.failure.credential')
+  return sentence.kind === 'provider' ? sentence.text : t('message.failure.unknown')
 }
 
 function ModelRetryItem({ node, active, t }: {
@@ -131,23 +146,40 @@ function ModelRetryItem({ node, active, t }: {
   )
 }
 
-/** Persistent, turn-positioned feedback for a terminal failure. */
+/**
+ * Persistent, turn-positioned feedback for a terminal failure.
+ * dshfiles (unslop T8): one card. A plain sentence, one row of recovery actions (Retry first, then what other plugins
+ * add), and the failure code with the provider's original text behind "Details".
+ */
 function TurnErrorItem({ node, t, action, extraActions }: {
   node: TurnErrorNode
   action?: ReactNode
   extraActions?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
+  const sentence = failureMessage(node.message, node.code, t)
+  const details = node.code === 'INTERRUPTED' ? null : failureDetails(node.message, node.code, sentence)
+  const stopped = node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED'
   return (
     <div className={css.turnErrorRow} role="status">
-      <StateDot state="error" className={css.turnErrorDot} />
+      {/* dshfiles (unslop C15): the state's glyph from the list and the tabs (a red cross, or the stopped square);
+          the words beside it stay ink. */}
+      <StatusGlyph status={stopped ? 'stopped' : 'failed'} decorative className={css.turnErrorGlyph} />
       <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
+        <span className={css.turnErrorTitle}>{stopped ? t('message.taskStopped') : t('message.turnError')}</span>
+        <span className={css.turnErrorMessage} data-turn-error-message>{sentence}</span>
+        <div className={css.turnErrorActions} data-turn-error-actions>
+          {action}
+          {extraActions}
+        </div>
+        {details !== null && (
+          <details className={css.turnErrorDetails} data-turn-error-details>
+            <summary className={css.turnErrorDetailsSummary}>{t('message.failure.details')}</summary>
+            {details.code !== undefined && <code className={css.turnErrorCode}>{details.code}</code>}
+            {details.raw !== undefined && <pre className={css.turnErrorRaw}>{details.raw}</pre>}
+          </details>
+        )}
       </div>
-      {extraActions}
-      {action}
-      {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
   )
 }
@@ -409,21 +441,27 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 const useResumeAction = (props: {
   readonly turn: number
   readonly seq: number
+  /** dshfiles (round four): an outline Retry when retrying is unlikely to help (a client error). */
+  readonly secondary?: boolean
 } & Pick<ChatNodeViewProps, 'useChat' | 'useSession' | 'useAccess'>): ReactNode => {
   const latest = props.useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === props.turn)
   const sessionId = props.useSession(snapshot => snapshot.sessionId)
   const running = props.useSession(snapshot => snapshot.running)
   const allowed = props.useAccess('session/prompt')
-  return latest && !running && allowed ? <ResumeInterrupted sessionId={sessionId} seq={props.seq} /> : undefined
+  return latest && !running && allowed ? <ResumeInterrupted sessionId={sessionId} seq={props.seq} secondary={props.secondary === true} /> : undefined
 }
 
 /** Terminal turn-error keyed Chat renderer. */
 export const TurnErrorNodeView = memo(function TurnErrorNodeView({
   node, t, useChat, useSession, useAccess, renderSlot,
 }: ChatNodeViewProps<'turn-error'> & PropsRenderSlots<'conversation.chat.turnErrorAction'>) {
-  const resume = useResumeAction({ turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess })
-  const action = node.data.code === 'ACCOUNT_SIGNED_OUT' ? undefined : resume
-  const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '' })
+  const failure = { code: node.data.code ?? '', message: node.data.message }
+  const resume = useResumeAction({
+    turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess, secondary: !TurnFailure.retryLeads(failure),
+  })
+  // dshfiles (round four D5): a credential failure fails again on Retry; the account action in the seat leads.
+  const action = node.data.code === 'ACCOUNT_SIGNED_OUT' || TurnFailure.isCredential(failure) ? undefined : resume
+  const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '', message: node.data.message })
   return <TurnErrorItem node={node.data} t={t} action={action} extraActions={extraActions} />
 })
 

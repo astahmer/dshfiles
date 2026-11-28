@@ -2,7 +2,6 @@ import { useState } from 'react'
 import * as Schema from 'effect/Schema'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { PencilIcon } from '@dshfiles/plugin-ui/icons'
 import { accountDraftSchema } from './api.js'
 
 export const AccountNameEditor = (props: {
@@ -15,12 +14,8 @@ export const AccountNameEditor = (props: {
   props.editing ? (
     <NameForm key={props.name} {...props} />
   ) : (
-    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-      <h2 className="dshx:min-w-0 dshx:truncate dshx:text-2xl dshx:font-semibold dshx:tracking-tight">{props.name}</h2>
-      <Button aria-label="Rename account" disabled={props.disabled} onClick={() => props.onEditingChange(true)} size="icon-xs" type="button" variant="ghost">
-        <PencilIcon className="dshx:size-3.5" />
-      </Button>
-    </div>
+    // Section-title size: the page title is the only larger text. Rename lives in the account's ⋯ menu.
+    <h2 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{props.name}</h2>
   )
 const NameForm = (props: Parameters<typeof AccountNameEditor>[0]): JSX.Element => {
   const [value, setValue] = useState(props.name)
@@ -46,7 +41,7 @@ const NameForm = (props: Parameters<typeof AccountNameEditor>[0]): JSX.Element =
         aria-label="Account name"
         aria-invalid={invalid}
         autoFocus
-        className="dshx:h-9 dshx:min-w-0 dshx:flex-1"
+        className="dshx:min-w-0 dshx:flex-1"
         disabled={props.disabled}
         maxLength={120}
         onChange={event => setValue(event.target.value)}

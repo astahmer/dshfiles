@@ -64,9 +64,18 @@ export class RemoteModelDirectory {
     this.unsubscribe = base.store.subscribe(() => this.syncSelection())
   }
 
-  readonly load = (): Promise<ModelDirectoryState> => {
+  readonly load = (options: { readonly fresh?: boolean } = {}): Promise<ModelDirectoryState> => {
+    const ready = this.catalogState.kind === 'ready'
     // The picker loads on every composer mount, i.e. every thread switch; a recent catalog answers it without a request.
-    if (this.catalogState.kind === 'ready' && performance.now() - this.loadedAt < CATALOG_FRESH_MS) return Promise.resolve(this.store.getSnapshot())
+    if (options.fresh !== true && ready && performance.now() - this.loadedAt < CATALOG_FRESH_MS) return Promise.resolve(this.store.getSnapshot())
+    // Round 5 U3: opening the picker reads again (accounts hidden or added a moment ago show at once), keeping the list
+    // on screen while it does, so nothing flashes "Loading".
+    if (options.fresh === true && ready) {
+      this.loading ??= this.readCatalog({ quiet: true }).finally(() => {
+        this.loading = undefined
+      })
+      return this.loading
+    }
     // Every picker showing this Session mounts at once (a kept view beside the visible one); they share one read.
     this.loading ??= this.readCatalog().finally(() => {
       this.loading = undefined
@@ -74,9 +83,9 @@ export class RemoteModelDirectory {
     return this.loading
   }
 
-  private async readCatalog(): Promise<ModelDirectoryState> {
+  private async readCatalog(options: { readonly quiet?: boolean } = {}): Promise<ModelDirectoryState> {
     const generation = ++this.generation
-    this.setCatalogState({ kind: 'loading' })
+    if (options.quiet !== true) this.setCatalogState({ kind: 'loading' })
     try {
       const catalog = await this.fetchCatalog()
       if (generation !== this.generation) return this.store.getSnapshot()
@@ -126,7 +135,9 @@ export class RemoteModelDirectory {
   private syncSelection(): void {
     const selection = this.base.store.getSnapshot()
     this.store.update(state => {
-      state.current = selection.current
+      // A Session never loses its model: a null after a known one is the projection reloading (a reconnect clears it
+      // until the new baseline lands), so the chip keeps the last known model instead of reading "Choose model".
+      state.current = selection.current ?? state.current
       if (selection.retainedEffort === undefined) delete state.retainedEffort
       else state.retainedEffort = selection.retainedEffort
       state.pending = selection.pending

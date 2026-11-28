@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { cn } from '../../lib/utils.js'
+import { triggerLook } from './input.js'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './command.js'
 import { Popover, PopoverContent, PopoverTrigger } from './popover.js'
 
@@ -20,8 +21,11 @@ export interface ComboboxOption {
   readonly disabled?: boolean | undefined
 }
 
-const triggerClass =
-  'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:outline-none dshx:transition-[color,box-shadow] dshx:focus-visible:border-ring dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50'
+/** The quiet trigger (council round 10 A1, `triggerLook`): filled, its 3:1 edge on hover, while open and on focus. */
+const triggerClass = cn(
+  triggerLook,
+  'dshx:flex dshx:h-(--dshx-control-h) dshx:w-full dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:outline-none dshx:transition-[color,background-color,border-color,box-shadow] dshx:duration-(--dshx-duration-hover) dshx:focus-visible:border-ring dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50',
+)
 
 const groupOf = (options: readonly ComboboxOption[]): readonly { readonly name: string | undefined; readonly options: readonly ComboboxOption[] }[] =>
   options.reduce<{ readonly name: string | undefined; readonly options: ComboboxOption[] }[]>((groups, option) => {
@@ -95,7 +99,7 @@ export const Combobox = (props: {
         type="button"
       >
         {triggerBody}
-        {props.triggerContent === undefined ? <ChevronDownIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-50" /> : null}
+        {props.triggerContent === undefined ? <ChevronDownIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       </PopoverTrigger>
       <PopoverContent
         align={props.align ?? 'start'}

@@ -4,12 +4,23 @@ import { createPortal } from 'react-dom'
 import type { SessionListState, SessionProjectionMap, SessionSummary, SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { StateDot, Tooltip as NativeTooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip as NativeTooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
+import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
+import { WORK_COUNT_SEPARATOR, workCountParts, type WorkCounts, type WorkCountWords } from '@dshfiles/plugin-ui/lib/work-count'
 import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { HeaderLiveSignal } from '../header-live-activity.js'
+import { useLiveTurns } from '../live-activity.js'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
 import { SubagentRouteLabelModel } from './route-label.js'
+import { SubagentFeedModel } from './subagent-feed.js'
+import { useSubagentFailedTurns } from './subagent-failed-turns.js'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import css from './SubagentHeaderLineage.module.css'
@@ -52,6 +63,34 @@ export class SubagentCatalogs {
     }
   }
 
+  /**
+   * A catalog's direct children counted by state, for the chip's summary: working while running, else the terminal
+   * state every list surface reads (round 21 D4). A child with no known state yet counts in no part.
+   */
+  static countsOf(
+    entries: readonly { readonly id: SessionId; readonly mode: string; readonly activity: 'running' | 'inactive' }[],
+    summaries: Readonly<Record<SessionId, SessionSummary>>,
+    failedTurns: ReadonlyMap<string, unknown>,
+  ): WorkCounts {
+    let working = 0
+    let failed = 0
+    let stopped = 0
+    let done = 0
+    for (const entry of entries) {
+      const state = rowStateOf({
+        external: entry.mode === 'external',
+        running: entry.activity === 'running',
+        failedTurn: failedTurns.has(entry.id),
+        lastTurnCompleted: summaries[entry.id]?.projectionValues?.subagentTiming?.lastTurnCompleted,
+      })
+      if (state === 'working') working += 1
+      else if (state === 'failed') failed += 1
+      else if (state === 'stopped') stopped += 1
+      else if (state === 'done') done += 1
+    }
+    return { working, failed, stopped, done }
+  }
+
   /** The Session whose subagent catalog lists `childSessionId`, first match in projection order. */
   static parentOf(projections: CatalogProjections, childSessionId: SessionId): SessionId | undefined {
     for (const parentId in projections) {
@@ -68,11 +107,29 @@ export class SubagentCatalogs {
   }
 }
 
+/**
+ * The chip and the popover rows say what they say in thread-sidebar's own words, so a row is never built from two
+ * dictionaries ("Sous-agents 2 working", C5).
+ */
+export interface SubagentCatalogCopy {
+  /** "1 subagent", "3 subagents": the chip's fallback while no child's state is known. */
+  readonly count: (count: number) => string
+  /** The one count formula's words (council round 22, item 3): the chip reads `6 working · 1 failed`. */
+  readonly summary: WorkCountWords
+  readonly working: string
+  /** The child header's live state while its turn waits on the user. */
+  readonly needsYou: string
+  readonly done: string
+  readonly stopped: string
+  readonly failed: string
+}
+
 /** Business actions supplied by the slot registration. */
 export interface SubagentCatalogInjected {
   openChild: (address: SubagentAddress) => void
   openChildAside: (address: SubagentAddress) => void
   refreshProjection: (parentSessionId: SessionId) => void
+  copy: SubagentCatalogCopy
 }
 
 /** Full props for the session-header lineage renderer. */
@@ -91,23 +148,11 @@ interface CatalogRowsProps {
   refreshProjection: (parentSessionId: SessionId) => void
   toggleBranch: (childSessionId: SessionId) => void
   closeCatalog: () => void
+  copy: SubagentCatalogCopy
 }
 
 function treeItems(root: HTMLDivElement | null): HTMLElement[] {
   return root === null ? [] : Array.from(root.querySelectorAll<HTMLElement>('[role="treeitem"]:not([aria-disabled="true"])'))
-}
-
-/** Compact token count shared in shape with the conversation stats strip. */
-function formatTokens(value: number, t: TranslateNS<typeof NS>): string {
-  const scaled = (next: number): string => (next >= 100 ? String(Math.round(next)) : String(Math.round(next * 10) / 10))
-  if (value < 1_000) return String(value)
-  if (value < 1_000_000) return t('tokens.thousand', { value: scaled(value / 1_000) })
-  return t('tokens.million', { value: scaled(value / 1_000_000) })
-}
-
-/** Sum the four disjoint durable provider-usage buckets. */
-function tokenTotal(usage: SessionProjectionMap['tokenUsage'] | undefined): number | undefined {
-  return usage === undefined ? undefined : usage.uncachedInputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
 }
 
 /** Exact whole-second active-turn duration for one catalog row. */
@@ -118,74 +163,6 @@ function activityDuration(summary: SessionSummary | undefined, activity: 'runnin
   if (timing.active === undefined) return timing.settledMs
   const end = activity === 'running' ? now : timing.active.through
   return timing.settledMs + Math.max(0, end - timing.active.since)
-}
-
-interface DurationParts {
-  seconds: number
-  minutes: number
-  hours: number
-  days: number
-  totalMinutes: number
-  totalHours: number
-}
-
-function splitDuration(ms: number): DurationParts {
-  const totalSeconds = Math.floor(Math.max(0, ms) / 1_000)
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const totalHours = Math.floor(totalMinutes / 60)
-  return {
-    seconds: totalSeconds % 60,
-    minutes: totalMinutes % 60,
-    hours: totalHours % 24,
-    days: Math.floor(totalHours / 24),
-    totalMinutes,
-    totalHours,
-  }
-}
-
-/** Format a duration with decreasing visual precision at larger scales. */
-function formatDuration(ms: number, t: TranslateNS<typeof NS>): string {
-  const { seconds, minutes, hours, days, totalMinutes, totalHours } = splitDuration(ms)
-  if (days >= 365) {
-    const years = Math.floor(days / 365)
-    const months = Math.floor((days % 365) / 30)
-    return months === 0 ? t('duration.years', { years }) : t('duration.yearsMonths', { years, months })
-  }
-  if (days >= 30) {
-    const months = Math.floor(days / 30)
-    const remainingDays = days % 30
-    return remainingDays === 0 ? t('duration.months', { months }) : t('duration.monthsDays', { months, days: remainingDays })
-  }
-  if (days > 0) {
-    return hours === 0 ? t('duration.days', { days }) : t('duration.daysHours', { days, hours })
-  }
-  if (totalHours > 0) {
-    return t('duration.hours', {
-      hours: totalHours,
-      minutes: String(minutes).padStart(2, '0'),
-      seconds: String(seconds).padStart(2, '0'),
-    })
-  }
-  if (totalMinutes > 0) {
-    return t('duration.minutes', {
-      minutes: totalMinutes,
-      seconds: String(seconds).padStart(2, '0'),
-    })
-  }
-  return t('duration.seconds', { seconds })
-}
-
-/** Preserve exact whole seconds for hover and accessible naming. */
-function formatExactDuration(ms: number, t: TranslateNS<typeof NS>): string {
-  const { seconds, minutes, hours, days } = splitDuration(ms)
-  return days === 0
-    ? formatDuration(ms, t)
-    : t('duration.exactDays', {
-        days,
-        hours: String(hours).padStart(2, '0'),
-        minutes: String(minutes).padStart(2, '0'),
-        seconds: String(seconds).padStart(2, '0'),
-      })
 }
 
 function SubagentSwitcherIcon() {
@@ -215,27 +192,29 @@ function isKnownLeaf(catalog: SubagentCatalogSnapshot | undefined): boolean {
   return catalog?.state === 'ready' && catalog.entries.length === 0
 }
 
-const modeLabelOf = (props: {
-  readonly mode: SubagentCatalogSnapshot['entries'][number]['mode']
-  readonly external: boolean
-  readonly t: TranslateNS<typeof NS>
-}): string => {
-  if (props.external) return props.t('mode.external')
-  if (props.mode === 'unknown') return props.t('mode.unknown')
-  if (props.mode === 'one-shot') return props.t('mode.oneShot')
-  return props.t('mode.continuable')
-}
-
-const activityLabelOf = (props: {
+/**
+ * A child's glyph in the popover: working, done, failed or stopped (round 21 D4: the same terminal state as the
+ * transcript and the list); nothing while none is known, and never Idle.
+ */
+const rowStateOf = (input: {
   readonly external: boolean
   readonly running: boolean
-  readonly completed: boolean
-  readonly t: TranslateNS<typeof NS>
-}): string | undefined => {
-  if (props.external) return undefined
-  if (props.running) return props.t('activity.running')
-  if (props.completed) return props.t('activity.completed')
-  return props.t('activity.inactive')
+  readonly failedTurn: boolean
+  readonly lastTurnCompleted: boolean | undefined
+}): StatusGlyphState | undefined => {
+  if (input.external) return undefined
+  if (input.running) return 'working'
+  const terminal = SubagentFeedModel.terminalOf(input)
+  if (terminal === 'completed') return 'done'
+  return terminal
+}
+
+const stateWordOf = (copy: SubagentCatalogCopy, state: StatusGlyphState | undefined): string | undefined => {
+  if (state === 'working') return copy.working
+  if (state === 'done') return copy.done
+  if (state === 'stopped') return copy.stopped
+  if (state === 'failed') return copy.failed
+  return undefined
 }
 
 /** Render one catalog level and recurse only through explicitly expanded rows. */
@@ -252,9 +231,11 @@ function CatalogRows({
   refreshProjection,
   toggleBranch,
   closeCatalog,
+  copy,
   t,
 }: CatalogRowsProps & { t: TranslateNS<typeof NS> }) {
   const [now, setNow] = useState(() => Date.now())
+  const failedTurns = useSubagentFailedTurns()
   const running = catalog.entries.some(entry => entry.activity === 'running')
   useEffect(() => {
     if (!running) return
@@ -295,26 +276,18 @@ function CatalogRows({
         const childLoading = childCatalog === undefined || (childCatalog.state === 'loading' && childCatalog.entries.length === 0)
         const summary = summaries[entry.id]
         const label = entry.label ?? entry.id
-        const mode = modeLabelOf({ mode: entry.mode, external, t })
         const runningEntry = entry.activity === 'running'
-        const completed = !external && !runningEntry && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
-        const activity = activityLabelOf({ external, running: runningEntry, completed, t })
-        const agentRoute = SubagentRouteLabelModel.displayedAgentRouteLabel(
-          summary?.projectionValues?.threadSidebarModelRoute,
-          summary?.projectionValues?.subagent,
-        )
-        const secondary = [summary?.title, mode, agentRoute, runningEntry ? undefined : activity].filter(value => value !== undefined).join(' · ')
-        const totalTokens = tokenTotal(summary?.projectionValues?.tokenUsage)
+        // The row is the child's glyph, its description and how long it worked; the child's own title (often the raw
+        // prompt), its mode, its route and a token count stay out of it (C13).
+        const rowState = rowStateOf({
+          external,
+          running: runningEntry,
+          failedTurn: failedTurns.has(entry.id),
+          lastTurnCompleted: summary?.projectionValues?.subagentTiming?.lastTurnCompleted,
+        })
+        const stateWord = stateWordOf(copy, rowState)
         const durationMs = activityDuration(summary, entry.activity, now)
-        const tokenMetric = totalTokens === undefined ? undefined : t('tokens.total', { value: formatTokens(totalTokens, t) })
-        const durationMetric =
-          durationMs === undefined
-            ? undefined
-            : {
-                compact: formatDuration(durationMs, t),
-                exact: formatExactDuration(durationMs, t),
-              }
-        const metrics = [tokenMetric, durationMetric?.exact].filter(value => value !== undefined).join(' · ')
+        const duration = durationMs === undefined ? undefined : formatElapsed(durationMs)
 
         const open = (): void => {
           if (external) return
@@ -357,7 +330,7 @@ function CatalogRows({
               aria-level={level}
               aria-current={isCurrent || undefined}
               aria-disabled={external || undefined}
-              aria-label={[label, secondary, runningEntry ? activity : undefined, metrics].filter(value => value !== undefined && value !== '').join(' ')}
+              aria-label={[label, stateWord, duration].filter(value => value !== undefined).join(' · ')}
               {...(knownLeaf ? {} : { 'aria-expanded': isExpanded })}
               className={css.row}
               onClick={open}
@@ -377,26 +350,13 @@ function CatalogRows({
                 </button>
               )}
               <div className={css.clickarea}>
-                <span className={css.rowActivitySlot}>
-                  <StateDot state={entry.activity === 'running' ? 'ongoing' : completed ? 'done' : 'idle'} />
-                </span>
+                <span className={css.rowActivitySlot}>{rowState === undefined ? null : <StatusGlyph status={rowState} decorative />}</span>
                 <span className={css.content}>
                   <span className={`${css.label} ${isCurrent ? css.currentLabel : ''}`}>{label}</span>
-                  <span className={css.summary}>{secondary}</span>
-                  {runningEntry && activity !== undefined && (
-                    <span className={css.activityStatus} role="status">
-                      {activity}
-                    </span>
-                  )}
                 </span>
-                {metrics !== '' && (
+                {duration !== undefined && (
                   <span className={css.metrics}>
-                    {tokenMetric !== undefined && <span className={css.metricToken}>{tokenMetric}</span>}
-                    {durationMetric !== undefined && (
-                      <NativeTooltip label={t('duration.exactTitle', { duration: durationMetric.exact })} side="bottom" portal>
-                        <span className={css.metricDuration}>{durationMetric.compact}</span>
-                      </NativeTooltip>
-                    )}
+                    <span className={css.metricDuration}>{duration}</span>
                   </span>
                 )}
                 {!isCurrent && !external && (
@@ -434,6 +394,7 @@ function CatalogRows({
                     refreshProjection={refreshProjection}
                     toggleBranch={toggleBranch}
                     closeCatalog={closeCatalog}
+                    copy={copy}
                     t={t}
                   />
                 )}
@@ -502,6 +463,7 @@ function CatalogDropdown({
   openChild,
   openChildAside,
   refreshProjection,
+  copy,
   t,
 }: CatalogDropdownProps) {
   const ancestorSwitcher = variant === 'switcher' && openTitle !== undefined
@@ -523,8 +485,14 @@ function CatalogDropdown({
   const directChildren = catalog?.entries ?? []
   const directCount = directChildren.length
   const runningCount = directChildren.filter(entry => entry.activity === 'running').length
-  const totalCountKey = directCount === 1 ? 'count.total.one' : 'count.total.other'
-  const runningCountKey = runningCount === 1 ? 'count.running.one' : 'count.running.other'
+  const failedTurns = useSubagentFailedTurns()
+  // `6 working · 1 failed`, the formula every surface that summarises children reads (council round 22, item 3), with
+  // the spinner only while one works; "3 subagents" only while no child's state is known yet.
+  const countParts = workCountParts(
+    variant === 'count' ? SubagentCatalogs.countsOf(directChildren, summaries, failedTurns) : {},
+    copy.summary,
+  )
+  const countLabel = countParts.length === 0 ? copy.count(directCount) : countParts.map(part => part.text).join(WORK_COUNT_SEPARATOR)
   const presentedCatalog: SubagentCatalogSnapshot | undefined = catalog ?? (variant === 'switcher' ? { entries: [], state: 'loading', error: null } : undefined)
 
   const closeBranch = (root: SessionId): void => {
@@ -650,7 +618,7 @@ function CatalogDropdown({
         aria-label={
           variant === 'switcher'
             ? t('switcher.aria', { title: switcherDisplayTitle })
-            : t(runningCount > 0 ? runningCountKey : totalCountKey, { count: runningCount > 0 ? runningCount : directCount })
+            : countLabel
         }
         onClick={
           openTitle === undefined
@@ -677,10 +645,13 @@ function CatalogDropdown({
           <>
             {runningCount > 0 && (
               <span className={css.activitySlot}>
-                <StateDot state="ongoing" />
+                <StatusGlyph status="working" decorative />
               </span>
             )}
-            <span className={css.count}>{t(totalCountKey, { count: runningCount > 0 ? `${runningCount}/${directCount}` : directCount })}</span>
+            <span className={css.count}>
+              {/* The failed clause leads with its cross in the failed ink, as on every surface (council round 23, item 2). */}
+              {countParts.length === 0 ? countLabel : <WorkCountText parts={countParts} />}
+            </span>
           </>
         )}
         {variant === 'switcher' ? <SubagentSwitcherIcon /> : <ChevronDownIcon size={14} strokeWidth={1.5} className={open ? css.triggerOpen : undefined} />}
@@ -710,6 +681,7 @@ function CatalogDropdown({
                 closeCatalog={() => {
                   sendHoverMenu({ type: 'dismiss' })
                 }}
+                copy={copy}
                 t={t}
               />
             </div>
@@ -738,6 +710,7 @@ export function SubagentCatalogAction({
   openChild,
   openChildAside,
   refreshProjection,
+  copy,
   t,
 }: SubagentCatalogActionProps) {
   const isChild = useSessions(state => state.byId[sessionId]?.origin === 'subagent')
@@ -752,8 +725,42 @@ export function SubagentCatalogAction({
       openChild={openChild}
       openChildAside={openChildAside}
       refreshProjection={refreshProjection}
+      copy={copy}
       t={t}
     />
+  )
+}
+
+const NO_IDS: readonly string[] = []
+
+/**
+ * A running child's live state right after its model: `… deepseek-v4-flash · ○ Working` (council round 22, item 7), not
+ * in the header's utilities seat, where it floated mid-bar. The same signal and live-turn read as a root thread's, with
+ * no clock: the transcript's "Working for 33s" is the child view's one clock, as on the phone (council round 24, item 6).
+ */
+const ChildLiveState = (props: {
+  readonly sessionId: SubagentHeaderLineageProps['sessionId']
+  readonly useSessions: SubagentHeaderLineageProps['useSessions']
+  readonly useSessionStatus: SubagentHeaderLineageProps['useSessionStatus']
+  readonly labels: { readonly working: string; readonly needsYou: string }
+}) => {
+  const running = props.useSessions(state => {
+    const session = state.byId[props.sessionId]
+    return session !== undefined && session.running && !session.blank
+  })
+  const phaseReady = props.useSessions(state => state.phase === 'ready')
+  const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
+  const turns = useLiveTurns(ids, phaseReady)
+  const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
+  const turn = turns.get(props.sessionId)
+  if (!running) return null
+  return (
+    <span className={cn('dshx-root', css.childLiveState)} data-subagent-live-state="">
+      <span aria-hidden="true" className={css.childLiveSeparator}>
+        ·
+      </span>
+      <HeaderLiveSignal turn={turn === undefined ? undefined : { ...turn, startedAt: undefined }} waitingOnYou={waitingOnYou} labels={props.labels} />
+    </span>
   )
 }
 
@@ -763,6 +770,7 @@ export function SubagentCatalogAction({
  * @returns A title-and-chevron sibling switcher, or nothing on a root session.
  */
 export function SubagentHeaderLineage({
+  sessionId,
   lineageSessionId,
   displayTitle,
   openTitle,
@@ -773,15 +781,18 @@ export function SubagentHeaderLineage({
   openChild,
   openChildAside,
   refreshProjection,
+  copy,
   t,
 }: SubagentHeaderLineageProps) {
   const address = useSession(session => session.subagent?.address)
-  const agentLabel = SubagentRouteLabelModel.displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
+  // The model this subagent runs on (council round 17 B1.1): the kit's mark and the model's name, never the provider id
+  // or a backend such as "in-process".
+  const route = SubagentRouteLabelModel.subagentRoute({ route: useProjection('threadSidebarModelRoute'), identity: useProjection('subagent') })
   const parentId = useSessions(state => {
     if (address?.childSessionId === lineageSessionId) return address.parentSessionId
     return SubagentCatalogs.parentOf(state.projectionsBySession, lineageSessionId)
   })
-  const shared = { useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t }
+  const shared = { useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, copy, t }
   // Root sessions carry no breadcrumb; their descendant count lives in the
   // header actions band (SubagentCatalogAction).
   if (parentId === undefined) return null
@@ -797,10 +808,20 @@ export function SubagentHeaderLineage({
         {...shared}
       />
       {openTitle === undefined && <CatalogDropdown key={`${lineageSessionId}-descendants`} rootSessionId={lineageSessionId} variant="count" {...shared} />}
-      {agentLabel !== undefined && (
-        <span className={css.agentBadge} title={agentLabel}>
-          {agentLabel}
+      {route !== undefined && (
+        <span className={cn('dshx-root', css.agentBadge)} data-subagent-route="">
+          <RouteModel provider={route.provider} model={route.model} size="md" />
         </span>
+      )}
+      {lineageSessionId === sessionId && (
+        <PluginQueryProvider>
+          <ChildLiveState
+            sessionId={sessionId}
+            useSessions={useSessions}
+            useSessionStatus={useSessionStatus}
+            labels={{ working: copy.working, needsYou: copy.needsYou }}
+          />
+        </PluginQueryProvider>
       )}
     </>
   )

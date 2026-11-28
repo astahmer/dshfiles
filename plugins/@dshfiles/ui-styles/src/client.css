@@ -9,6 +9,8 @@
 @import './transcript.css';
 /* Native core controls widened for touch (visual refresh T5.4): the Settings font-size stepper. */
 @import './phone-touch.css';
+/* The core Plugins page (round five A7): shared page inset, identity icon tiles, a quiet Experimental chip. */
+@import './core-plugins.css';
 
 /* The kit sheet scans every owned plugin (`@source '../..'`), which also reads test files and markdown that never
    ship to a browser: they cost roughly a third of the scan and produce no class the app can render. */
@@ -23,6 +25,21 @@
    CSS lays it out under its backdrop host. */
 [data-dshx-scene] {
   display: none;
+}
+
+/* Every switch's on state is `control-on`, the ink (round five K10; ink since council round 7 A1; L 0.82 in dark since
+   council round 9 A2). The core Plugins page draws the Host primitives Switch, a `button[role=switch]` whose module
+   class fills `[aria-checked='true']`; this out-ranks that (0,2,0) rule at (0,3,1) so both switches draw the same ink.
+   Kit switches carry `data-slot` and already draw `control-on`. Unlayered, as the Host module sheet is. Guard: tests/core-switch.test.ts. */
+button[role='switch'][aria-checked='true']:not([data-slot]) {
+  background: var(--dshx-control-on, var(--dsw-alias-label-primary));
+}
+
+/* An enabled off switch shows its boundary, the field border (council round 8 A3), so an off toggle reads as a control.
+   The Host track is border-box with border 0 and 2px padding, so the edge is an inset ring: a border would push the
+   knob 1px. A disabled one keeps the washed look. Guard: tests/core-switch.test.ts. */
+button[role='switch'][aria-checked='false']:not([data-slot], :disabled) {
+  box-shadow: inset 0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3));
 }
 
 /* Touch platform baseline: the tells that make the page feel like a website on a phone. Rules gate by capability,

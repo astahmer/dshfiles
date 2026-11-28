@@ -4,7 +4,8 @@
     {
       "id": "palette-search",
       "title": "Search threads and workspace files",
-      "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
+      "summary": "Search threads by title, project or id, and files in the workspace.",
+      "details": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all. On Everything, threads come before commands when their best match is stronger, and an empty search leads with recent threads; every thread row reads in the thread list's grammar: its status glyph on the rail, then `[mark] project · word · age` (Working, Ready, Idle, Approval, Question, Turn failed), the word from the provider (thread-sidebar) that adds one to PaletteThreadStatuses, else from the thread's running fact.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",
@@ -119,7 +120,8 @@
     {
       "id": "action-registry",
       "title": "Register and invoke typed palette actions",
-      "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
+      "summary": "Features register actions that the command palette lists and runs.",
+      "details": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
       "reach": ["click button \"New thread\"", "click button \"Open command palette\"", "expect option \"New thread*\"", "expect option \"Use dark theme*\""],
       "surfaces": ["client", "api"],
       "surface": "infrastructure",
@@ -184,8 +186,9 @@
     },
     {
       "id": "contributed-commands",
-      "title": "List commands other plugins contribute through dshx",
-      "summary": "Show every scoped, visible dshx Command under Commands, grey out disabled ones and follow them as plugins load, reload or withdraw them.",
+      "title": "List commands from every plugin",
+      "summary": "The palette lists every command plugins add, with disabled ones greyed out.",
+      "details": "Show every scoped, visible dshx Command under Commands, grey out disabled ones and follow them as plugins load, reload or withdraw them.",
       "reach": ["press Meta+Shift+P", "fill combobox \"Search the command palette\" \"Toggle sidebar\"", "expect option \"Toggle sidebar*\""],
       "surfaces": ["client"],
       "surface": "command",
@@ -227,7 +230,8 @@
     {
       "id": "frecency-ranking",
       "title": "Rank recently used actions and files",
-      "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
+      "summary": "Actions and files you use often rank higher in this browser.",
+      "details": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
       "surfaces": ["client", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -277,7 +281,8 @@
     {
       "id": "palette-prefix-routing",
       "title": "Route prefixed searches to the right content",
-      "summary": "Use palette prefixes to switch between commands, indexed content, line navigation, and the Backlog capture flow.",
+      "summary": "Type a prefix in the palette to search commands, content, a line number or capture to Backlog.",
+      "details": "Use palette prefixes to switch between commands, indexed content, line navigation, and the Backlog capture flow.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",
@@ -334,7 +339,8 @@
     {
       "id": "ask-dsh",
       "title": "Ask DSH from an empty palette",
-      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH · <question>, and that thread opens in the main view.",
+      "summary": "Press Tab in an empty palette to ask DSH a question in a new thread.",
+      "details": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH · <question>, and that thread opens in the main view.",
       "reach": [
         "press Meta+Shift+P",
         "press Tab",
@@ -437,7 +443,8 @@
     {
       "id": "performance-budget",
       "title": "Keep palette ranking within the interaction budget",
-      "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
+      "summary": "The palette stays fast to open and to type in, even with many threads and files.",
+      "details": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -487,7 +494,8 @@
     {
       "id": "command-effective-keys",
       "title": "Commands show the keys they answer to",
-      "summary": "Command rows show each command's effective keys from api.commands.keys, so a binding the user changed shows at once, and commands marked suggested appear before anything is typed.",
+      "summary": "Each command shows the keys it answers to, including the ones you changed.",
+      "details": "Command rows show each command's effective keys from api.commands.keys, so a binding the user changed shows at once, and commands marked suggested appear before anything is typed.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",

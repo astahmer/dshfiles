@@ -411,7 +411,9 @@
   line-height: 16px;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-secondary, currentColor);
-  background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+  /* Council round 6 (A4): the strip continues the nav column it runs under, so it takes the nav surface (lifted in
+     dark), not the panel tone it used to share with it. */
+  background: var(--dshx-surface-nav, var(--dshx-tone-panel, var(--dsw-alias-bg-base)));
   border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
   z-index: 12;
 }
@@ -430,7 +432,9 @@
   padding: 0 8px;
 }
 
-.statusSide > .statusItem + .statusItem::before {
+/* dshfiles (unslop r5 C6, council round 4): a divider sits before an item only when a shown item precedes it, so a
+   blank item (status-blank.ts) never leaves a hairline at either end. */
+.statusSide > .statusItem:not([data-status-blank], :empty, :has(> .statusItemButton:empty)) ~ .statusItem::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -462,7 +466,8 @@
 }
 
 .statusItem:empty,
-.statusItem:has(> .statusItemButton:empty) {
+.statusItem:has(> .statusItemButton:empty),
+.statusItem[data-status-blank] {
   display: none;
 }
 
@@ -481,9 +486,12 @@
   cursor: pointer;
 }
 
-.statusItemButton:hover {
-  color: var(--dsw-alias-label-primary, currentColor);
-  background: var(--dsw-alias-interactive-bg-hover, transparent);
+/* Only where something hovers: a tap on a phone leaves no stuck hover tint. */
+@media (hover: hover) {
+  .statusItemButton:hover {
+    color: var(--dsw-alias-label-primary, currentColor);
+    background: var(--dsw-alias-interactive-bg-hover, transparent);
+  }
 }
 
 .statusItemButton:focus-visible {
@@ -543,6 +551,12 @@
   box-shadow: var(--dshx-elevation-2, 0 8px 24px rgb(0 0 0 / 0.18));
 }
 
+/* The sheet the phone top bar's status button opens (round five C2): the same rows, inside the kit's sheet. */
+.statusSheetList {
+  display: grid;
+  gap: 6px;
+}
+
 .statusSheetRow {
   display: flex;
   align-items: center;
@@ -555,8 +569,11 @@
   opacity: 0.7;
 }
 
-/* An item with nothing to say renders null: its row leaves the list instead of showing a bare label. */
-.statusSheetRow:has(.statusItem:empty) {
+/* An item with nothing to say renders null (or an empty open button): its row leaves the list instead of showing a bare
+   label ("Working", "Orphans", "Restart" with no value on a phone). An item whose only child is an empty button, the
+   frame's open wrapper or its own control, has nothing to say either. */
+.statusSheetRow:has(.statusItem:empty),
+.statusSheetRow:has(.statusItem > button:only-child:empty) {
   display: none;
 }
 
@@ -596,10 +613,11 @@
 }
 
 /* Local delta (dshfiles): phone navigation. A left-column occupant that draws its own phone navigation (a bottom tab
-   bar and a full-screen list, plans/ade-ux §4.1) marks the document with data-shell-phone-nav. Below 640px the frame
-   then gives the whole width to the stage and leaves room for that bar; without the mark nothing changes, so a
-   sidebar with no phone navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
-@media (max-width: 639.98px) {
+   bar and a full-screen list, plans/ade-ux §4.1) marks the document with data-shell-phone-nav. Below 640px, or on a
+   phone turned sideways (a coarse pointer under 500px tall: plugin-ui lib/phone-shell), the frame then gives the
+   whole width to the stage and leaves room for that bar; without the mark nothing changes, so a sidebar with no phone
+   navigation keeps the rail. The inline grid template is a JS solve, hence !important. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   /* The occupant also publishes --dsh-phone-top-height (its top bar: Back, title, panels) and, while the software
      keyboard is open, --dsh-keyboard-inset with data-phone-keyboard on the document (its tab bar then hides). The
      frame sits between the bars on the dynamic viewport, so the composer stays just above whichever bar or keyboard
@@ -608,6 +626,9 @@
      taller than the viewport, which a focus or scroll-into-view then scrolls (the bars and stage shift up). */
   :global([data-shell-phone-nav]) .frame {
     grid-template-columns: 0px minmax(0, 1fr) 0px !important;
+    /* A phone turned sideways keeps the stage, the composer and the dock strip out of the notch, as the bars are. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     top: var(--dsh-phone-top-height, 0px);
     height: calc(100% - var(--dsh-phone-top-height, 0px) - var(--dsh-phone-nav-height, 0px));
     height: calc(100dvh - var(--dsh-phone-top-height, 0px) - var(--dsh-phone-nav-height, 0px));
@@ -625,18 +646,41 @@
   }
 
   /* The status strip becomes one pill just above the tab bar (visual refresh T1.6; plan §4.1 R5 compact): a quiet
-     row on the stage's background, the pill centred, its 44pt hit area wider than its drawn 24px. Its list opens
+     row on the stage's background, the pill centred. Its row is 44px so the pill's 44pt hit area (the kit's
+     dshx-hit-44, wider than its drawn 24px) stays inside it instead of reaching into the tab bar below. Its list opens
      upward from it. The top bar's trailing corner is left to the thread's `⋯` menu. */
   :global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact'] {
     justify-content: center;
-    height: 32px;
+    /* With no tab bar below (an open thread) the row sits on the home indicator: it grows by the bottom safe area and
+       keeps the pill above it. Under the tab bar (which already pads that area) the difference is negative, so 0. */
+    height: calc(44px + max(0px, env(safe-area-inset-bottom, 0px) - var(--dsh-phone-nav-height, 0px)));
+    /* The tab bar draws 1px taller than the --dsh-phone-nav-height it publishes and overlaps this row's last pixel:
+       lifting the pill 2px (a 46px row) keeps its whole hit area on this row. */
     padding: 0;
-    border-top: none;
+    padding-bottom: max(2px, calc(env(safe-area-inset-bottom, 0px) - var(--dsh-phone-nav-height, 0px)));
+    /* Round five P3: the stage scrolls behind nothing; a hairline ends it, so a card clipped at the stage's edge
+       reads as scrolled out of view, not as covered by the pill. */
+    border-top: 1px solid var(--dsw-alias-border-l2, transparent);
     background: transparent;
+  }
+
+  /* Round five C2: no permanent band above the tab bar. Status opens from the top bar's button (PhoneStatus); the row
+     returns ('compact') only while an item marks data-status-actionable, and the auto grid row collapses meanwhile. */
+  :global([data-shell-phone-nav]) .statusStrip[data-status-strip='button'] {
+    display: none;
   }
 
   /* While the software keyboard is up the composer sits on it; the pill would only push it up (T3.5). */
   :global([data-shell-phone-nav][data-phone-keyboard]) .statusStrip[data-status-strip='compact'] {
+    display: none;
+  }
+
+  /* Round five C1: the pill belongs to the overview screens (Threads and Inbox). On a thread the composer owns the bottom
+     edge, and on Land, More and the pages opened from More (Settings) the 46px row is chrome the page needs; the auto
+     grid row collapses with it. thread-sidebar marks a thread on the stage (data-phone-in-thread) and the current tab
+     (aria-current on [data-phone-tab]); a drawer layout has no tab bar, so only its thread screen drops the pill. */
+  :global(html[data-phone-in-thread]) .statusStrip,
+  :global(html:has([data-phone-tab-bar]):not(:has([data-phone-tab='threads'][aria-current='page'], [data-phone-tab='inbox'][aria-current='page']))) .statusStrip {
     display: none;
   }
 
@@ -645,14 +689,8 @@
     max-width: min(80vw, 320px);
     height: 24px;
     padding: 0 12px;
-    background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+    background: var(--dshx-surface-nav, var(--dshx-tone-panel, var(--dsw-alias-bg-base)));
     color: var(--dsw-alias-label-secondary, currentColor);
-  }
-
-  :global([data-shell-phone-nav]) .statusChip::after {
-    content: '';
-    position: absolute;
-    inset: -10px -4px;
   }
 
   :global([data-shell-phone-nav]) .statusSheet {

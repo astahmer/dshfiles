@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@dshfiles/plugin-ui/components/ui/field'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useState, useSyncExternalStore } from 'react'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { KeyboardShortcutModel, parseChord, serializeChord } from './keyboard-shortcuts.js'
@@ -143,19 +144,21 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
             <FieldContent>
               <FieldLabel className="dshx:font-normal">{props.t('threadSidebarNavigationDensity')}</FieldLabel>
             </FieldContent>
-            <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5">
-              {(['compact', 'comfortable'] as const).map(density => (
-                <Button
-                  key={density}
-                  size="sm"
-                  type="button"
-                  variant={preferences.navigationDensity === density ? 'default' : 'outline'}
-                  onClick={() => updatePreferences({ navigationDensity: density })}
-                >
-                  {props.t(density === 'compact' ? 'threadSidebarNavigationCompact' : 'threadSidebarNavigationComfortable')}
-                </Button>
-              ))}
-            </div>
+            {/* One segmented style for a choice between a few values (DESIGN.md): the kit ToggleGroup, never a pair of buttons with a black one. */}
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              className="dshx:shrink-0"
+              aria-label={props.t('threadSidebarNavigationDensity')}
+              value={preferences.navigationDensity}
+              onValueChange={value => {
+                if (value === 'compact' || value === 'comfortable') updatePreferences({ navigationDensity: value })
+              }}
+            >
+              <ToggleGroupItem value="compact">{props.t('threadSidebarNavigationCompact')}</ToggleGroupItem>
+              <ToggleGroupItem value="comfortable">{props.t('threadSidebarNavigationComfortable')}</ToggleGroupItem>
+            </ToggleGroup>
           </Field>
           <Field orientation="horizontal" className="dshx:items-center">
             <FieldContent>
@@ -182,24 +185,20 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
               <FieldLabel className="dshx:font-normal">{props.t('threadSidebarArrowKeys')}</FieldLabel>
               <FieldDescription>{props.t('threadSidebarArrowKeysHint')}</FieldDescription>
             </FieldContent>
-            <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5">
-              <Button
-                size="sm"
-                type="button"
-                variant={preferences.arrowKeysSwitchThread ? 'default' : 'outline'}
-                onClick={() => updatePreferences({ arrowKeysSwitchThread: true })}
-              >
-                {props.t('threadSidebarArrowKeysSwitch')}
-              </Button>
-              <Button
-                size="sm"
-                type="button"
-                variant={preferences.arrowKeysSwitchThread ? 'outline' : 'default'}
-                onClick={() => updatePreferences({ arrowKeysSwitchThread: false })}
-              >
-                {props.t('threadSidebarArrowKeysFocus')}
-              </Button>
-            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              className="dshx:shrink-0"
+              aria-label={props.t('threadSidebarArrowKeys')}
+              value={preferences.arrowKeysSwitchThread ? 'switch' : 'focus'}
+              onValueChange={value => {
+                if (value === 'switch' || value === 'focus') updatePreferences({ arrowKeysSwitchThread: value === 'switch' })
+              }}
+            >
+              <ToggleGroupItem value="switch">{props.t('threadSidebarArrowKeysSwitch')}</ToggleGroupItem>
+              <ToggleGroupItem value="focus">{props.t('threadSidebarArrowKeysFocus')}</ToggleGroupItem>
+            </ToggleGroup>
           </Field>
           {chordRow('paletteChord', props.t('threadSidebarPaletteChord'))}
           {chordRow('fileSearchChord', props.t('threadSidebarFileSearchChord'))}

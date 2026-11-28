@@ -48,7 +48,7 @@ const status = (overrides: Partial<AutoRestartStatusWire>): AutoRestartStatusWir
 })
 
 // SAFETY: the item never reads the strip props in these cases.
-const item = (): JSX.Element => <RestartStatusItem {...({} as Parameters<typeof RestartStatusItem>[0])} text={text} />
+const item = (fallback?: JSX.Element): JSX.Element => <RestartStatusItem {...({} as Parameters<typeof RestartStatusItem>[0])} text={text} fallback={fallback} />
 
 afterEach(() => {
   cleanup()
@@ -64,6 +64,36 @@ describe('RestartStatusItem', () => {
     act(() => RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null, onRail: false }))
     view.rerender(item())
     expect(screen.getByTestId('status-item-restart').textContent).toBe('Restart pending · 1 plugins')
+    // A pending restart is actionable: the phone keeps the status strip for it (council round 3 B6).
+    expect(screen.getByTestId('status-item-restart').hasAttribute('data-status-actionable')).toBe(true)
+  })
+
+  it('is the one strip item for updates and restarts: the update notice shows only while no restart waits', () => {
+    const update = <span data-testid="update-notice">Update available</span>
+    const view = render(item(update))
+    expect(screen.getByTestId('update-notice')).toBeTruthy()
+    expect(screen.queryByTestId('status-item-restart')).toBeNull()
+    act(() => RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: false, waitingLabel: null, onRail: false }))
+    view.rerender(item(update))
+    expect(screen.getByTestId('status-item-restart')).toBeTruthy()
+    expect(screen.queryByTestId('update-notice')).toBeNull()
+  })
+
+  it('names the plugins a restart loads in plain words, and says what to do when DSH cannot restart itself', () => {
+    act(() =>
+      RestartBridge.publish({
+        hostPlugins: ['@dshfiles/thread-sidebar', '@dshfiles/ai-accounts', 'profile'],
+        available: false,
+        waitingLabel: null,
+        onRail: false,
+      }),
+    )
+    render(item())
+    fireEvent.click(screen.getByTestId('status-item-restart'))
+    const listed = screen.getAllByRole('listitem').map(entry => entry.textContent)
+    expect(listed).toEqual(['AI accounts', 'Thread sidebar', 'Profile'])
+    expect(document.body.textContent).not.toContain('@dshfiles/')
+    expect(screen.getByText(text.manual)).toBeTruthy()
   })
 
   it('offers to turn the automatic restart off from the unsupervised notice', () => {

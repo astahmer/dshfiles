@@ -89,6 +89,8 @@ When('the Threads panel is moved right and its tab row is hidden', async ({ page
   await expect(right(page).getByRole('tab', { name: THREADS, exact: true })).toBeVisible()
   await right(page).getByRole('tab', { name: 'New tab', exact: true }).getByRole('button', { name: 'Close New tab', exact: true }).click()
   await right(page).getByRole('tab', { name: THREADS, exact: true }).click({ button: 'right' })
+  // A tab's docking verbs sit under Layout.
+  await page.getByRole('menuitem', { name: 'Layout', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Hide tab row', exact: true }).click()
   await expect(right(page).getByRole('tab', { name: THREADS, exact: true })).toHaveCount(0)
   await expect(gear(page)).toBeVisible()

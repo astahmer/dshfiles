@@ -2,8 +2,8 @@ Feature: Traces alerts, boards and saved views
 
   Alert rules run on the Traces Host over the stored spans. A synthetic OTLP
   export with failing spans is posted to the receiver, a rule is created in the
-  Alerts tab and evaluated, and the firing alert shows in the panel and in an
-  in-app banner. Boards break agent tool spans down by tool, and a saved view
+  Alerts tab and evaluated, and the firing alert shows in the panel and, while
+  the Alerts view is not on screen, in an in-app banner. Boards break agent tool spans down by tool, and a saved view
   brings a filtered trace list back.
 
   @scenario:traces.alerts-browser-journey
@@ -12,10 +12,10 @@ Feature: Traces alerts, boards and saved views
     When the Traces panel is opened
     And a synthetic OTLP JSON export is posted to the receiver
     And an error-rate alert rule for "e2e-checkout" is created in the Alerts tab
-    And the alert rules are evaluated now
-    Then the rule fires with its value and its sample trace
+    And the alert rules are evaluated while the Traces tab is shown
+    Then an in-app banner announces the firing alert
     And the Alerts tab and the panel banner mark the firing alert
-    And an in-app banner announces the firing alert
+    And the rule fires with its value and its sample trace
     When the firing rule is muted for one hour
     Then the rule shows that it is muted
     When the firing rule is deleted after confirming

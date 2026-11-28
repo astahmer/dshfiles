@@ -36,6 +36,8 @@ export const ReadToolCard = (props: ReadToolCardProps): ReactNode => {
   return (
     <ToolCard
       {...cardLabel(props.t('tool.title.read'))}
+      // Round five C1: a succeeded read shows the kit's neutral file glyph instead of a check.
+      kind="read"
       meta={props.t('read.window', { shown: window.lineCount, total: window.totalLines })}
       onToggle={disclosure.toggle}
       open={disclosure.expanded}

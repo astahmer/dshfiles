@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "agent-registry",
-      "title": "Manage persistent agents",
-      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
+      "title": "Manage agents",
+      "summary": "Create, edit and remove agents with their own instructions, model and tools, shared by every browser.",
+      "details": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
       "reach": [
         "click button \"Agents\"",
         "expect text \"Start from a template\"",
@@ -168,9 +169,95 @@
       ]
     },
     {
+      "id": "agent-colour",
+      "title": "Colour an agent",
+      "summary": "Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.",
+      "details": "An agent stores an optional palette slot (tone 0–5) beside its glyph. The editor's Identity section offers the theme's six colours as a radio group under the glyph, with the handle's default marked and Use default to clear a choice. The glyph tile in the list, the editor heading, the start dialog, peer buttons and the mention card, every @{handle} reference chip in sent messages and answers, and an agent mention in the composer draft (rich-composer reads the same registry list once), paint the agent's colour on its own wash. The active theme paints the slot, so switching theme recolours every agent to match; an agent without one, including every agent saved before colours, takes the slot hashed from its handle (the shared project-tone hash). The agents_save tool takes the same slot: null returns to the default and leaving it out keeps the current colour.",
+      "surfaces": ["client", "host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents",
+      "configuration": [],
+      "states": ["default-tone", "chosen-tone", "cleared", "theme-switched"],
+      "failureModes": [
+        "A slot outside 0–5 is refused by the save, and the stored colour stays.",
+        "A save that names no tone keeps the stored one, so an edit by an agent tool never drops the colour."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "agents.tone-store",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "keeps a chosen tone across a restart and a save that omits it, and clears it with null"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-schema",
+          "file": "plugins/@dshfiles/agents/src/agent.test.ts",
+          "testName": "a tone is one of the six identity slots"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-tool",
+          "file": "plugins/@dshfiles/agents/tests/api-schema-parity.spec.ts",
+          "testName": "the agents_save tool takes an optional colour slot, null to clear it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-paint",
+          "file": "plugins/@dshfiles/agents/src/agent-tone.test.tsx",
+          "testName": "paints a reference chip with the chosen colour once the registry list names it, else the hashed one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-list",
+          "file": "plugins/@dshfiles/agents/src/agent-tone.test.tsx",
+          "testName": "paints each list row\u2019s glyph tile with the agent\u2019s colour on its wash"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-editor-pick",
+          "file": "plugins/@dshfiles/agents/src/agent-editor-colour.test.tsx",
+          "testName": "offers the palette beside the glyph, marks the handle\u2019s default and picks a slot"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-editor-clear",
+          "file": "plugins/@dshfiles/agents/src/agent-editor-colour.test.tsx",
+          "testName": "clears a chosen colour back to the default"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.tone-browser",
+          "reason": "No Gherkin scenario switches themes yet; the coloured panel, the editor's palette, a composer mention and a transcript reference were walked on a scratch DSH in the default theme and Dracula, light and dark, at desktop and 390 px WebKit, and the stored slot is Host-tested."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "reach": [
+        "click button \"Agents\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Luna\"",
+        "expect radiogroup \"Colour\"",
+        "click radio \"Violet\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\""
+      ]
+    },
+    {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "summary": "Start a thread on an agent by typing its @handle at the start of your message.",
+      "details": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": [
         "client",
         "host",
@@ -253,7 +340,8 @@
     {
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
-      "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
+      "summary": "Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.",
+      "details": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
       "surfaces": [
         "client"
       ],
@@ -344,7 +432,8 @@
     {
       "id": "agent-tool-access",
       "title": "An agent decides its threads' tools",
-      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
+      "summary": "Each agent says which tools its threads get, and a thread takes its own agent, its parent's, its project's default or @dsh.",
+      "details": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
       "surfaces": [
         "host",
         "integration"
@@ -430,7 +519,8 @@
     {
       "id": "subagent-agents",
       "title": "A subagent starts as a configured agent",
-      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
+      "summary": "A subagent can start as a configured agent, limited to the agents its caller allows.",
+      "details": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
       "surfaces": [
         "host",
         "integration"
@@ -486,7 +576,8 @@
     {
       "id": "agent-tools-tree",
       "title": "Choose an agent's tools, subagents and projects",
-      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
+      "summary": "Pick the tools an agent's threads get and pin the ones they need from the start, like VS Code's Configure Tools.",
+      "details": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"New agent\"",
@@ -586,7 +677,8 @@
     {
       "id": "composer-agent",
       "title": "Start a new thread as the project's default agent",
-      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
+      "summary": "A new thread starts as its project's default agent, and the chip beside the composer's tools switches or sets it.",
+      "details": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -672,7 +764,8 @@
     {
       "id": "thread-tools",
       "title": "See and switch a running thread's tools",
-      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
+      "summary": "A running thread shows which agent decides its tools and can switch to another agent's tools or to every tool.",
+      "details": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",

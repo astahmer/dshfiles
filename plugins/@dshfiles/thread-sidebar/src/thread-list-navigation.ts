@@ -171,6 +171,51 @@ export class ThreadListNavigationModel {
     })
   }
 
+  /**
+   * Where focus goes once a verb (Done, Snooze) takes the focused row out of the list: the row after it that is still
+   * listed, else the one before it, so a run of E presses walks down the list and focus never falls to the page body.
+   */
+  static afterRemoval(input: {
+    readonly orderedIds: readonly string[]
+    readonly focusedId: string
+    readonly listed: ReadonlySet<string>
+  }): string | undefined {
+    const index = input.orderedIds.indexOf(input.focusedId)
+    if (index === -1) return undefined
+    for (const id of input.orderedIds.slice(index + 1)) if (id !== input.focusedId && input.listed.has(id)) return id
+    for (const id of input.orderedIds.slice(0, index).reverse()) if (input.listed.has(id)) return id
+    return undefined
+  }
+
+  /**
+   * After a list verb: if the focused row left the list, focus the row {@link afterRemoval} names once the list has
+   * re-rendered. A row still listed keeps its focus.
+   */
+  static keepFocusInList(list: HTMLElement, before: { readonly orderedIds: readonly string[]; readonly focusedId: string | undefined }): void {
+    const focusedId = before.focusedId
+    if (focusedId === undefined) return
+    const view = list.ownerDocument.defaultView
+    const document = list.ownerDocument
+    // A row moves only after the Host confirms the verb and the list's settle delay (GROUP_SETTLE_MS, 600 ms) passes.
+    const until = Date.now() + 5_000
+    const settle = (): void => {
+      const rows = ThreadListNavigationModel.visibleRows(list)
+      const listed = new Set(rows.map(row => row.id))
+      const active = document.activeElement
+      const lost = active === null || active === document.body
+      if (listed.has(focusedId) && !lost) {
+        // The verb has not moved the row yet; look again on the next frame until the settle delay has passed.
+        if (Date.now() < until) view?.requestAnimationFrame(settle)
+        return
+      }
+      // Gone, or re-mounted in another group (Done): focus moves on to the row after it either way.
+      listed.delete(focusedId)
+      const nextId = ThreadListNavigationModel.afterRemoval({ orderedIds: before.orderedIds, focusedId, listed })
+      rows.find(row => row.id === nextId)?.button.focus()
+    }
+    view?.requestAnimationFrame(settle)
+  }
+
   /** The thread id of the row that holds focus, if one does. */
   static focusedRowId(list: HTMLElement): string | undefined {
     const focused = list.ownerDocument.activeElement

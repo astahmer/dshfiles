@@ -1,0 +1,1003 @@
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
+import { cleanup, fireEvent, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_PREFERENCES } from './organization.js'
+import { HoverStripFit, STRIP_SEAT_ON } from './hover-strip-fit.js'
+import { renderRow, rowProps, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
+import { PhoneLayout } from './phone-layout.js'
+
+beforeEach(() => {
+  vi.stubGlobal('IntersectionObserver', VisibleObserver)
+})
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+const whereLine = (row: HTMLElement): string => row.querySelector('[data-thread-where]')?.textContent ?? ''
+
+describe('pressing a row', () => {
+  it('answers a tap or click with the accent fill within the hover duration (80ms)', async () => {
+    const row = await renderRow()
+    const button = row.querySelector<HTMLElement>('[data-thread-main-action]')
+    expect(button?.className).toContain('dshx:active:bg-accent')
+    expect(button?.className).toContain('dshx:transition-[background-color]')
+    expect(button?.className).toContain('dshx:duration-(--dshx-duration-hover)')
+  })
+})
+
+describe('a working thread row', () => {
+  const working = { session: rowSession({ running: true }), workStatus: rowStatus({ status: 'working' }) }
+
+  it('does not repeat the state name under the Working heading: without a known step the second line keeps where it runs', async () => {
+    const row = await renderRow({ ...working, liveTurn: { startedAt: Date.now() - 471_000, step: null } })
+    expect(whereLine(row)).not.toContain('threadSidebarWorking')
+    expect(whereLine(row)).toContain('sample')
+  })
+
+  it('shows the elapsed time once, in the time slot of the first line', async () => {
+    const row = await renderRow({ ...working, liveTurn: { startedAt: Date.now() - 471_000, step: 'Running pnpm test' } })
+    expect(row.querySelectorAll('[data-live-elapsed]')).toHaveLength(1)
+    expect(row.querySelector('[data-thread-where] [data-live-elapsed]')).toBeNull()
+    // Whole units in the list (round five B3): "7m", never "7m 51s".
+    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
+    // The static age would be a second reading of the same turn.
+    expect(row.textContent).not.toContain('7m7m')
+    expect(whereLine(row)).toContain('Running pnpm test')
+  })
+
+  it('keeps the age when the start of the turn is unknown', async () => {
+    const row = await renderRow({ ...working, liveTurn: { startedAt: undefined, step: null } })
+    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
+  })
+})
+
+const stripLabels = (row: HTMLElement): (string | null)[] =>
+  Array.from(row.querySelectorAll('[data-testid="thread-row-actions"] button')).map(button => button.getAttribute('aria-label'))
+
+describe('the hover actions of a thread row', () => {
+  it('shows one verb and the row menu by default, and keeps the title readable beside them', async () => {
+    const row = await renderRow()
+    expect(stripLabels(row)).toEqual(['threadSidebarSettle', 'threadSidebarContextMenu'])
+    // The two seats lie over the time slot and the title's end fades under them (round 28, item 11); the time keeps its
+    // place, hidden, so line 1 never reflows.
+    expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:group-hover/row:invisible')
+    expect(row.querySelector('[data-testid="thread-row-actions"]')?.className).not.toContain('dshx:bg-popover')
+  })
+
+  it('still draws every action the Customize sidebar setting shows, then the row menu', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    expect(stripLabels(row)).toEqual([
+      'threadSidebarPin',
+      'threadSidebarPark',
+      'threadSidebarMute',
+      'threadSidebarArchive',
+      'threadSidebarSettle',
+      'threadSidebarContextMenu',
+    ])
+  })
+
+  it('opens the row menu from the strip', async () => {
+    const row = await renderRow()
+    const opened = vi.fn()
+    row.querySelector('article')?.addEventListener('contextmenu', opened)
+    fireEvent.click(row.querySelector('[data-testid="thread-row-actions"] button[aria-label="threadSidebarContextMenu"]') ?? row)
+    expect(opened).toHaveBeenCalledOnce()
+  })
+})
+
+describe('a row that needs you', () => {
+  const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout should the release notes use?' }) }
+
+  it('keeps the title and time on line 1 and puts Answer at line 2\'s trailing edge as attention text (council round 8 B3)', async () => {
+    const row = await renderRow(asking)
+    const verb = row.querySelector<HTMLElement>('[data-testid="thread-row-verb"]')
+    expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('meta')
+    // One layer of colour: the row keeps its wash, the verb is attention text on a transparent fill.
+    expect(verb?.getAttribute('data-variant')).toBe('attention-text')
+    // 24px drawn; the kit gives it a 44px hit area on touch, painted above the row after it.
+    expect(verb?.className).toContain('dshx:h-6')
+    expect(verb?.className).toContain('dshx:z-10')
+    // Line 1 is the title at full width and the time: no verb seat there any more.
+    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
+    // Line 2 keeps the verb's own width at its end (council round 14 B1), never a fixed 70px: an invisible copy of the
+    // verb's label holds its seat, so the project and the kind take the rest.
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    expect(where?.className).not.toMatch(/dshx:pr-(17\.5|34)\b/u)
+    const reserve = where?.querySelector<HTMLElement>(':scope > [data-verb-reserve]')
+    expect(reserve?.textContent).toBe(verb?.textContent)
+    expect(reserve?.getAttribute('aria-hidden')).toBe('true')
+    expect(reserve?.className).toContain('dshx:invisible')
+    expect(reserve?.className).toContain('dshx:shrink-0')
+    expect(reserve?.className).toContain('dshx:px-2')
+    expect(reserve?.className).toContain('dshx:text-xs')
+    expect(reserve?.className).toContain('dshx:font-medium')
+    // Only its width counts: it keeps line 2 at 16px instead of the verb's 24px, so the row never grows.
+    expect(reserve?.className).toContain('dshx:h-4')
+    expect(reserve?.className).not.toMatch(/dshx:(pointer-coarse:)?h-[67]\b/u)
+    expect(row.querySelector('[data-testid="thread-row-status-kind"]')?.className).toContain('dshx:flex-1')
+  })
+
+  it('lets a Needs-you title wrap to two lines at 13/18, weight 550', async () => {
+    const row = await renderRow(asking)
+    const title = row.querySelector<HTMLElement>('[data-thread-title]')
+    expect(title?.className).toContain('dshx:line-clamp-2')
+    expect(title?.className).not.toContain('dshx:truncate')
+    expect(title?.className).toContain('dshx:text-sm/[18px]')
+    expect(title?.className).toContain('dshx:font-[550]')
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(idle.querySelector<HTMLElement>('[data-thread-title]')?.className).toContain('dshx:truncate')
+  })
+
+
+  it('gives a failed row\'s verb the danger text (council round 8 B3)', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-text')
+  })
+
+  it('reads the kind or failure under the title in the secondary ink at 12/16 (council round 14)', async () => {
+    for (const workStatus of [asking.workStatus, rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' })]) {
+      const row = await renderRow({ workStatus })
+      const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-kind"]')
+      expect(detail?.className).toContain('dshx:text-xs/4')
+      expect(detail?.className).toContain('dshx:text-muted-foreground')
+      expect(detail?.className).not.toContain('dshx:text-foreground')
+    }
+  })
+
+  it('lets a Failed title wrap to two lines like a Needs-you one', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    const title = row.querySelector<HTMLElement>('[data-thread-title]')
+    expect(title?.className).toContain('dshx:line-clamp-2')
+    expect(title?.className).not.toContain('dshx:truncate')
+  })
+
+  it('opens its sub-rows from a real chevron in a 24 px seat, not a 12 px caret', async () => {
+    const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ childThreads: children })
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.className).toContain('dshx:h-6')
+    const seat = toggle?.querySelector<HTMLElement>('[data-children-chevron]')
+    expect(seat?.className).toContain('dshx:size-6')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('dshx:size-4')
+  })
+
+  it('drops the counter\'s dots and number when line 2 already says how many subagents it waits on (round five B1)', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({ childThreads: [child], workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.textContent).toBe('')
+    expect(toggle?.querySelector('[data-children-chevron]')).not.toBeNull()
+    // The spoken name keeps the count.
+    expect(toggle?.getAttribute('aria-label')).toMatch(/^threadSidebarShowChildren: subagentCount_(?:one|other)$/u)
+    cleanup()
+    const plain = await renderRow({ childThreads: [child], workStatus: rowStatus({ status: 'idle' }) })
+    expect(plain.querySelector('[data-thread-children-toggle]')?.textContent).toMatch(/^subagentCount_(?:one|other)$/u)
+  })
+
+  it('keeps the question readable beside a subagent counter', async () => {
+    // The verb and the counter share line 2's end; the question keeps the rest of the line.
+    const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ ...asking, childThreads: children })
+    const end = row.querySelector('[data-thread-row-end]')
+    expect(end?.querySelector('[data-testid="thread-row-verb"]')).not.toBeNull()
+    expect(end?.querySelector('[data-thread-children-toggle]')).not.toBeNull()
+    // The verb's own width and the counter's own words (their invisible copies), not a fixed padding.
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    expect(where?.className).not.toMatch(/dshx:pr-(?:16|18|34)\b/u)
+    expect(where?.querySelector('[data-verb-reserve]')?.textContent).toBe(end?.querySelector('[data-testid="thread-row-verb"]')?.textContent)
+    expect(where?.querySelector('[data-children-reserve]')?.textContent).toBe(end?.querySelector('[data-thread-children-toggle]')?.textContent)
+  })
+
+  it('ends a touch row\'s verb label at the time column above it, the counter at the menu column (round nine B5)', async () => {
+    const row = await renderRow(asking)
+    const end = row.querySelector<HTMLElement>('[data-thread-row-end]')
+    // The verb button's 8px padding reaches into the 44px menu column, so its label ends where the time does.
+    expect(end?.className).toContain('dshx:pointer-coarse:right-9')
+    expect(end?.className).not.toContain('dshx:pointer-coarse:right-11')
+    expect(row.querySelector('[data-testid="thread-row-verb"]')?.className).toContain('dshx:px-2')
+    cleanup()
+    const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const counted = await renderRow({ ...asking, childThreads: children })
+    expect(counted.querySelector('[data-thread-row-end]')?.className).toContain('dshx:pointer-coarse:right-11')
+    // A touch row's reservation reaches 8px into the menu column like the verb does; beside a counter it does not.
+    expect(row.querySelector('[data-verb-reserve]')).toBeNull()
+    expect(counted.querySelector('[data-verb-reserve]')?.className).not.toContain('dshx:pointer-coarse:-mr-2')
+  })
+
+  it('keeps the attention verb to Needs-you and Failed rows: a Ready row carries no Land button', async () => {
+    const row = await renderRow({
+      workStatus: rowStatus({ status: 'ready', verb: 'Land' }),
+      projectMark: false,
+    })
+    expect(row.querySelector('[data-testid="thread-row-verb"]')).toBeNull()
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
+  })
+
+  it('reads `[mark] project · kind` through the kit AttentionMeta, the mark on the rail under the glyph (council round 14 B1)', async () => {
+    const parts = (line: HTMLElement | null): (string | null)[] =>
+      Array.from(line?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+    const text = (line: HTMLElement | null, part: string): string | undefined => line?.querySelector(`:scope > [data-attention-meta-part="${part}"]`)?.textContent ?? undefined
+    for (const [workStatus, kind] of [
+      [asking.workStatus, 'threadSidebarAskQuestion'],
+      [rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }), 'threadSidebarAskApproval'],
+      [rowStatus({ status: 'needs-you', verb: 'Review', detail: 'Publish the preview build' }), 'threadSidebarAskApproval'],
+      [rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }), 'Turn failed'],
+    ] as const) {
+      const row = await renderRow({ workStatus })
+      const line = row.querySelector<HTMLElement>('[data-testid="thread-row-status-kind"]')
+      expect(line?.getAttribute('data-slot')).toBe('attention-meta')
+      expect(line?.getAttribute('data-mark-seat')).toBe('rail')
+      // One formatter for every surface: the mark in its rail seat, then the name, then the kind.
+      expect(parts(line)).toEqual(['rail', 'name', 'sep', 'kind'])
+      expect(text(line, 'name')).toBe('sample')
+      expect(text(line, 'kind')).toBe(kind)
+      // On the desktop sidebar the name outlasts the kind: the glyph and the verb already say the kind (lead, round 14).
+      expect(line?.getAttribute('data-keep')).toBe('name')
+      // One mark on the line, in the rail seat under the status glyph, so every row's marks form one column.
+      const marks = row.querySelectorAll<HTMLElement>('[data-thread-where] [data-slot="project-mark"]')
+      expect(marks).toHaveLength(1)
+      expect(marks[0]?.parentElement?.getAttribute('data-attention-meta-part')).toBe('rail')
+      expect(marks[0]?.getAttribute('data-size')).toBe('dense')
+      // The line is the meta line itself, not a second seat beside one.
+      expect(line?.parentElement?.hasAttribute('data-thread-where')).toBe(true)
+      expect(row.querySelectorAll('[data-thread-where] > span.dshx\\:w-4')).toHaveLength(0)
+      cleanup()
+    }
+  })
+})
+
+describe('the trailing column and the phone row (council round 17 B1.2)', () => {
+  const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) }
+  const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+  const classOf = (row: HTMLElement, selector: string): string => row.querySelector<HTMLElement>(selector)?.className ?? ''
+
+  it('ends the age, the verb label and the chevron glyph on one edge: the time column\'s', async () => {
+    // Comfortable rows pad their content 10px: the age ends 10px in. The verb's 8px padding and the chevron's 8px of
+    // seat and glyph inset need their box 2px in, not 6px (the 4–5px ragged column the council measured).
+    const comfortable = { ...rowProps().rowStyle, density: 'comfortable' as const }
+    const row = await renderRow({ ...asking, childThreads: children, rowStyle: comfortable })
+    expect(classOf(row, '[data-thread-main-action]')).toContain('dshx:px-2.5')
+    const end = classOf(row, '[data-thread-row-end]')
+    expect(end).toContain('dshx:right-0.5')
+    expect(end).not.toMatch(/(?<![:-])dshx:right-1\.5\b/u)
+    // Touch keeps its columns: the counter at the menu column.
+    expect(end).toContain('dshx:pointer-coarse:right-11')
+    // Beside a counter the counter's copy, not the verb's, gives back the 8px past line 2's end (council round 34, A7).
+    expect(classOf(row, '[data-children-reserve]')).toContain('dshx:-mr-2')
+    expect(classOf(row, '[data-verb-reserve]')).not.toContain('dshx:-mr-2')
+    cleanup()
+    // A compact row pads 8px: its trailing parts sit on the row's edge box.
+    const compact = await renderRow({ ...asking, rowStyle: { ...rowProps().rowStyle, density: 'compact' } })
+    expect(classOf(compact, '[data-thread-main-action]')).toContain('dshx:px-2')
+    expect(classOf(compact, '[data-thread-row-end]').split(' ')).toContain('dshx:right-0')
+    cleanup()
+    // A chevron alone ends the time column on touch, out of the row menu's column (council round 18 B1.3).
+    const plain = await renderRow({ childThreads: children, workStatus: rowStatus({ status: 'idle' }), rowStyle: comfortable })
+    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:right-0.5')
+    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:pointer-coarse:right-11')
+  })
+
+  it('draws the touch row menu ⋯ in the tertiary ink at 16px', async () => {
+    const row = await renderRow()
+    const menu = row.querySelector<HTMLElement>('[data-testid="thread-row-menu"]')
+    expect(menu?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(menu?.className).not.toContain('dshx:text-muted-foreground')
+    expect(menu?.querySelector('[data-slot="overflow-glyph"]')?.getAttribute('class')).toContain('dshx:size-4')
+  })
+
+  it('selects a child row with the root row\'s wash and edge, and drops the edge on the phone list (council round 24, item 5)', async () => {
+    const child = rowSession({ id: SessionId('child-selected'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      selectedChildId: child.id,
+      childStatuses: new Map([[child.id, rowStatus({ status: 'working' })]]),
+    })
+    const button = row.querySelector<HTMLElement>(`ul [data-thread-id="${child.id}"]`)
+    expect(button?.getAttribute('data-selected')).toBe('true')
+    const classes = button?.className ?? ''
+    expect(classes).toContain('dshx:data-[selected=true]:bg-selected-wash')
+    expect(classes).toContain('dshx:data-[selected=true]:selected-edge')
+    expect(classes).toContain('dshx:phone:data-[selected=true]:shadow-none')
+    // A grey accent fill alone read as a hover, not the selection the root row's edge says.
+    expect(classes).not.toContain('dshx:data-[selected=true]:bg-accent')
+  })
+
+  it('drops the selected edge on the phone list, keeping it on the desktop sidebar', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    const fill = classOf(row, 'article > div')
+    expect(fill).toContain('dshx:group-data-[selected=true]/row:selected-edge')
+    expect(fill).toContain('dshx:phone:group-data-[selected=true]/row:shadow-none')
+  })
+})
+
+describe('the glyph column (council round 15 B1)', () => {
+  const SEAT = 'dshx:w-[var(--attention-meta-rail-seat,20px)]'
+
+  it('seats the status glyph at the rail seat\'s 20px width, centred, so glyph and mark share one axis', async () => {
+    for (const workStatus of [
+      rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }),
+      rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }),
+      rowStatus({ status: 'idle' }),
+    ]) {
+      const row = await renderRow({ selected: true, workStatus })
+      const lead = row.querySelector<HTMLElement>('[data-thread-lead]')
+      expect(lead?.className).toContain(SEAT)
+      expect(lead?.className).toContain('dshx:justify-center')
+      expect(lead?.className).not.toContain('dshx:size-4')
+      // Line 2's mark sits in a seat as wide: the kit's rail on an attention row, the row's own seat otherwise.
+      const seat = row.querySelector<HTMLElement>('[data-attention-meta-part="rail"]') ?? row.querySelector<HTMLElement>('[data-thread-mark-seat]')
+      expect(seat?.className).toContain(SEAT)
+      expect(seat?.querySelector('[data-slot="project-mark"]')).not.toBeNull()
+      cleanup()
+    }
+  })
+})
+
+describe('colour in a row', () => {
+  const wash = (row: HTMLElement): HTMLElement | null => row.querySelector<HTMLElement>('[data-row-wash]')
+
+  it('holds a soft indigo wash on a Needs-you row and a softer red one on a Failed row', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(wash(asking)?.getAttribute('data-row-wash')).toBe('needs-you')
+    expect(wash(asking)?.className).toContain('dshx:bg-wash-needs-you')
+    cleanup()
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
+    expect(wash(failed)?.getAttribute('data-row-wash')).toBe('failed')
+    expect(wash(failed)?.className).toContain('dshx:bg-wash-failed')
+    cleanup()
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(wash(idle)).toBeNull()
+  })
+
+  it('paints the selected row with the selected wash, not the grey hover fill', async () => {
+    const row = await renderRow({ selected: true })
+    const fill = row.querySelector<HTMLElement>('article > div')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-marker')
+    expect(fill?.className).not.toContain('dshx:group-data-[selected=true]/row:bg-accent')
+    expect(row.querySelector('[data-thread-title]')?.className).toContain('dshx:group-data-[selected=true]/row:font-selected')
+  })
+
+  it('draws no marker pill beside a leading status glyph: the selected wash and the 550 title carry it (council round 11 B3)', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    expect(row.querySelector('[data-thread-lead]')?.hasAttribute('data-leading-glyph')).toBe(true)
+    expect(row.querySelector('[data-marker]')).toBeNull()
+  })
+
+  it('outlines the selected glyph-led row with the kit selected edge on its wash (council round 12 B1)', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    const fill = row.querySelector<HTMLElement>('article > div')
+    // The wash alone measured 1.10:1 off the dark list; a 1px neutral inset edge (3:1 on the wash) outlines it.
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-edge')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+    cleanup()
+    // A Needs-you or Failed row keeps its attention wash and its pill, no edge.
+    const asking = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(asking.querySelector<HTMLElement>('[data-row-wash]')?.className).not.toContain('selected-edge')
+  })
+
+  it('keeps the pill on a selected Needs-you or Failed row, whose attention wash replaces the selected wash (council round 11 B3)', async () => {
+    for (const workStatus of [rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }), rowStatus({ status: 'failed', detail: 'Turn failed' })]) {
+      const row = await renderRow({ selected: true, workStatus })
+      const fill = row.querySelector<HTMLElement>('[data-row-wash]')
+      // The kit's `MARKER_KEEP` on the element that carries `selected-marker`: it beats the leading-glyph rule.
+      expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-marker')
+      expect(fill?.getAttribute('data-marker')).toBe('pill')
+      cleanup()
+    }
+  })
+
+  it('keeps a selected Needs-you row on its attention wash and adds only the marker', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    const fill = row.querySelector<HTMLElement>('[data-row-wash]')
+    expect(fill?.className).toContain('dshx:bg-wash-needs-you')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-marker')
+    expect(fill?.className).not.toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+  })
+})
+
+describe('the project on line 2', () => {
+  it('is a 16px ProjectMark tile in the seat under the status glyph, with the name in muted text', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    const mark = row.querySelector<HTMLElement>('[data-thread-where] [data-slot="project-mark"]')
+    expect(mark?.getAttribute('data-size')).toBe('dense')
+    expect(mark?.textContent).toBe('SA')
+    const name = row.querySelector<HTMLElement>('[data-testid="thread-row-project"]')
+    expect(name?.textContent).toBe('sample')
+    expect(name?.className).not.toMatch(/project-tone-/u)
+  })
+
+  it('uses the colour picked for the project', async () => {
+    const row = await renderRow({ projectChipTone: 4, workStatus: rowStatus({ status: 'idle' }) })
+    expect(row.querySelector('[data-slot="project-mark"]')?.className).toContain('project-tone-balanced-4')
+  })
+
+  it('reads a working reason through the same AttentionMeta, the mark on the rail (council round 14 B1)', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
+    const line = row.querySelector<HTMLElement>('[data-thread-where] > [data-slot="attention-meta"]')
+    expect(line?.getAttribute('data-mark-seat')).toBe('rail')
+    expect(line?.querySelector(':scope > [data-attention-meta-part="kind"]')?.textContent).toBe('Waiting on 1 subagent')
+    // The reason is the line's news: it outlasts the name.
+    expect(line?.getAttribute('data-keep')).toBe('kind')
+    // The name shows while it fits and gives way, whole, to the mark when it does not (the kit measures it).
+    expect(line?.querySelector(':scope > [data-attention-meta-part="name"]')?.textContent).toBe('sample')
+    expect(line?.querySelector(':scope > [data-attention-meta-part="rail"] [data-slot="project-mark"]')).not.toBeNull()
+  })
+})
+
+describe('a thread that runs a background job', () => {
+  it('says so in line 2\'s own words and ink and stays Idle, never Working', async () => {
+    const row = await renderRow({ runningJobs: 1, workStatus: rowStatus({ status: 'idle' }) })
+    const jobs = row.querySelector<HTMLElement>('[data-thread-jobs]')
+    expect(jobs?.textContent).toMatch(/threadSidebarRunningJobs/u)
+    // Plain text in the line's secondary ink (council round 34, A7): no chip fill or radius of its own.
+    expect(jobs?.className).not.toMatch(/dshx:(?:bg-|rounded)/u)
+    expect(jobs?.closest('[data-thread-where]')?.className).toContain('dshx:text-muted-foreground')
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
+  })
+
+  it('drops the job chip when line 2 already says it waits on its subagents', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({ runningJobs: 1, childThreads: [child], workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
+    const detail = row.querySelector('[data-thread-where] > [data-slot="attention-meta"]')
+    expect(detail?.querySelector(':scope > [data-attention-meta-part="kind"]')?.textContent).toBe('Waiting on 1 subagent')
+    // The reason's line takes the rest of line 2.
+    expect(detail?.className).toContain('dshx:flex-1')
+    expect(row.querySelector('[data-thread-jobs]')).toBeNull()
+  })
+
+  it('shows no chip without a running job', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(row.querySelector('[data-thread-jobs]')).toBeNull()
+  })
+})
+
+describe('a subagent row under its parent', () => {
+  it('is titled with the name the parent gave the subagent, not with the prompt it was sent', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      displayTitle: '[[once call bash {"command":"sleep 3000"}]] check the release',
+      projectionValues: { subagent: { mode: 'continuable', label: 'Release check', seq: SessionSeq(3) } },
+    })
+    const unnamed = rowSession({ id: SessionId('child-2'), parentId: SessionId('s1'), origin: 'subagent', displayTitle: 'Summarise the diff' })
+    // No time column: the age helper comes from the Host's primitives, which this environment does not load.
+    const row = await renderRow({
+      childThreads: [child, unnamed],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+    })
+    const titles = Array.from(row.querySelectorAll('ul [data-thread-main-action]')).map(button => button.querySelector('span.dshx\\:truncate')?.textContent)
+    expect(titles).toEqual(['Release check', 'Summarise the diff'])
+  })
+
+  it('names the model it runs on in line 2, `[mark] model · state`, and no line 2 for an unknown model (council round 17 B1.1)', async () => {
+    const routed = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      running: true,
+      // A held child has not answered: the route projection holds the route its descriptor started it on (the parent's).
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna',
+        subagent: { mode: 'continuable', label: 'Audit', seq: SessionSeq(3) },
+      },
+    })
+    const backendOnly = rowSession({
+      id: SessionId('child-2'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: null, subagent: { mode: 'continuable', label: 'Lint', seq: SessionSeq(4) } },
+    })
+    const row = await renderRow({
+      childThreads: [routed, backendOnly],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([
+        [routed.id, rowStatus({ status: 'working' })],
+        [backendOnly.id, rowStatus({ status: 'failed' })],
+      ]),
+    })
+    const [first, second] = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-main-action]'))
+    const meta = first?.querySelector<HTMLElement>('[data-thread-child-meta]')
+    expect(meta?.querySelector('[data-slot="route-model"]')?.textContent).toBe('gpt-6-luna')
+    expect(meta?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    // Council round 18 B1.1: the working glyph says Working, so line 2 is the model alone.
+    expect(meta?.querySelector('[data-thread-child-state]')).toBeNull()
+    expect(meta?.className).toContain('dshx:text-xs/4')
+    expect(meta?.className).toContain('dshx:text-muted-foreground')
+    // Line 2 starts under the title: the 16px glyph seat and line 1's 8px gap.
+    expect(meta?.className).toContain('dshx:pl-6')
+    expect(first?.querySelector('[data-thread-child-lead]')?.className).toContain('dshx:w-4')
+    expect(first?.textContent).not.toContain('dshx_fake_commandcode')
+    // No known model: one line, and its Failed word stays on it.
+    expect(second?.querySelector('[data-thread-child-meta]')).toBeNull()
+    expect(second?.querySelector('[data-slot="route-model"]')).toBeNull()
+    expect(second?.querySelector('[data-thread-child-head]')?.textContent).toContain('threadSidebarStateFailed')
+  })
+
+  it('drops line 2\'s state word where the glyph already says it, and keeps the words the glyph cannot (council round 18 B1.1)', async () => {
+    const statuses = ['working', 'idle', 'ready', 'done', 'needs-you', 'failed'] as const
+    const children = statuses.map((status, index) =>
+      rowSession({
+        id: SessionId(`child-${status}`),
+        parentId: SessionId('s1'),
+        origin: 'subagent',
+        projectionValues: {
+          threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna',
+          subagent: { mode: 'continuable', label: status, seq: SessionSeq(index + 3) },
+        },
+      }),
+    )
+    const row = await renderRow({
+      childThreads: children,
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 10 },
+      childStatuses: new Map(children.map((child, index) => [child.id, rowStatus({ status: statuses[index] ?? 'idle' })])),
+    })
+    const words = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-child-meta]')).map(
+      meta => meta.querySelector('[data-thread-child-state]')?.textContent ?? null,
+    )
+    expect(words).toEqual([null, null, null, null, 'threadSidebarStateNeedsYou', 'threadSidebarStateFailed'])
+    // Without a word, line 2 is the model alone: no dangling separator.
+    const working = row.querySelector<HTMLElement>('ul [data-thread-child-meta]')
+    expect(working?.textContent).toBe('gpt-6-luna')
+  })
+
+  it('draws no age on a child row, which equals its parent\'s, so the model and its state keep the room (council round 23, item 6)', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5', subagent: { mode: 'continuable', label: 'Diff', seq: SessionSeq(3) } },
+    })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: true },
+      childStatuses: new Map([[child.id, rowStatus({ status: 'failed', detail: 'Turn failed' })]]),
+    })
+    const head = row.querySelector<HTMLElement>('ul [data-thread-child-head]')
+    expect(head?.textContent).toBe('Diff')
+    expect(head?.querySelector('.dshx\\:tabular-nums')).toBeNull()
+  })
+
+  it('says "Failed" in the failed ink on either line, and Needs you in the muted one (council round 23, item 2; round 24, item 3)', async () => {
+    const routed = rowSession({
+      id: SessionId('child-routed'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5', subagent: { mode: 'continuable', label: 'Diff', seq: SessionSeq(3) } },
+    })
+    const unrouted = rowSession({ id: SessionId('child-unrouted'), parentId: SessionId('s1'), origin: 'subagent' })
+    const asking = rowSession({
+      id: SessionId('child-asking'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna', subagent: { mode: 'continuable', label: 'Ask', seq: SessionSeq(4) } },
+    })
+    const row = await renderRow({
+      childThreads: [routed, unrouted, asking],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([
+        [routed.id, rowStatus({ status: 'failed', detail: 'Turn failed' })],
+        [unrouted.id, rowStatus({ status: 'failed', detail: 'Turn failed' })],
+        [asking.id, rowStatus({ status: 'needs-you' })],
+      ]),
+    })
+    const word = (id: string): HTMLElement | null => row.querySelector<HTMLElement>(`ul [data-thread-id="${id}"] [data-thread-child-state]`)
+    const words = [word('child-routed'), word('child-unrouted'), word('child-asking')]
+    // The ✕ and the failed ink say the rest; "Turn failed" cut the model to "claude-sonnet…" (council round 24, item 3).
+    expect(words.map(state => state?.textContent)).toEqual(['threadSidebarStateFailed', 'threadSidebarStateFailed', 'threadSidebarStateNeedsYou'])
+    expect(words.map(state => state?.className.includes('dshx:text-destructive'))).toEqual([true, true, false])
+    expect(words[1]?.className).not.toContain('dshx:text-muted-foreground')
+  })
+
+  it('draws a parent\'s failed child count with its cross in the failed ink, finished or running (council round 23, item 2)', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const workStatus = rowStatus({ status: 'working', detail: '6 working · 1 failed', childCounts: { working: 6, failed: 1 } })
+    for (const running of [false, true]) {
+      const row = await renderRow({ session: rowSession({ running }), childThreads: [child], workStatus })
+      const line = row.querySelector<HTMLElement>('[data-thread-where]')
+      const onScreen = (selector: string): HTMLElement[] =>
+        Array.from(line?.querySelectorAll<HTMLElement>(selector) ?? []).filter(part => part.closest('[data-attention-meta-measure]') === null)
+      const failed = onScreen('[data-work-count-tone="failed"]')
+      expect(failed.map(part => part.textContent)).toEqual(['threadSidebarFailedCount'])
+      expect(failed[0]?.className).toContain('dshx:text-destructive')
+      expect(failed[0]?.firstElementChild?.getAttribute('data-status')).toBe('failed')
+      // The working clause keeps the line's ink (and, running, the shimmer).
+      expect(line?.textContent).toContain('threadSidebarWorkingCount')
+      expect(onScreen('[data-work-count-tone="plain"] [data-status]')).toEqual([])
+      cleanup()
+    }
+  })
+
+  it('starts an unknown-family model on the same edge as a marked one: an empty 16 px seat (round 21 D5)', async () => {
+    const child = rowSession({
+      id: SessionId('child-unknown'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/step-5-preview',
+        subagent: { mode: 'continuable', label: 'Review currency conversion', seq: SessionSeq(3) },
+      },
+    })
+    const row = await renderRow({ childThreads: [child], childrenOpen: true, allChildrenShown: true, rowStyle: { ...rowProps().rowStyle, time: false } })
+    const model = row.querySelector<HTMLElement>('ul [data-thread-child-meta] [data-slot="route-model"]')
+    expect(model?.textContent).toBe('step-5-preview')
+    expect(model?.firstElementChild?.getAttribute('data-model-mark')).toBe('none')
+    expect(model?.firstElementChild?.className).toContain('dshx:size-4')
+  })
+
+  it('reads a failed child\'s model whole: "Failed" after it, and the word gives way before the model (council round 24, item 3)', async () => {
+    const child = rowSession({
+      id: SessionId('child-failed'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5',
+        subagent: { mode: 'continuable', label: 'Diff the ledger', seq: SessionSeq(3) },
+      },
+    })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([[child.id, rowStatus({ status: 'failed', detail: 'Turn failed' })]]),
+    })
+    const button = row.querySelector<HTMLElement>('ul [data-thread-main-action]')
+    expect(button?.querySelector('[data-thread-child-lead] [data-status="failed"]')).not.toBeNull()
+    const meta = button?.querySelector<HTMLElement>('[data-thread-child-meta]')
+    expect(meta?.textContent).toBe('claude-sonnet-5-5·threadSidebarStateFailed')
+    // If the line is still too narrow, the state word truncates first; the model shrinks only once the word is gone.
+    const word = meta?.querySelector<HTMLElement>('[data-thread-child-state]')
+    expect(word?.className).toContain('dshx:truncate')
+    expect(word?.className).toContain('dshx:shrink-[100]')
+    expect(meta?.querySelector('[data-slot="route-model"]')?.className).not.toContain('dshx:shrink-[100]')
+  })
+
+  it('merges its list controls into one muted 12 px footer line after every child (council round 22, item 11)', async () => {
+    const working = ['w1', 'w2', 'w3', 'w4'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('s1'), origin: 'subagent', running: true }))
+    const failed = rowSession({ id: SessionId('f1'), parentId: SessionId('s1'), origin: 'subagent' })
+    const row = await renderRow({
+      childThreads: working,
+      finishedChildThreads: [failed],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 3 },
+    })
+    const list = row.querySelector('ul')
+    const footer = () => list?.lastElementChild
+    expect(footer()?.hasAttribute('data-thread-child-footer')).toBe(true)
+    expect(footer()?.className).toContain('dshx:text-xs')
+    expect(footer()?.className).toContain('dshx:text-muted-foreground')
+    expect([...(footer()?.querySelectorAll('button') ?? [])].map(button => button.textContent)).toEqual([
+      'threadSidebarFewerChildren',
+      '1 threadSidebarFinishedChildren',
+    ])
+    // Opening the finished children puts them above the footer, never below a control.
+    const footerLine = row.querySelector<HTMLElement>('[data-thread-child-footer]')
+    if (footerLine === null) throw new Error('no child list footer')
+    fireEvent.click(within(footerLine).getByText('1 threadSidebarFinishedChildren'))
+    const items = [...(list?.children ?? [])]
+    expect(items.at(-2)?.querySelector('[data-thread-id="f1"]')).not.toBeNull()
+    expect(footer()?.textContent).toBe('threadSidebarFewerChildren·threadSidebarHideFinishedChildren')
+    expect(list?.querySelectorAll('[data-thread-child-footer]')).toHaveLength(1)
+  })
+
+  it('lists its children in launch order with the failed ones last, whatever their activity (council round 22, item 12)', async () => {
+    // The tree hands children newest-updated first, so a parent's list reshuffled as children worked.
+    const ids = ['c-credit', 'c-ledger', 'c-csv', 'c-audit']
+    const children = ['c-csv', 'c-audit', 'c-ledger', 'c-credit'].map(id =>
+      rowSession({ id: SessionId(id), parentId: SessionId('s1'), origin: 'subagent', running: id !== 'c-ledger' }),
+    )
+    const row = await renderRow({
+      childThreads: children,
+      childLaunchOrder: ids,
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 10 },
+      childStatuses: new Map(children.map(child => [child.id, rowStatus({ status: child.id === 'c-ledger' ? 'failed' : 'working' })])),
+    })
+    const order = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-main-action]')).map(button => button.getAttribute('data-thread-id'))
+    expect(order).toEqual(['c-credit', 'c-csv', 'c-audit', 'c-ledger'])
+  })
+})
+
+describe('the phone list (council round 18 B1.3)', () => {
+  const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent', running: true }))
+  const waiting = { childThreads: children, workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) }
+  const classOf = (row: HTMLElement, selector: string): string => row.querySelector<HTMLElement>(selector)?.className ?? ''
+
+  it('seats the row ⋯ in a 44pt column flush with the row edge, centred on line 1', async () => {
+    const row = await renderRow()
+    const menu = classOf(row, '[data-testid="thread-row-menu"]')
+    // 44pt wide from the row's edge: its glyph centre sits 22pt in (x ≈ 349 at 390pt), and its hit area ends on the row.
+    expect(menu).toContain('dshx:pointer-coarse:right-0')
+    expect(menu).toContain('dshx:pointer-coarse:w-11')
+    // Line 1 is the row's 6px padding and an 18px line: a 28px button 1px down centres on it.
+    expect(menu).toContain('dshx:pointer-coarse:top-px')
+  })
+
+  it('moves the expand chevron out of the ⋯ column into line 2\'s time column', async () => {
+    const row = await renderRow(waiting)
+    const end = classOf(row, '[data-thread-row-end]')
+    expect(end).toContain('dshx:pointer-coarse:right-11')
+    expect(end).not.toContain('dshx:pointer-coarse:right-1.5')
+    // A 44pt toggle that ends where the ⋯ column starts, so the two hit areas never share a square.
+    const toggle = classOf(row, '[data-thread-children-toggle]')
+    expect(toggle).toContain('dshx:pointer-coarse:min-w-11')
+    expect(toggle).toContain('dshx:pointer-coarse:justify-end')
+    // The glyph ends on the time's edge: its seat reaches 8px past the toggle (its own 4px inset and the glyph's),
+    // drawn only, so the overhang takes no taps.
+    const seat = classOf(row, '[data-children-chevron]')
+    expect(seat).toContain('dshx:pointer-coarse:-mr-2')
+    expect(seat).toContain('dshx:pointer-events-none')
+    // Line 2 keeps the toggle's 44pt clear of its words.
+    expect(classOf(row, '[data-thread-where]')).toContain('dshx:pointer-coarse:pr-11')
+  })
+
+  it('gives every row one title-to-meta pitch: an 18px title line, 6px, a 16px line 2', async () => {
+    for (const props of [
+      {},
+      waiting,
+      { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout?' }) },
+      { workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) },
+    ]) {
+      const row = await renderRow(props)
+      const button = classOf(row, '[data-thread-main-action]')
+      expect(button).toContain('dshx:pointer-coarse:py-1.5')
+      expect(button).toContain('dshx:pointer-coarse:gap-1.5')
+      const title = classOf(row, '[data-thread-title]')
+      expect(title.includes('dshx:text-sm/[18px]') || title.includes('dshx:pointer-coarse:leading-[18px]')).toBe(true)
+      const where = classOf(row, '[data-thread-where]')
+      expect(where).toContain('dshx:pointer-coarse:h-4')
+      expect(where).toContain('dshx:pointer-coarse:text-xs/4')
+      // The verb no longer stretches line 2 to 28px: it centres on the 16px line instead.
+      expect(where).not.toContain('dshx:pointer-coarse:min-h-7')
+      const end = row.querySelector<HTMLElement>('[data-thread-row-end]')
+      if (end !== null) expect(end.className).toContain('dshx:pointer-coarse:bottom-0')
+      cleanup()
+    }
+  })
+
+  it('keeps a subagent child row on the same pitch: a 28px line 1 and 1px to its 16px line 2', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna', subagent: { mode: 'continuable', label: 'Audit', seq: SessionSeq(3) } },
+    })
+    for (const density of ['compact', 'comfortable'] as const) {
+      const row = await renderRow({ childThreads: [child], childrenOpen: true, allChildrenShown: true, rowStyle: { ...rowProps().rowStyle, time: false, density } })
+      expect(classOf(row, 'ul [data-thread-main-action]')).toContain('dshx:pointer-coarse:gap-px')
+      // A compact list's 24px head measured a 21pt pitch at 390pt: on touch the head is 28px whatever the density.
+      expect(classOf(row, 'ul [data-thread-child-head]')).toContain('dshx:pointer-coarse:h-7')
+      cleanup()
+    }
+  })
+})
+
+// Council round 27, item 11: the strip lies over the time slot and the title's end fades under it; nothing reflows.
+describe('the hover strip without reflow (round 28, item 11)', () => {
+  it('keeps line 1 as it is on hover: no padding change, the time kept in place but hidden', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const head = row.querySelector<HTMLElement>('[data-thread-head]')
+    expect(head?.className).not.toMatch(/group-hover\/row:pr-/u)
+    const time = row.querySelector<HTMLElement>('[data-thread-time]')
+    expect(time?.className).toContain('dshx:not-pointer-coarse:group-hover/row:invisible')
+    expect(time?.className).not.toContain('group-hover/row:hidden')
+  })
+
+  it('fades the strip in on hover only, so it leaves no ghost over the time on mouse-out', async () => {
+    const row = await renderRow()
+    const strip = row.querySelector<HTMLElement>('[data-row-strip]')
+    expect(strip?.className).toContain('dshx:transition-none')
+    expect(strip?.className).toContain('dshx:group-hover/row:transition-opacity')
+    expect(strip?.className).not.toMatch(/(?:^|\s)dshx:transition-opacity(?:\s|$)/u)
+  })
+})
+
+// Council round 28, item 1: the strip never overlaps a resting title glyph. `⋯` keeps the time slot; a further action
+// shows only when its whole button starts 8px clear of the title's last glyph; the rest stay in `⋯`.
+describe('the hover strip beside the title (round 29, item 1)', () => {
+  it('fits an action only when its button starts clear of the last glyph, so a click on the title opens the row', () => {
+    // A 300px row whose strip ends at 294: a 9px title leaves room for three actions, a 169px one for none.
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 120, actions: 5, firstChangesState: false })).toBe(5)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: false })).toBe(2)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 240, actions: 5, firstChangesState: false })).toBe(0)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 260, actions: 1, firstChangesState: false })).toBe(0)
+    for (let glyph = 40; glyph <= 270; glyph += 1) {
+      const fit = HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: glyph, actions: 8, firstChangesState: false })
+      const left = 294 - (fit + 1) * 24 - fit * 2
+      if (fit > 0) expect(left, `title ending at ${glyph}`).toBeGreaterThanOrEqual(glyph + 8)
+    }
+  })
+
+  it('keeps every action hidden until the row is measured, and the time slot one seat wide so ⋯ never meets the title', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const seats = Array.from(row.querySelectorAll<HTMLElement>('[data-row-strip] > [data-strip-seat]'))
+    expect(seats.length).toBeGreaterThan(1)
+    for (const seat of seats) expect(seat.className).toContain('dshx:hidden dshx:data-[strip-on]:contents')
+    expect(row.querySelector('[data-row-strip] > :last-child button')?.getAttribute('aria-label')).toBe('threadSidebarContextMenu')
+    expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:min-w-6')
+    // No budget classes and no mask: nothing on line 1 changes on hover.
+    expect(row.innerHTML).not.toContain('rowbox')
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('mask-image')
+  })
+
+  it('measures the row as the pointer enters it and shows only the seats that fit', async () => {
+    const container = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const article = container.querySelector<HTMLElement>('article')
+    const strip = container.querySelector<HTMLElement>('[data-row-strip]')
+    const title = container.querySelector<HTMLElement>('[data-thread-title]')
+    if (article === null || strip === null || title === null) throw new Error('The row has no strip or no title.')
+    strip.getBoundingClientRect = () => new DOMRect(0, 0, 294, 24)
+    title.getBoundingClientRect = () => new DOMRect(30, 0, 170, 18)
+    // jsdom draws no text: the title's text range reports its glyphs ending at 210.
+    const createRange = document.createRange.bind(document)
+    // SAFETY: the code under test only spreads the list (`Array.from`), which an array satisfies.
+    const rects = [new DOMRect(30, 0, 180, 18)] as unknown as DOMRectList
+    document.createRange = () => Object.assign(createRange(), { getClientRects: () => rects })
+    fireEvent.mouseEnter(article)
+    document.createRange = createRange
+    const on = Array.from(container.querySelectorAll('[data-strip-seat]')).map(seat => seat.hasAttribute(STRIP_SEAT_ON))
+    expect(on.length).toBeGreaterThan(2)
+    // The first action changes the thread, so it needs 8px plus a seat (34px): 294 - 2 seats - 1 gap = 244 ≥ 210 + 34,
+    // but two actions (218) would not be: one action and ⋯.
+    expect(on).toEqual(on.map((_, index) => index < 1))
+  })
+})
+
+// Council round 28, item 10: hovering a tinted row keeps its tint.
+describe('a hovered attention row (round 29, item 10)', () => {
+  it('deepens its wash on hover instead of the grey fill; a plain row keeps the grey fill', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    const fill = asking.querySelector<HTMLElement>('[data-row-wash]')?.className ?? ''
+    expect(fill).toContain('dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)]')
+    expect(fill).toContain('dshx:dark:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_8%)]')
+    expect(fill).not.toContain('dshx:hover:bg-accent/60')
+    cleanup()
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    expect(failed.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain('var(--dshx-wash-failed),var(--dsw-alias-label-primary)_3%')
+    cleanup()
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(idle.querySelector<HTMLElement>('article > div')?.className).toContain('dshx:hover:bg-accent/60')
+  })
+})
+
+// Council round 28, item 1, second half: no state-changing verb (Done, Snooze…) sits first next to the title. Measured
+// on the scratch: "Cart badge count" drew [Done, ⋯] 39px after its title. A first seat that changes the thread's state
+// needs one more seat of clearance; Open in side panel, which changes nothing, keeps the 8px.
+describe('a state-changing verb beside the title (round 29, item 1)', () => {
+  it('needs a full seat more clearance when the first action changes the thread', () => {
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: false })).toBe(2)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: true })).toBe(1)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 215, actions: 5, firstChangesState: false })).toBe(1)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 215, actions: 5, firstChangesState: true })).toBe(0)
+  })
+
+  it('marks every seat but Open in side panel as changing the thread, and reads the first one', async () => {
+    const container = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const seats = Array.from(container.querySelectorAll<HTMLElement>('[data-row-strip] > [data-strip-seat]'))
+    expect(seats.length).toBeGreaterThan(1)
+    for (const seat of seats) {
+      const name = seat.querySelector('button')?.getAttribute('aria-label') ?? ''
+      expect(seat.hasAttribute('data-strip-changes'), name).toBe(name !== 'threadSidebarOpenInSidePanel')
+    }
+  })
+})
+
+// Found on the scratch (round 29, item 10): the kit declares its colours with `@theme inline`, so `--color-*` names
+// never exist at runtime; an arbitrary value that reads one resolves to nothing, and the hovered Needs-you row lost its
+// wash instead of deepening it. Arbitrary values read the runtime tokens (`--dshx-*`, `--dsw-alias-*`) instead.
+describe('arbitrary colour values read runtime tokens (round 29, item 10)', () => {
+  it('never reads a --color-* name the kit only declares inline', () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
+    expect(source.match(/var\(--color-[a-z-]+\)/gu) ?? []).toEqual([])
+  })
+
+  it('deepens the Needs-you and Failed washes from their runtime tokens', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(asking.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain(
+      'dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)]',
+    )
+  })
+})
+
+// Council round 29, item 12: Snooze is a clock, not a pause glyph (pause reads as stopping a running turn).
+describe('the Snooze glyph (round 30, item 12)', () => {
+  const read = (name: string): string => readFileSync(join(dirname(fileURLToPath(import.meta.url)), name), 'utf8')
+  it('draws the alarm clock on the hover strip', async () => {
+    const row = await renderRow({ rowActions: ['park'] })
+    const seat = row.querySelector('[data-row-strip] [data-strip-seat]')
+    expect(seat?.querySelector('button')?.getAttribute('aria-label')).toBe('threadSidebarPark')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-alarm-clock')
+  })
+
+  it('draws it in the row menu, the batch menu and the hover-actions setting too', () => {
+    expect(read('thread-menu.tsx')).toContain('  snooze: AlarmClockIcon,')
+    expect(read('sidebar-shell.tsx')).toContain('  park: <AlarmClockIcon strokeWidth={1.5} size={14} />,')
+    const batch = read('client.tsx')
+    expect(batch).toContain("<AlarmClockIcon aria-hidden=\"true\" />\n          {props.t('threadSidebarPark')}")
+  })
+})
+
+// Council round 34, A7 (Opus, Fable): "billing-api [1 job] … ● 1 ⌄" counted in three forms on one line: a muted chip,
+// a dot cluster and a bare number. One form now: "billing-api · 1 job" as text, and the disclosure "1 subagent ⌄".
+describe('a row counts in one form (council round 34, A7)', () => {
+  it('reads "project · 1 job" and "1 subagent ⌄", with no chip and no dots', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('session-1'), origin: 'subagent' })
+    const row = await renderRow({ runningJobs: 1, childThreads: [child], workStatus: rowStatus({ status: 'idle' }) })
+    const jobs = row.querySelector<HTMLElement>('[data-thread-jobs]')
+    // A separator after the project name, as between every other part of line 2.
+    expect(jobs?.textContent).toMatch(/^·threadSidebarRunningJobs_(?:one|other)$/u)
+    expect(jobs?.firstElementChild?.getAttribute('aria-hidden')).toBe('true')
+    expect(jobs?.className).not.toContain('dshx:bg-muted')
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.textContent).toMatch(/^subagentCount_(?:one|other)$/u)
+    expect(toggle?.querySelector('[data-slot="status-dot"]')).toBeNull()
+    expect(toggle?.querySelector('[data-children-chevron]')).not.toBeNull()
+    // The spoken name starts with what the toggle does and ends with the words it shows.
+    expect(toggle?.getAttribute('aria-label')).toMatch(/^threadSidebar(?:Hide|Show)Children: subagentCount_(?:one|other)$/u)
+  })
+
+  it('keeps the words\' room on line 2 with an invisible copy of the toggle, not a fixed padding', async () => {
+    const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ childThreads: children, workStatus: rowStatus({ status: 'idle' }) })
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    const reserve = where?.querySelector<HTMLElement>('[data-children-reserve]')
+    expect(reserve?.textContent).toBe('subagentCount_other')
+    expect(reserve?.getAttribute('aria-hidden')).toBe('true')
+    expect(reserve?.className).toContain('dshx:invisible')
+    expect(where?.className).not.toMatch(/dshx:pr-1[68]\b/u)
+  })
+})
+
+// Council round 34, B9 (Astra): the phone's row menu is a sheet over the row it acts on, and it did not say which thread.
+describe('the phone row menu names its thread (council round 34, B9)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+  const openMenu = async (phone: boolean): Promise<HTMLElement> => {
+    vi.spyOn(PhoneLayout, 'matches').mockReturnValue(phone)
+    const row = await renderRow({ session: rowSession({ displayTitle: 'Fix invoice tax rounding' }) })
+    fireEvent.contextMenu(row.querySelector('[data-thread-main-action]') ?? row, { clientX: 20, clientY: 20 })
+    const menu = document.querySelector<HTMLElement>('[data-slot="context-menu-content"]')
+    if (menu === null) throw new Error('The row menu did not open.')
+    return menu
+  }
+
+  it('leads the phone sheet with the thread title: 14px semibold, not an item, before the first verb', async () => {
+    const menu = await openMenu(true)
+    const title = menu.querySelector<HTMLElement>('[data-thread-menu-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    expect(title?.getAttribute('data-slot')).toBe('context-menu-label')
+    expect(title?.getAttribute('role')).toBeNull()
+    expect(title?.closest('[role="menuitem"]')).toBeNull()
+    for (const token of ['dshx:text-sm', 'dshx:font-semibold', 'dshx:line-clamp-2']) expect(title?.className).toContain(token)
+    const first = menu.querySelector('[role="menuitem"]')
+    expect(first !== null && title !== null && (title.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+  })
+
+  it('leaves the desktop menu, opened at the row, without it', async () => {
+    const menu = await openMenu(false)
+    expect(menu.querySelector('[data-thread-menu-title]')).toBeNull()
+  })
+})

@@ -56,13 +56,13 @@ const registration = (): Promise<ServiceWorkerRegistration | undefined> => navig
 
 /**
  * Push to this device (productivity pass T6.5): one switch per device under the in-tab alerts. On subscribes this
- * browser with the Host's key, Off unsubscribes it; Send test proves the path end to end. A notification click opens
- * the item's thread in this window (the worker cannot navigate a page it does not control, so it tells the page).
+ * browser with the Host's key, Off unsubscribes it; Send test proves the path end to end.
  */
-const Control = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
-  const api = useApi(webPushApi)
-  const id = useId()
-  const queryClient = useQueryClient()
+/**
+ * A notification click opens its item in this window: the worker cannot navigate a page it does not control, so it tells
+ * the page. The Inbox listens for as long as it is open, whether or not the alert settings are on screen.
+ */
+const useNotificationOpen = (): void => {
   const mode = support()
   useEffect(() => {
     if (mode !== 'supported') return
@@ -73,6 +73,13 @@ const Control = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
     navigator.serviceWorker.addEventListener('message', open)
     return () => navigator.serviceWorker.removeEventListener('message', open)
   }, [mode])
+}
+
+const Control = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
+  const api = useApi(webPushApi)
+  const id = useId()
+  const queryClient = useQueryClient()
+  const mode = support()
   const subscription = useQuery({
     queryKey: keys.subscription,
     enabled: mode === 'supported',
@@ -133,5 +140,6 @@ const Control = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
 
 export class InboxPush {
   static readonly Control = Control
+  static readonly useNotificationOpen = useNotificationOpen
   static readonly support = support
 }

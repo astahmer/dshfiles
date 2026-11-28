@@ -11,37 +11,32 @@ import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient, MenuItem } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
-import { AccountUsageDashboard } from './account-usage-dashboard.js'
+import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type { OpenThread } from './format.js'
-import { UsagePanel, UsageTabs } from './panel.js'
-import { UsageQuota } from './quota-tab.js'
-import { ThreadCostFacet } from './thread-cost-facet.js'
+import { UsageTabs } from './panel-state.js'
+import { QuotaLocations } from './quota-location.js'
+import { UsageGlyph } from './usage-glyph.js'
+
+/** The Usage page, the account dashboard and the Cost facet load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const UsagePanel = lazyView(() => views().then(module => module.LazyViews.UsagePanel), { label: 'Usage' })
+const AccountUsageDashboard = lazyView(() => views().then(module => module.LazyViews.AccountUsageDashboard), { label: 'Account usage' })
+const ThreadCostFacet = lazyView(() => views().then(module => module.LazyViews.ThreadCostFacet), { label: 'Cost' })
 
 const PANEL_ID = 'dshfiles-usage'
 /** The thread panel's Cost facet (docs/ade-ux §4.4): a page tab type of the right pane. */
 const COST_FACET_ID = 'dshfiles-usage-cost'
 const TRACES_PANEL_ID = 'traces'
 
-const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
-  <svg
-    aria-hidden
-    width={props.size ?? 18}
-    height={props.size ?? 18}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-  >
-    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-  </svg>
-)
 
 export default defineClient({
   name: '@dshfiles/usage',
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
+    // The tab names the page with its own bar chart, as the left column and the title do (council round 18, D2).
+    plugin?.add(TabPlaceGlyphs, { panelId: PANEL_ID, glyph: UsageGlyph, tone: 'var(--dshx-nav-tone-observe)' })
     const navigate = (apply: (panelId?: string) => void): void => {
       void WorkbenchMainNavigation.open(PANEL_ID)
         .then(result => {
@@ -61,7 +56,7 @@ export default defineClient({
       // saved tabs open it through this contract.
       const openQuota = (target?: UsageQuotaTarget): void => {
         navigate(panelId => {
-          UsageQuota.go(target, panelId)
+          QuotaLocations.go(target, panelId)
           UsageTabs.show('quota', panelId)
         })
       }
@@ -140,7 +135,7 @@ export default defineClient({
               order: 61,
               title: () => 'Cost',
               description: () => "This thread's route, cost per turn and requests.",
-              icon: PanelGlyph,
+              icon: UsageGlyph,
             },
           ],
         }),
@@ -159,7 +154,7 @@ export default defineClient({
               onOpenTraces={() => reveal(TRACES_PANEL_ID)}
               onOpenAccount={accountId => {
                 navigate(panelId => {
-                  UsageQuota.go({ view: 'accounts', accountId }, panelId)
+                  QuotaLocations.go({ view: 'accounts', accountId }, panelId)
                   UsageTabs.show('quota', panelId)
                 })
               }}
@@ -168,7 +163,7 @@ export default defineClient({
         )),
       ),
     )
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage' }, UsageGlyph))
     ctx.effect(
       () =>
         workbenchPanels().register({

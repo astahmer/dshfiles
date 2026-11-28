@@ -14,5 +14,5 @@ Feature: Right pane closes with its last tab
     When the unified right pane is revealed from the main Pane options
     And a Scratchpad view in the right pane receives a draft
     Then closing one of two right tabs keeps the other view and closing the last hides the pane
-    And manual right-pane reopen offers one stable chooser that can close the pane again
+    And manual right-pane reopen restores the last view in one click and can close the pane again
     And a reload keeps the empty right pane closed and a real view can reopen it

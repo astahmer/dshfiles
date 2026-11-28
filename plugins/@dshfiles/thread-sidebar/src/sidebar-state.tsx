@@ -1,5 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { useSettings } from '@dshfiles/dshx/client'
+import { apiResource, resourceStore, useApi, useResource, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import type { PaletteMode } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
@@ -7,6 +7,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { MutableRefObject, ReactNode } from 'react'
 import { storedCollapsedGroups } from './collapsed-groups.js'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
+import { threadSidebarSettledApi } from './settled-api.js'
+import { SettledPreferencesModel } from './settled-preferences.js'
+import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
 import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
 import { threadSidebarSettings } from './settings.js'
@@ -35,6 +38,23 @@ const useOptionalSettings = (): ThreadSidebarSettingsState | null => {
   }
 }
 
+/** The settled read's options; a write that answers the status writes it under the same key. */
+const SETTLED_READ = { staleTime: 30_000 } as const
+
+/** The Host's settled-thread store; outside a DSHX slot there is none and the settings fields stay the status. */
+const useSettledStore = () => ({
+  api: useApi(threadSidebarSettledApi),
+  read: useResource(threadSidebarSettledApi, 'read', {}, SETTLED_READ),
+})
+
+const useOptionalSettledStore = (): ReturnType<typeof useSettledStore> | null => {
+  try {
+    return useSettledStore()
+  } catch {
+    return null
+  }
+}
+
 /**
  * Preferences from DSH Settings (Host-synced). Browser storage only stands in
  * while the Host namespace is unavailable. Writes are not optimistic in the
@@ -49,6 +69,21 @@ export const usePreferences = (): PreferencesSnapshot & {
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
 } => {
   const settings = useOptionalSettings()
+  const settledStore = useOptionalSettledStore()
+  // The store's write client is one object per contract; the store pair around it is new on every render, so the
+  // callbacks below depend on the client, never on the pair (performance P1: an unstable `updatePreferences` re-added
+  // every command palette row on each thread switch).
+  const settledApi = settledStore?.api ?? null
+  const settledData = settledStore?.read.data
+  const settledError = settledStore?.read.error
+  const settledServed = settledStore !== null
+  const settledSource = useMemo(
+    () => SettledPreferencesModel.sourceOf(settledServed ? { data: settledData, error: settledError } : null),
+    [settledData, settledError, settledServed],
+  )
+  // A settle or restore the Host has not answered yet, shown at once; a refused one is dropped, as a refused setting is.
+  const [optimisticSettled, setOptimisticSettled] = useState<SettledStatus | null>(null)
+  const [settledWriteFailed, setSettledWriteFailed] = useState(false)
   const localPreferences = storedPreferences.useValue() ?? DEFAULT_PREFERENCES
   const hostPreferences = useMemo(() => (settings?.value === undefined ? null : SidebarPreferencesModel.decode(settings.value)), [settings?.value])
   const hostBacked = settings !== null && settings.status === 'ready' && settings.writable && hostPreferences !== null
@@ -99,8 +134,9 @@ export const usePreferences = (): PreferencesSnapshot & {
     [settingsRef],
   )
   const [snapshot, send] = useMachine(SidebarPreferencesMachine.machine, { input: { client } })
-  const updatePreferences = useCallback(
+  const writeSettings = useCallback(
     (patch: Partial<SidebarPreferences>) => {
+      if (Object.keys(patch).length === 0) return
       if (!hostBacked) {
         send({
           type: 'local.write.result',
@@ -113,6 +149,47 @@ export const usePreferences = (): PreferencesSnapshot & {
     [hostBacked, send],
   )
 
+  const preferences = useMemo(
+    () =>
+      SettledPreferencesModel.merge(
+        hostBacked ? { ...hostPreferences, ...snapshot.context.pending } : localPreferences,
+        settledSource,
+        optimisticSettled,
+      ),
+    [hostBacked, hostPreferences, snapshot.context.pending, localPreferences, settledSource, optimisticSettled],
+  )
+  const preferencesRef = useRef(preferences)
+  preferencesRef.current = preferences
+
+  // One call for its callers: the settled keys go to the Host store, every other key to Settings, as one change.
+  const updatePreferences = useCallback(
+    (patch: Partial<SidebarPreferences>) => {
+      const { settled, rest } = SettledPreferencesModel.split(patch)
+      if (settled === null || settledApi === null || settledSource.kind === 'settings') {
+        writeSettings(patch)
+        return
+      }
+      writeSettings(rest)
+      const current: SettledStatus = { settledSessionIds: [...preferencesRef.current.settledSessionIds], settledAt: { ...preferencesRef.current.settledAt } }
+      const next: SettledStatus = { settledSessionIds: [...(settled.settledSessionIds ?? current.settledSessionIds)], settledAt: { ...(settled.settledAt ?? current.settledAt) } }
+      setOptimisticSettled(next)
+      settledApi.change(SettledThreadsModel.changeBetween(current, next)).then(
+        answered => {
+          resourceStore().mutate(apiResource({ client: settledApi, method: 'read', input: {}, options: SETTLED_READ }), () => answered)
+          setOptimisticSettled(latest => (latest === next ? null : latest))
+          setSettledWriteFailed(false)
+        },
+        (error: unknown) => {
+          setOptimisticSettled(latest => (latest === next ? null : latest))
+          // A Host without the store still keeps the status in Settings: write it there, as before.
+          if (SettledPreferencesModel.notServed(error)) writeSettings(settled)
+          else setSettledWriteFailed(true)
+        },
+      )
+    },
+    [settledApi, settledSource.kind, writeSettings],
+  )
+
   const threadViewWritePending = snapshot.context.pendingOperationIds.threadViews !== undefined
   // One-shot: the machine queues it once and latches its outcome, so a later render never replays the hand-over.
   useEffect(() => {
@@ -120,13 +197,9 @@ export const usePreferences = (): PreferencesSnapshot & {
     send({ type: 'migration.requested' })
   }, [hostBacked, threadViewWritePending, send])
 
-  const preferences = useMemo(
-    () => (hostBacked ? { ...hostPreferences, ...snapshot.context.pending } : localPreferences),
-    [hostBacked, hostPreferences, snapshot.context.pending, localPreferences],
-  )
   return {
     preferences,
-    storageWarning: hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed,
+    storageWarning: settledWriteFailed || (hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed),
     hostBacked,
     boardViewOnHost,
     layoutMergeOnHost,

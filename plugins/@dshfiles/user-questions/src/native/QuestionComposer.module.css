@@ -366,14 +366,15 @@
   font-weight: 500;
 }
 
+/* Owned delta (unslop r3 item 23): "Recommended" is a muted chip; the indigo is reserved for interaction and Needs you. */
 .badge {
   padding: 0 4px;
   border-radius: var(--dsw-radius-xs);
-  background: var(--dsw-specific-sidebar-nav-item-active-accent);
-  color: var(--dsw-alias-button-info-fill);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 18px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .description {
@@ -563,6 +564,18 @@
   flex: 1;
 }
 
+/* dshfiles (round four R12): on a touch screen the inline answer field is a 44px target, not its 24px line. */
+@media (pointer: coarse) {
+  .customRow {
+    min-height: 44px;
+  }
+
+  .customInline {
+    align-self: stretch;
+    min-height: 44px;
+  }
+}
+
 /* Optionless question: the free-form answer is the whole body, so it carries
    its own frame. The 12px side margins add to the .options 12px padding so both
    edges align with the title's 24px inset; two lines are reserved before the
@@ -656,9 +669,20 @@
 }
 
 /* The row, not the button alone, carries hover and selection, so the description reads as part of its option. */
-.optionItem:hover:has(> .optionRowInteractive),
 .optionItem:has(> .optionSelected) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* dshfiles (round four R12): hover sits behind (hover: hover), so a tap does not leave a row lit on a phone. */
+@media (hover: hover) {
+  .optionItem:hover:has(> .optionRowInteractive) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  .optionItem > .optionRow:hover {
+    border-color: transparent;
+    background: transparent;
+  }
 }
 
 .optionItem:has(> .optionSelected) {
@@ -666,7 +690,6 @@
 }
 
 .optionItem > .optionRow,
-.optionItem > .optionRow:hover,
 .optionItem > .optionSelected {
   border-color: transparent;
   background: transparent;
@@ -710,5 +733,86 @@
     content: '';
     position: absolute;
     inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
+
+  /* Owned delta (unslop r3 item 23): the header's Collapse and Answer later sit on the body's positioned rows and on
+     each other; their areas win those strips, so each answers its full 44pt. */
+  .headerActions :where(button) {
+    z-index: 1;
+  }
+
+  /* Two 24px icons 4px apart cannot both answer 44pt: on touch they stand 20px apart. */
+  .headerActions {
+    column-gap: 20px;
+  }
+}
+
+/* Owned delta (unslop T17): the way out of a pending question is a word, not a second bare icon beside Collapse. */
+.exitButton {
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 999px;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 24px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .exitButton:hover:not(:disabled) {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.exitButton:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
+/* Owned delta (unslop M3): the answers of a question with a rich body were below the fold of the card's own scroll,
+   under a pinned Skip and Submit (a table and a chart fill the seat on a phone, and on a desktop too). The answers now
+   stick to the bottom of that scroll seat, on the card's surface, and the body scrolls above them. Their height is
+   capped so a long list still leaves the body in view. */
+.cardRich .options {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex-shrink: 0;
+  max-height: min(46vh, 420px);
+  margin-top: 0;
+  padding-top: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-input-major);
+}
+
+/* Owned delta (unslop r3 item 22): the card enters with opacity and 8px of travel in 220ms; focus moves at mount, not
+   after it. Under reduced motion it only fades. */
+.card {
+  animation: question-card-in var(--dshx-duration-panel, 220ms) var(--dshx-motion-ease-enter, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@keyframes question-card-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes question-card-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation-name: question-card-fade;
   }
 }

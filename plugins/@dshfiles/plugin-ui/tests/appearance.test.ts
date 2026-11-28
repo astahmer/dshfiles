@@ -27,8 +27,8 @@ function expectAccessible(input: ThemeInput, scheme: Scheme, label: string): voi
     expect(PaletteMath.contrastRatio(p.accent.fg, under), `${label}: accent on ${surface}`).toBeGreaterThanOrEqual(4.5)
   }
   expect(PaletteMath.contrastRatio(p.accent.onSolid, p.accent.fg), `${label}: text on a solid accent`).toBeGreaterThanOrEqual(4.5)
-  for (const hue of [20, 245, 55, 300, 210])
-    expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), p.neutral[1]!), `${label}: syntax ${hue}`).toBeGreaterThanOrEqual(4.5)
+  for (const hue of Object.values(ThemeCss.SYNTAX_HUES))
+    expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme, p), p.neutral[1]!), `${label}: syntax ${hue}`).toBeGreaterThanOrEqual(4.5)
 }
 
 describe('appearance presets', () => {

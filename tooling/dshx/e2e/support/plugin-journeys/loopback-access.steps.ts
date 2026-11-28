@@ -305,18 +305,18 @@ Then('network choices are staged safely and loaded at the next isolated startup'
       expect(await section.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
       await expect(page.getByRole('switch', { name: 'LAN access', exact: true })).toBeVisible()
       if (width === 360) {
-        const sections = page.getByRole('combobox', { name: 'Sections', exact: true })
-        await expect(sections).toBeVisible()
-        await sections.click()
-        await page.getByRole('option', { name: 'General', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        // A narrow pane drills down (round five B6): Back to the grouped category list, then one category.
+        const root = page.locator('[data-settings-root]')
+        const back = page.getByRole('button', { name: 'Back to Settings', exact: true })
+        await back.click()
+        await expect(root).toBeVisible()
+        expect(await page.getByRole('searchbox', { name: 'Search settings', exact: true }).evaluate(element => element.clientWidth)).toBeGreaterThan(60)
+        await root.getByRole('button', { name: 'General', exact: true }).click()
         await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
         await page.screenshot({ path: test.info().outputPath('settings-shell-port-compact.png') })
-        await sections.click()
-        await page.getByRole('option', { name: 'Network access', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        await back.click()
+        await root.getByRole('button', { name: 'Network access', exact: true }).click()
         await expect(page.getByRole('switch', { name: 'LAN access', exact: true })).toBeVisible()
-        expect(await page.getByRole('searchbox', { name: 'Search settings', exact: true }).evaluate(element => element.clientWidth)).toBeGreaterThan(60)
       }
       await page.screenshot({ path: test.info().outputPath(`network-access-settings-${String(width)}.png`) })
     }

@@ -1,19 +1,19 @@
 # @dshfiles/tool-meta
 
-![Tool timing and a live wait countdown](docs/screenshots/tool-call-timing.png)
+![How long a tool call took, at the right of its row](docs/screenshots/tool-call-timing.png)
 
-Start time and duration on every tool call in the chat transcript: `1.2 s · 14:02:11` at the right of each tool card's header row, for native tools and plugin-owned ones, root calls and PTC children alike. While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls name what they are waiting for and show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. The bar measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls. It also renders the file tool cards themselves: `read` on the shared `CodeBlock`, and `edit` / `write` / `apply_patch` on the shared `PatchView`; and the native approval request as a risk card in the composer.
+How long each tool call took, in the chat transcript: `3s` or `2m 05s` (the kit's `formatElapsed`, DESIGN.md › Durations) right after the tool row's label, for native tools and plugin-owned ones, root calls and PTC children alike. A call under one second shows nothing, so the slow step stands out; hover a duration for the start time (the turn's time divider already gives the clock time, so rows do not repeat it). While a call runs the duration counts up every second. `job_output` waits and `background_jobs_wait` calls name what they are waiting for and show a live wait bar: a countdown against an explicit timeout when one is supplied, otherwise an indeterminate bar with elapsed time. The bar measures the wait, not the job's progress or expected completion. To interrupt a wait, steer or stop the turn with the existing composer controls. It also renders the file tool cards themselves: `read` on the shared `CodeBlock`, and `edit` / `write` / `apply_patch` on the shared `PatchView`; and the native approval request as a risk card in the composer.
 
 Built with dshx (no port: nothing upstream does this). Its own small plugin rather than a slice of an existing one, because it touches no other plugin's state and has its own fragile seam to watch. Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
 ## Settings (`dshfiles-tool-meta`)
 
-| Key            | Default    | Meaning                                                                                   |
-| -------------- | ---------- | ----------------------------------------------------------------------------------------- |
-| `enabled`      | `true`     | Show the timing line on tool cards.                                                       |
-| `timeFormat`   | `absolute` | `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
-| `fileCards`    | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                   |
-| `approvalCard` | `true`     | Show tool approval requests as a risk card instead of the native panel.                   |
+| Key            | Default    | Meaning                                                                                                                  |
+| -------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`      | `true`     | Show the duration of tool calls that took one second or more.                                                            |
+| `timeFormat`   | `absolute` | Start time in the hover label. `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
+| `fileCards`    | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                                                  |
+| `approvalCard` | `true`     | Show tool approval requests as a risk card instead of the native panel.                                                  |
 
 ## File tool cards
 
@@ -39,11 +39,15 @@ per request key, so an answered or withdrawn request never unlocks the next one.
 
 ## Where the times come from
 
-DSH already folds them into the blocks it hands every tool view: a dispatched call carries its `tool/call` time, a result carries its `tool/result` time and, while the call is still in the loaded window, the call's time (`callTime`). Nothing is read from the event stream. A result whose call fell outside the loaded window shows only `ended 14:02:12`; a call whose arguments are still streaming shows nothing.
+DSH already folds them into the blocks it hands every tool view: a dispatched call carries its `tool/call` time, a result carries its `tool/result` time and, while the call is still in the loaded window, the call's time (`callTime`). Nothing is read from the event stream. A result whose call fell outside the loaded window has no duration to show, and neither does a call whose arguments are still streaming.
 
 ## How it decorates native cards
 
 `tool.call.toolview` is keyed per tool, so a registration replaces a card instead of adding to it. One level up, `@deepseek-ai/dsh-client-ui-tool` renders each tool call through its `conversation.chat.node` `tool-call` entry (`ToolCallTree`), which dispatches every atomic call through its `renderSlot('tool.call.toolview', owner)`. This plugin swaps that ledger entry's component (read through the public `ctx.slots.entriesOfSlot`) for a wrapper that renders the original tree with a `renderSlot` framing each dispatch with the timing line. The tree keeps its slot authorization, keys and memoization, and every card renders exactly as before. It re-wraps when the entry is re-registered (HMR, a plugin taking the key) and puts the original back on dispose. A shadowing registration cannot do this: the tree's `tool.call.toolview` child slot is declared by the native entry, so a shadow could not render the cards.
+
+The timing label is an overlay at the right of the card's top row, and it shows only where that row can make room for it: a native disclosure row, which the frame pads by the label's width. A card that draws its own header (the HTML page card, with its copy and expand buttons) has no such row, so it gets no label instead of text over its controls. A card that prints its own duration opts out by marking any element inside it with `data-tool-card-timing="own"`, as the test-run card does.
+
+A card that is one collapsed row (a bash call, a read, a write, a subagent's record row) is a work row: its frame takes the width of the row's content, capped at Chat's prose measure (`--dsh-chat-prose-measure`), so the label lands 8px after the label it times and the row's hover covers only its own box. The frame keeps the message column as soon as the row opens, and for every card with a body (a diff, a plan, a page, a job), a section under it, a card that prints its own duration, or a card holding a size container. A fitted row keeps its duration in a narrow pane (a split, a phone); on a full-width card the label still gives way below the narrow tier, where it would cover the card's own chips.
 
 ### Sections under a card
 

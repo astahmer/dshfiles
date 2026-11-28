@@ -1,10 +1,32 @@
+import { readFileSync } from 'node:fs'
 // @vitest-environment jsdom
 import { ListHeaderExtras } from './list-header-extras.js'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DestinationSelection, DestinationShell, type DestinationShellProps } from './destination-shell.js'
+import { DestinationSelection, DestinationShell, PHONE_TAB_PILL, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
+import { SettingsColumnScroll } from './settings-column-scroll.js'
+import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
+import type { PhoneMenuSnapshot, PhoneMenuTool, PhoneThreadMenuService } from '@dshfiles/rich-composer/phone-thread-menu'
+import { createContext } from 'react'
+
+/** frame-layout's phone status button (council round 3 B6): absent unless a test provides it. */
+type PhoneStatusStub = { Button: (() => JSX.Element) | undefined }
+const phoneStatus: PhoneStatusStub = { Button: undefined }
+/** rich-composer's phone thread menu (its `⋯` sheet): absent unless a test provides it. */
+interface ThreadMenuStub {
+  service: PhoneThreadMenuService | undefined
+}
+const threadMenu: ThreadMenuStub = { service: undefined }
+vi.mock('@dshfiles/dshx/client', async importOriginal => ({
+  ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
+  useContract: (token: { readonly id: string }) => {
+    if (token.id === '@dshfiles/rich-composer.phone-thread-menu')
+      return threadMenu.service === undefined ? { status: 'inactive' } : { status: 'active', value: threadMenu.service }
+    return phoneStatus.Button === undefined ? { status: 'inactive' } : { status: 'active', value: { Button: phoneStatus.Button } }
+  },
+}))
 
 const panels = [
   { id: 'dshfiles-thread-board', label: 'Thread Sidebar: Board', order: 2 },
@@ -38,6 +60,35 @@ const props = (overrides: Partial<DestinationShellProps> = {}): DestinationShell
   record: vi.fn(),
   ...overrides,
 })
+
+/** Settings' category list as `@dshfiles/settings-shell` provides it (council round 4 B1). */
+const settingsState: SettingsNavigationState = {
+  open: true,
+  searching: false,
+  activeId: 'general',
+  groups: [
+    {
+      id: 'general',
+      label: 'General',
+      items: [
+        { id: 'general', label: 'General' },
+        { id: 'plugin:dshfiles-ui-styles', label: 'Appearance' },
+      ],
+    },
+    { id: 'models', label: 'Models & accounts', items: [{ id: 'ai-accounts', label: 'AI accounts', page: 'ai-accounts' }] },
+    { id: 'plugins', label: 'Plugins', items: [{ id: 'link:plugins', label: 'Plugins', page: 'plugins', linkOnly: true }] },
+  ],
+}
+
+const navigationOf = (state: SettingsNavigationState) => {
+  const release = vi.fn()
+  return {
+    state: { get: () => state, subscribe: () => () => undefined },
+    select: vi.fn(),
+    attach: vi.fn(() => release),
+    release,
+  } satisfies SettingsNavigationService & { readonly release: () => void }
+}
 
 const renderShell = (overrides: Partial<DestinationShellProps> = {}) => {
   const shell = props(overrides)
@@ -77,7 +128,16 @@ describe('DestinationShell', () => {
       within(rail)
         .getAllByRole('tab')
         .map(tab => tab.textContent),
-    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Settings'])
+    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', ''])
+    // The bottom cluster is glyphs only, like New folder and the rail actions beside it (council round 4 B6).
+    expect(within(rail).getByRole('tab', { name: 'Settings' }).querySelector('[data-rail-icon] + span')).toBeNull()
+    // Labels at the 11px floor, -0.01em, in a 60px rail (round five B3).
+    expect(within(rail).getByText('Knowledge').className).toContain('dshx:text-2xs')
+    expect(within(rail).getByText('Knowledge').className).not.toContain('dshx:text-[10.5px]')
+    expect(within(rail).getByText('Knowledge').className).toContain('dshx:tracking-[-0.01em]')
+    expect(screen.getByRole('navigation', { name: 'Destinations' }).className).toContain('dshx:w-15')
+    // One hairline between the labelled destinations and the glyph-only bottom cluster.
+    expect(rail.querySelector('[data-rail-divider]')?.className).toContain('dshx:border-t')
     expect(screen.getByText('Thread list')).toBeTruthy()
     // Productivity pass Q5 (T5.3): the Threads pages (Board) are items of the list's Filter menu, published through
     // ListHeaderExtras rather than drawn as buttons above the list.
@@ -103,6 +163,369 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith({ destination: 'observe', section: 'traces', surface: 'index' })
   })
 
+  it('lists pages for plugin authors in a Developer group at the end of Settings, which one setting hides', () => {
+    setPhone(false)
+    const developerPanels = [
+      ...panels,
+      { id: 'component-gallery', label: 'Component gallery', order: 90 },
+      { id: 'dshfiles-plugin-guide', label: 'Plugin guide', order: 8 },
+    ]
+    renderShell({ panels: developerPanels })
+    fireEvent.click(screen.getByRole('tab', { name: 'Knowledge' }))
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    const pages = within(screen.getByRole('navigation', { name: 'Settings pages' }))
+      .getAllByRole('button')
+      .map(button => button.getAttribute('aria-label'))
+    expect(pages).toEqual(['All settings', 'Plugins'])
+    const developer = screen.getByRole('region', { name: 'Developer' })
+    expect(
+      within(developer)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(['Component gallery', 'Plugin guide'])
+    // The group follows everything a user came for.
+    expect(screen.getByRole('navigation', { name: 'Settings pages' }).compareDocumentPosition(developer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Council round 8 B4: no grey group; its rows keep their own icons, drawn in the Developer tone.
+    for (const button of within(developer).getAllByRole('button', { name: /^(?:Component gallery|Plugin guide)$/u }))
+      expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph')).toBe('developer')
+    // Round nine B1: its head is a Settings group head like the others, at their indent and 20px under the group above
+    // (council round 13 B5), with no rule of its own.
+    expect(developer.className).not.toContain('dshx:border-t')
+    expect(developer.className).toBe('dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-0.5')
+    expect(developer.querySelector('h3')?.className).toBe('dshx:px-2.5 dshx:pb-0.5 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-(--dsw-alias-label-tertiary)')
+    cleanup()
+    DestinationSelection.set('settings')
+    renderShell({ panels: developerPanels, showDeveloperPages: false })
+    expect(screen.queryByRole('region', { name: 'Developer' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Component gallery' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
+  })
+
+  it('lists page names only, under one line that describes the destination (round five B1)', () => {
+    setPhone(false)
+    renderShell()
+    fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
+    const usage = screen.getByRole('button', { name: 'Usage' })
+    expect(usage.getAttribute('aria-describedby')).toBeNull()
+    expect(usage.textContent).toBe('Usage')
+    expect(document.querySelectorAll('[data-destination-index="observe"] header p')).toHaveLength(1)
+  })
+
+  it('lights the current place once: a toned tile on the rail item, the wash and marker on the open page (council round 3 B2)', () => {
+    setPhone(false)
+    renderShell({ activePanelId: 'dshfiles-usage', renderPanelIcon: () => <svg data-testid="page-icon" /> })
+    fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
+    const tab = screen.getByRole('tab', { name: 'Observe' })
+    // The rail item: its identity tone's 14% tile behind the glyph and an ink label at 600, no wash and no marker.
+    expect(tab.className).toContain('dshx:nav-tone-observe')
+    expect(tab.className).not.toContain('dshx:bg-selected-wash')
+    expect(tab.className).not.toContain('dshx:selected-marker')
+    expect(within(tab).getByText('Observe').className).toContain('dshx:font-semibold')
+    expect(tab.className).toContain('dshx:text-foreground')
+    expect(tab.className).not.toMatch(/(^| )dshx:bg-accent( |$)/u)
+    expect(tab.querySelector('[data-rail-icon]')?.className).toContain('dshx:bg-nav-tile')
+    // Every destination glyph draws in its own tone; only the active one gets the tile.
+    const threads = screen.getByRole('tab', { name: 'Threads' })
+    expect(threads.className).toContain('dshx:nav-tone-threads')
+    expect(threads.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-nav-tone')
+    expect(threads.querySelector('[data-rail-icon]')?.className).not.toContain('dshx:bg-nav-tile')
+    // The open page: the neutral wash and the marker; its glyph carries the destination's tone on that tone's 14% tile
+    // (round nine B2, kit A1), the selected-place seat that follows the row's aria-current.
+    const usage = screen.getByRole('button', { name: 'Usage' })
+    expect(usage.className).toContain('dshx:bg-selected-wash')
+    expect(usage.className).toContain('dshx:selected-marker')
+    // A place-tile row draws no edge (council round 13 B4): the toned tile, the wash and the 550 label carry the
+    // selection; the edge stays on thread, account and palette rows.
+    expect(usage.className).not.toContain('selected-edge')
+    const seat = usage.querySelector<HTMLElement>('[data-section-icon]')
+    expect(seat?.className).toContain('dshx:place-seat')
+    expect(seat?.className).toContain('dshx:nav-tone-observe')
+    expect(seat?.className).not.toContain('dshx:text-control-on')
+    // A 24px seat on the 16px glyph's footprint, so selecting a row never moves it.
+    expect(seat?.className).toContain('dshx:size-6 dshx:-mx-1 dshx:-mt-0.5 dshx:-mb-1')
+    const traces = screen.getByRole('button', { name: 'Traces' })
+    expect(traces.className).not.toContain('dshx:bg-selected-wash')
+    // At rest a row's glyph stays in the secondary ink, with no tile.
+    const quiet = traces.querySelector<HTMLElement>('[data-section-icon]')
+    expect(quiet?.className).not.toContain('dshx:nav-tone-observe')
+    expect(quiet?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dsw-alias-label-secondary)')
+  })
+
+  it('sizes every side-column glyph by its seat and draws Review with the Land glyph its tab shows (council round 10 B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('land')
+    // A page that registers a bare lucide icon (24px by default), as diffs-review does.
+    const unsized = (panelId: string) => (
+      <svg data-registered-glyph={panelId} width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    )
+    renderShell({
+      panels: [
+        ...panels,
+        { id: 'jj-integration', label: 'JJ Integration: Thread integration', order: 1 },
+        { id: 'diffs-review', label: 'Review', order: 2 },
+      ],
+      activePanelId: 'diffs-review',
+      renderPanelIcon: unsized,
+    })
+    const review = screen.getByRole('button', { name: 'Review' })
+    const seat = review.querySelector<HTMLElement>('[data-section-icon]')
+    expect(seat?.className).toContain('dshx:[&_svg]:size-4')
+    // The Land glyph, not the page's registered one: the row and its tab name the page alike.
+    expect(seat?.querySelector('[data-registered-glyph]')).toBeNull()
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-git-merge')
+    // Every other row keeps its own glyph, sized by the seat.
+    const workspaces = screen.getByRole('button', { name: 'Workspaces' }).querySelector<HTMLElement>('[data-section-icon]')
+    expect(workspaces?.querySelector('[data-registered-glyph="jj-integration"]')).not.toBeNull()
+    expect(workspaces?.className).toContain('dshx:[&_svg]:size-4')
+  })
+
+  it('marks a side-column row\'s plain glyph seat as its leading glyph, so a selected row draws no pill beside it (council round 11 B3)', () => {
+    // A destination or Settings row's seat is a kit place seat, which the kit rule finds itself; a custom folder's row
+    // keeps a plain 16px seat, which says so through the kit hook.
+    const source = readFileSync('src/destination-shell.tsx', 'utf8')
+    const plainSeat = source.slice(source.indexOf("props.place === undefined ? ("), source.indexOf('// The selected-place seat'))
+    expect(plainSeat).toContain('data-section-icon=""')
+    expect(plainSeat).toContain('{...LEADING_GLYPH_ATTRIBUTE}')
+  })
+
+  it('keeps the Settings column open on every Settings page: it is the one Settings navigation (council round 4 B1)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const shell = renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-stage-folded]')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeTruthy()
+    // The open category leads with its toned place tile, so it takes the wash and no edge (council round 13 B4).
+    const general = within(screen.getByRole('navigation', { name: 'Settings pages' })).getByRole('button', { name: 'General' })
+    expect(general.getAttribute('aria-current')).toBe('page')
+    expect(general.className).toContain('dshx:bg-selected-wash')
+    expect(general.className).not.toContain('selected-edge')
+  })
+
+  it('heads the Settings column with the source filter the Settings page lends it (upstream #290, merged)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const OriginFilter = (): JSX.Element => <div role="group" aria-label="Filter categories by source" data-origin-filter-probe="" />
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: { ...navigationOf(settingsState), OriginFilter } })
+    const column = screen.getByRole('navigation', { name: 'Settings pages' })
+    const filter = within(column).getByRole('group', { name: 'Filter categories by source' })
+    // First in the column, above the first group, so it reads as the list's own control.
+    const first = column.querySelector('[data-settings-group]')
+    expect(first === null ? 0 : filter.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The first group keeps its 20px step under the filter, as under any group: the filter adds no room of its own.
+    expect(column.querySelector('[data-settings-column-filter]')?.className ?? '').not.toMatch(/dshx:p[bty]?-/u)
+  })
+
+  it('brings the current Settings row into view at its nearest edge, its group label shown (council round 18 B2.4)', async () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const reveal = vi.spyOn(SettingsColumnScroll, 'reveal').mockImplementation(() => undefined)
+    try {
+      renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+      const column = screen.getByRole('navigation', { name: 'Settings pages' })
+      await waitFor(() => expect(reveal).toHaveBeenCalledWith(column))
+    } finally {
+      reveal.mockRestore()
+    }
+  })
+
+  it('heads each Settings group 12/600 in the tertiary ink, +0.01em, 20px under the group above and 4px over its first row (council round 13 B5)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+    const column = screen.getByRole('navigation', { name: 'Settings pages' })
+    const group = column.querySelector<HTMLElement>('[data-settings-group="models"]')
+    // 20px above: the group's top margin. 4px below: the head's 2px padding and the group's 2px row gap.
+    expect(group?.className).toMatch(/(^| )dshx:mt-5( |$)/u)
+    expect(group?.className).toContain('dshx:gap-0.5')
+    const head = group?.querySelector<HTMLElement>('h3')?.className ?? ''
+    for (const token of ['dshx:text-xs', 'dshx:font-semibold', 'dshx:tracking-[0.01em]', 'dshx:text-(--dsw-alias-label-tertiary)', 'dshx:pb-0.5'])
+      expect(head).toContain(token)
+    expect(head).not.toContain('dshx:text-sm')
+    expect(head).not.toContain('dshx:text-muted-foreground')
+  })
+
+  it('lists Settings categories and pages in one list, each once, and the page drops its own list (council round 4 B1)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }, { id: 'secret-catalog', label: 'Secrets', order: 2 }]
+    const contributed = [
+      { panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 },
+      { panelId: 'secret-catalog', destination: 'settings' as const, label: 'Secrets', order: 1 },
+    ]
+    const navigation = navigationOf(settingsState)
+    const shell = renderShell({ panels: settingsPanels, contributed, activePanelId: 'dshfiles-settings', settingsNavigation: navigation })
+    const list = screen.getByRole('navigation', { name: 'Settings pages' })
+    const labels = within(list)
+      .getAllByRole('button')
+      .map(button => button.getAttribute('aria-label'))
+    expect(labels).toEqual(['General', 'Appearance', 'AI accounts', 'Plugins', 'Secrets'])
+    expect(screen.queryByRole('button', { name: 'All settings' })).toBeNull()
+    // General's first row names its group; the others keep a heading.
+    expect(within(list).getByRole('group', { name: 'General' }).querySelector('h3')).toBeNull()
+    expect(within(within(list).getByRole('group', { name: 'Models & accounts' })).getByText('Models & accounts')).toBeTruthy()
+    // Round five B5, council round 6 B3: every category row has its 16px glyph in its group's tone; group heads are
+    // 13/600 secondary, 16px under the group above and 4px over their first row.
+    for (const [name, group] of [['General', 'general'], ['Appearance', 'general'], ['AI accounts', 'models']] as const) {
+      const glyph = within(list).getByRole('button', { name }).querySelector('[data-section-icon] [data-settings-glyph]')
+      expect(glyph?.getAttribute('class'), name).toContain('dshx:size-4')
+      expect(glyph?.getAttribute('class'), name).toContain('dshx:text-(--settings-tone)')
+      expect(glyph?.getAttribute('data-settings-glyph'), name).toBe(group)
+    }
+    // Round nine B2: each row's seat takes its group's tone, so the selected row's glyph sits on a 14% tile of it.
+    const general = within(list).getByRole('button', { name: 'General' }).querySelector<HTMLElement>('[data-section-icon]')
+    expect(general?.className).toContain('dshx:place-seat')
+    expect(general?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-7)')
+    // Council round 8 B4: the Pages group's rows keep their own icons, in the Pages tone, never grey.
+    const pages = list.querySelector<HTMLElement>('[data-settings-group="pages"]')
+    expect(pages).not.toBeNull()
+    for (const button of within(pages ?? list).getAllByRole('button'))
+      expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph'), button.getAttribute('aria-label') ?? '').toBe('pages')
+    const head = within(list).getByRole('group', { name: 'Models & accounts' }).querySelector('h3')
+    expect(head?.className).toContain('dshx:font-semibold')
+    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-5')
+    // Council round 7 B2: the column keeps its "Settings" head on every Settings page (the page's h1 names the category),
+    // so the list never jumps 36px between General and another Settings page.
+    const columnTitle = screen.getByRole('heading', { level: 2, name: 'Settings' })
+    expect(columnTitle.className).not.toContain('dshx:sr-only')
+    expect(columnTitle.closest('header')?.className).not.toContain('dshx:sr-only')
+    // The column sits on the nav surface (kit A4).
+    expect(screen.getByRole('tabpanel', { name: 'Settings' }).className).toContain('dshx:surface-nav')
+    // The page's current category is the column's current row.
+    expect(within(list).getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('page')
+    // The column draws the list while it shows: the Settings page drops its own.
+    expect(navigation.attach).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(list).getByRole('button', { name: 'Appearance' }))
+    expect(navigation.select).toHaveBeenCalledWith('plugin:dshfiles-ui-styles')
+    // A category that stands for a page opens the page; one no category claims follows under Pages.
+    fireEvent.click(within(list).getByRole('button', { name: 'AI accounts' }))
+    expect(shell.selectPanel).toHaveBeenCalledWith('ai-accounts')
+    expect(within(within(list).getByRole('group', { name: 'Pages' })).getByRole('button', { name: 'Secrets' })).toBeTruthy()
+    cleanup()
+    expect(navigation.release).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps a page's own category one row under it while the page shows (council round 4 B1)", () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }]
+    const contributed = [{ panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 }]
+    const navigation = navigationOf({ ...settingsState, open: false, activeId: undefined })
+    renderShell({ panels: settingsPanels, contributed, activePanelId: 'ai-accounts', settingsNavigation: navigation })
+    expect(screen.getByRole('button', { name: 'AI accounts' }).getAttribute('aria-current')).toBe('page')
+    // Council round 14 B2: the child row hangs a child-line glyph (↳) in a 16px seat that starts 12px in from the
+    // parent's glyph, so its label still starts 12px past the parent's text edge (22px + 16px seat + 8px gap = 46px).
+    const child = screen.getByRole('button', { name: 'AI accounts settings' })
+    expect(child.className).toContain('dshx:pl-5.5')
+    expect(child.className).not.toContain('dshx:pl-11.5')
+    const seat = child.querySelector<HTMLElement>(':scope > [data-section-icon]')
+    expect(seat?.className).toContain('dshx:size-4')
+    expect(seat?.className).toContain('dshx:text-muted-foreground')
+    expect(seat?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-corner-down-right')
+    // The connector is not a place: no toned tile and no selected edge when its row is current.
+    expect(seat?.hasAttribute('style')).toBe(false)
+    // On another Settings page the column keeps its visible title: the page's h1 names that page, not Settings.
+    expect(screen.getByRole('heading', { level: 2, name: 'Settings' }).className).not.toContain('dshx:sr-only')
+    fireEvent.click(screen.getByRole('button', { name: 'AI accounts settings' }))
+    expect(navigation.select).toHaveBeenCalledWith('ai-accounts')
+  })
+
+  it('selects a child row with the wash alone, like its place-tile siblings: no selected edge (council round 14 B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }]
+    const contributed = [{ panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 }]
+    const navigation = navigationOf({ ...settingsState, open: true, activeId: 'ai-accounts' })
+    renderShell({ panels: settingsPanels, contributed, activePanelId: 'dshfiles-settings', settingsNavigation: navigation })
+    const child = screen.getByRole('button', { name: 'AI accounts settings' })
+    expect(child.getAttribute('aria-current')).toBe('page')
+    expect(child.className).toContain('dshx:bg-selected-wash')
+    expect(child.className).not.toContain('selected-edge')
+    expect(child.querySelector('[data-section-icon] svg')?.getAttribute('class')).toContain('lucide-corner-down-right')
+  })
+
+  it('shows match counts while Settings searches, and dims a category without one', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const searching = {
+      ...settingsState,
+      searching: true,
+      activeId: undefined,
+      groups: settingsState.groups.map(group => ({ ...group, items: group.items.map((item, index) => ({ ...item, count: index === 0 ? 3 : 0 })) })),
+    }
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(searching) })
+    expect(screen.getByRole('button', { name: 'General' }).textContent).toBe('General3')
+    expect(screen.getByRole('button', { name: 'Appearance' }).className).toContain('dshx:opacity-45')
+  })
+
+  it('opens the folded list again from its own rail item, so a one-page destination stays one click away', () => {
+    setPhone(false)
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const shell = props({ panels: inboxPanels, activePanelId: 'attention-inbox' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    // Folded by the stage, not by hand.
+    view.rerender(
+      <TooltipProvider>
+        <DestinationShell {...shell} collapsed />
+      </TooltipProvider>,
+    )
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-stage-folded]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves a column the person collapsed or opened by hand as they left it', () => {
+    setPhone(false)
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const collapsedByHand = renderShell({ panels: inboxPanels, collapsed: true, activePanelId: 'attention-inbox' })
+    expect(collapsedByHand.toggleSidebar).not.toHaveBeenCalled()
+    cleanup()
+    localStorage.clear()
+    DestinationSelection.set('inbox')
+    const shell = props({ panels: inboxPanels, activePanelId: 'attention-inbox' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    const draw = (overrides: Partial<DestinationShellProps>): void =>
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} {...overrides} />
+        </TooltipProvider>,
+      )
+    draw({ collapsed: true })
+    // Opened by hand while the Inbox shows: it stays open.
+    draw({ collapsed: false })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('folds the column while the page of a one-page destination is on stage (round five B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const shell = renderShell({ panels: inboxPanels, activePanelId: 'attention-inbox' })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    cleanup()
+    localStorage.clear()
+    // Observe lists several pages: its list stays.
+    DestinationSelection.set('observe')
+    const observe = renderShell({ activePanelId: 'dshfiles-usage' })
+    expect(observe.toggleSidebar).not.toHaveBeenCalled()
+  })
+
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {
     setPhone(false)
     const shell = renderShell({ activePanelId: 'dshfiles-settings' })
@@ -116,6 +539,31 @@ describe('DestinationShell', () => {
     expect(screen.queryByRole('group', { name: 'Layout' })).toBeNull()
   })
 
+  it('folded, keeps the rail it has open: its labels, order, width and active item (round five B1)', () => {
+    setPhone(false)
+    DestinationSelection.set('observe')
+    type RailSnapshot = { readonly labels: string; readonly width: string; readonly active: string | null }
+    const rail = (): RailSnapshot => {
+      const nav = document.querySelector('nav[aria-label="Destinations"]')
+      const items = [...(nav?.querySelectorAll('[role="tab"]') ?? [])]
+      return {
+        labels: items.map(item => item.textContent).join('|'),
+        width: nav?.className ?? '',
+        active: items.find(item => item.getAttribute('aria-selected') === 'true')?.getAttribute('data-destination') ?? null,
+      }
+    }
+    renderShell({ collapsed: false, activePanelId: 'dshfiles-usage' })
+    const open = rail()
+    // The rail paints the panel step itself, so it reads the same beside the list and on the frame's folded track.
+    expect(open.width).toContain('dshx:bg-[var(--dsw-specific-sidebar-fill)]')
+    expect(open.labels).toContain('Knowledge')
+    expect(open.active).toBe('observe')
+    cleanup()
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
+    expect(rail()).toEqual(open)
+    expect(screen.queryByText('Thread list')).toBeNull()
+  })
+
   it('collapsed, keeps only the rail and expands on a destination', () => {
     setPhone(false)
     const shell = renderShell({ collapsed: true })
@@ -124,6 +572,73 @@ describe('DestinationShell', () => {
     expect(shell.startSession).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('tab', { name: 'Land' }))
     expect(shell.toggleSidebar).toHaveBeenCalled()
+  })
+
+  it('opens the Inbox page at once, with its count at the trailing edge of its one row', () => {
+    setPhone(false)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({
+      panels: inboxPanels,
+      contributed,
+      // The Inbox glyph as its plugin draws it: a count over the icon.
+      renderPanelIcon: panelId =>
+        panelId === 'attention-inbox' ? (
+          <span data-attention-badge="2">
+            <svg />
+            <span>2</span>
+          </span>
+        ) : null,
+    })
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    // One page, so the rail opens it: no second row that lists the same threads.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    const rows = within(screen.getByRole('navigation', { name: 'Inbox pages' })).getAllByRole('button')
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['Inbox'])
+    // SAFETY: the assertion above pins exactly one row, so the first one exists.
+    const row = rows[0] as HTMLElement
+    const seat = row.querySelector('[data-attention-badge]')?.parentElement
+    // The count is positioned against the row (its trailing edge), not over the 16px icon where it touched the label.
+    expect(row.className).toContain('dshx:relative')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]]:static')
+    expect(seat?.className).toContain('dshx:[&_[data-attention-badge]>span]:right-8')
+  })
+
+  it('says the Inbox did not load, with Reload and Open Plugins, when its page never registered', () => {
+    setPhone(false)
+    const shell = renderShell()
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(screen.getByText('Inbox did not load. Reload the page; if it keeps failing, open Settings › Plugins.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Plugins' }))
+    expect(shell.selectPanel).toHaveBeenCalledWith('plugins')
+  })
+
+  it('on a phone, the Inbox tab opens the Inbox page directly', () => {
+    setPhone(true)
+    const inboxPanels = [
+      ...panels,
+      { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 },
+      { id: 'thread-sidebar-waiting', label: 'Waiting threads', order: 3 },
+    ]
+    const contributed = [{ panelId: 'thread-sidebar-waiting', destination: 'inbox' as const, label: 'Waiting threads', order: 2, unlisted: true }]
+    const shell = renderShell({ panels: inboxPanels, contributed, collapsed: true })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Inbox' }))
+    // No intermediate two-row list (Needs you, Waiting threads) between the tab and the page.
+    expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
+    expect(screen.queryByRole('button', { name: 'Waiting threads' })).toBeNull()
+  })
+
+  it("on a phone, ends the full-screen list above the frame's status pill row while the frame draws it", () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const list = document.querySelector<HTMLElement>('[data-phone-list]')
+    expect(list?.className).toContain('dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]')
+    expect(list?.style.bottom).toContain('var(--phone-list-status-room, 0px)')
   })
 
   it('replaces the rail with a bottom tab bar on a phone', () => {
@@ -146,6 +661,193 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith(expect.objectContaining({ destination: 'land', surface: 'tab-bar' }))
     cleanup()
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
+  })
+
+  it('on a phone, lights the current tab with its tone tile and a 600 label, and More while Settings shows (council round 3 B6)', () => {
+    setPhone(true)
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    const bar = screen.getByRole('navigation', { name: 'Destinations' })
+    const more = within(bar).getByRole('button', { name: 'More' })
+    expect(more.getAttribute('aria-current')).toBe('page')
+    expect(more.className).toContain('dshx:nav-tone-settings')
+    expect(more.querySelector('[data-phone-tab-seat]')?.className).toContain(PHONE_TAB_PILL)
+    expect(within(more).getByText('More').className).toContain('dshx:font-semibold')
+    const threads = within(bar).getByRole('button', { name: 'Threads' })
+    expect(threads.getAttribute('aria-current')).toBeNull()
+    expect(threads.querySelector('[data-phone-tab-seat]')?.className).not.toContain('dshx:bg-nav-tile')
+    // Colour on the current tab only (council round 12 B3, reversing round nine B3): a tinted glyph means "selected" on a
+    // phone, so the others rest in tertiary ink; the current glyph takes its tone on its tile.
+    for (const tab of within(bar).getAllByRole('button')) {
+      const seat = tab.querySelector('[data-phone-tab-seat]')?.className
+      if (tab === more) expect(seat).toContain('dshx:text-foreground')
+      else {
+        expect(seat).not.toContain('dshx:text-nav-tone')
+        expect(seat).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+      }
+    }
+    expect(threads.className).toContain('dshx:nav-tone-threads')
+    cleanup()
+    // One neutral selected pill on every current tab (council round 13 B2): the tone's own tile read blue on Threads and
+    // grey on Inbox. The glyph carries the tone; Inbox and More, the neutral destinations, draw ink.
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    for (const destination of ['threads', 'inbox', 'more'] as const) {
+      localStorage.clear()
+      if (destination === 'inbox') DestinationSelection.set('inbox')
+      if (destination === 'more') renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+      else renderShell({ panels: inboxPanels, collapsed: false })
+      const tab = within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: { threads: 'Threads', inbox: 'Inbox', more: 'More' }[destination] })
+      expect(tab.getAttribute('aria-current'), destination).toBe('page')
+      const seat = tab.querySelector('[data-phone-tab-seat]')?.className ?? ''
+      expect(seat, destination).toContain(PHONE_TAB_PILL)
+      expect(seat, destination).not.toContain('dshx:bg-nav-tile')
+      expect(seat, destination).toContain(destination === 'threads' ? 'dshx:text-nav-tone' : 'dshx:text-foreground')
+      cleanup()
+    }
+    // Another destination's page reached through More keeps More lit too.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
+    expect(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('on a phone, puts the status button in the Threads bar\'s leading seat, New thread trailing, and none without frame-layout (council round 3 B6, round 6 B1)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    expect(document.querySelector('[data-phone-status-probe]')).toBeNull()
+    cleanup()
+    phoneStatus.Button = () => <button type="button" aria-label="Status" data-phone-status-probe="" />
+    try {
+      renderShell({ collapsed: false })
+      const bar = document.querySelector<HTMLElement>('[data-phone-top-bar]')
+      const status = bar?.querySelector('[data-phone-status-probe]')
+      const add = bar?.querySelector('[data-phone-new]')
+      expect(status).not.toBeNull()
+      if (status == null || add == null) throw new Error('Phone status button or + button missing')
+      expect(status.compareDocumentPosition(add)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      // The same seat as the Inbox bar's gauge: before the centred title, with + alone after it.
+      const title = bar?.querySelector('[data-phone-title]')
+      if (title == null) throw new Error('Phone title missing')
+      expect(status.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(title.compareDocumentPosition(add)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    } finally {
+      phoneStatus.Button = undefined
+    }
+  })
+
+  it('gives the phone thread list a 44px search, the touch control height (council round 6 B8)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const search = within(document.querySelector<HTMLElement>('[data-phone-list]') ?? document.body).getByRole('button', { name: 'Search threads' })
+    // The kit's one control height (round nine B5, kit A4): 32px, 44px under a coarse pointer.
+    expect(search.getAttribute('data-size')).toBe('field')
+    expect(search.className).toContain('dshx:h-(--dshx-control-h)')
+    // It looks like a field, with the field edge (council round 7 B3).
+    expect(search.className).toContain('dshx:border-field-border')
+    cleanup()
+    // The desktop column's search is 32px, the height of the project and Filter fields beside it (round nine B5).
+    setPhone(false)
+    renderShell({ collapsed: false })
+    expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:h-(--dshx-control-h)')
+    expect(screen.getByRole('button', { name: 'Search threads' }).className).not.toContain('dshx:h-7')
+    expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:border-field-border')
+    // It stands for a text field (council round 10 A1): the text field's edge and paper at rest, not the quiet chip's
+    // transparent edge and fill that the project and Filter triggers beside it take.
+    for (const phone of [false, true]) {
+      cleanup()
+      setPhone(phone)
+      renderShell({ collapsed: false })
+      const launcher = screen.getByRole('button', { name: 'Search threads' }).className
+      expect(launcher).toContain('dshx:bg-background')
+      expect(launcher).not.toContain('dshx:bg-trigger-fill')
+      expect(launcher).not.toContain('dshx:border-transparent')
+    }
+  })
+
+  it('draws Search threads in the kit field look, left-aligned, with no outline edge to replace the field edge in dark (council round 8 B1)', () => {
+    for (const phone of [false, true]) {
+      setPhone(phone)
+      renderShell({ collapsed: false })
+      const search = screen.getByRole('button', { name: 'Search threads' })
+      expect(search.getAttribute('data-variant')).toBe('field')
+      // The outline variant's `dark:border-input` beat the field edge in dark: 1.43:1 rendered (#393633 on #1e1b19).
+      expect(search.className).not.toContain('dshx:dark:border-input')
+      expect(search.className).not.toContain('dshx:dark:bg-input/30')
+      expect(search.className).toContain('dshx:justify-start')
+      expect(search.className).not.toContain('dshx:justify-between')
+      cleanup()
+    }
+  })
+
+  it('ends the phone search row in the list\'s scope seat, one 44px toolbar row, and publishes it (council round 10 B1)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const list = document.querySelector<HTMLElement>('[data-phone-list]')
+    const search = within(list ?? document.body).getByRole('button', { name: 'Search threads' })
+    const seat = search.parentElement?.querySelector<HTMLElement>('[data-thread-list-scope]')
+    if (seat == null) throw new Error('Phone scope seat missing')
+    // After the search, in the same row, 8px apart; the row stands 6px over the first group head.
+    expect(search.compareDocumentPosition(seat)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(search.parentElement?.className).toContain('dshx:gap-2')
+    expect(search.parentElement?.className).toContain('dshx:pb-1.5')
+    expect(ListHeaderExtras.get().scopeSlot).toBe(seat)
+    // The search stands 8pt under the top bar's rule, as Inbox's and Settings' first controls do (council round 19 B4;
+    // 4pt read as pressed against it), instead of the 12px other lists keep.
+    expect(search.parentElement?.hasAttribute('data-threads-toolbar')).toBe(true)
+    expect(list?.className).toContain('dshx:has-[[data-threads-toolbar]]:pt-2')
+    expect(list?.className).not.toContain('dshx:has-[[data-threads-toolbar]]:pt-1')
+    cleanup()
+    // A desktop column keeps the list's own project and Filter row: no seat.
+    setPhone(false)
+    renderShell({ collapsed: false })
+    expect(document.querySelector('[data-thread-list-scope]')).toBeNull()
+    expect(ListHeaderExtras.get().scopeSlot).toBeNull()
+  })
+
+  it('reclaims the search\'s extra 16px from the gaps around the filter row and the group heads on touch (council round 6 B8)', () => {
+    const source = readFileSync('src/client.tsx', 'utf8')
+    // The project and Filter row sits 4px under the search and directly over the first group head on touch; the phone
+    // shell grid (round nine B4) puts it on the 12px gutter, 6px over the first head.
+    expect(source).toContain("scopeSlot === null ? 'dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5'")
+    // Groups stand flush on touch: the 2px each group added above its head is gone.
+    expect(source).toContain('dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0')
+    expect(source).not.toContain('dshx:pointer-coarse:not-first:mt-0.5')
+  })
+
+  it('puts the phone Threads list on one gutter: fills from 12px, text from 24px, 12px under the top bar (round nine B4, B5)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const list = document.querySelector<HTMLElement>('[data-phone-list]')
+    expect(list?.className).toContain('dshx:pt-3')
+    expect(list?.className).not.toMatch(/(^| )dshx:pt-1( |$)/u)
+    const search = within(list ?? document.body).getByRole('button', { name: 'Search threads' })
+    expect(search.parentElement?.className).toContain('dshx:px-3')
+    expect(search.className).toContain('dshx:px-3')
+    const source = readFileSync('src/client.tsx', 'utf8')
+    // The project and Filter fields are 44px on a phone like the search, 32px beside it on a desktop.
+    expect(source).toContain('triggerClassName="dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:phone:px-3"')
+    expect(source).toContain('size="field"\n          data-thread-list-filter=""')
+    expect(source).toContain("'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'")
+    expect(source).not.toContain('dshx:px-2.5 dshx:pointer-coarse:h-7"')
+    // Rows and the scroll area sit on the same gutter, the group heads' labels on the 24px text edge.
+    expect(source).toContain('dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3')
+    expect(source).toContain("'dshx:phone:pl-3',")
+    expect(readFileSync('src/thread-group-header.tsx', 'utf8')).toContain('dshx:pointer-coarse:h-7 dshx:phone:px-3')
+  })
+
+  it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
+    // Only the landscape clause of the phone rule matches: the viewport is 844px wide.
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)'),
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
+    })
+    renderShell({ collapsed: true })
+    expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(true)
+    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Destinations' })).toBeTruthy()
+    cleanup()
   })
 
   it('on a phone, drops the page description and row descriptions in a destination list', () => {
@@ -222,6 +924,331 @@ describe('DestinationShell', () => {
     renderShell({ collapsed: true, selectedThreadId: null, stageThreadId: null, stageSessionId: 'session-draft', pendingTitle: 'Fix the login race' })
     expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Fix the login race')
     expect(document.querySelector('header[data-phone-top-bar]')?.getAttribute('data-phone-stage')).toBe('thread')
+  })
+
+  it('on a phone, centres a page title apart from a muted 17px Back, and starts a thread title 12px after the chevron (council round 4 B3)', () => {
+    setPhone(true)
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    expect(document.querySelector('[data-phone-bar-layout]')?.getAttribute('data-phone-bar-layout')).toBe('centred')
+    const title = document.querySelector('[data-phone-title]')
+    expect(title?.className).toContain('dshx:text-center')
+    expect(title?.className).toContain('dshx:font-semibold')
+    const back = screen.getByRole('button', { name: 'Back to More' })
+    expect(back.textContent).toBe('More')
+    expect(back.className).toContain('dshx:text-muted-foreground')
+    // Both read at 17px, set once on the bar row they share.
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:text-[17px]')
+    // The way back and the title are two cells of the bar, not one run of text.
+    expect(back.contains(title)).toBe(false)
+    cleanup()
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
+    expect(document.querySelector('[data-phone-bar-layout]')?.getAttribute('data-phone-bar-layout')).toBe('leading')
+    const chevron = screen.getByRole('button', { name: 'Back to Threads' })
+    // The 44px leading seat (council round 17 B2.2), the glyph centred in it; the title starts where the seat ends,
+    // 12px after the glyph, with no gap.
+    expect(chevron.className).toContain('dshx:w-11')
+    expect(chevron.className).toContain('dshx:justify-center')
+    expect(chevron.className).not.toContain('dshx:w-7')
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).not.toMatch(/dshx:gap-/u)
+  })
+
+  it('names the thread\'s project, status and children in the count formula on a 13px line under its title (council round 17 B2.2, round 22 item 2)', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Fix invoice tax rounding',
+      stageWorking: true,
+      stageMeta: {
+        project: 'billing-api',
+        mark: { tone: 3, palette: 'balanced' },
+        status: 'Working',
+        working: true,
+        children: [
+          { key: 'working', count: 6, text: '6 working', tone: 'plain' },
+          { key: 'failed', count: 1, text: '1 failed', tone: 'failed' },
+        ],
+      },
+    })
+    const block = document.querySelector('[data-phone-title-block]')
+    expect(block?.querySelector('[data-phone-title]')?.textContent).toBe('Fix invoice tax rounding')
+    // 17/20 over 13/16: both lines fit the 44px row with 4px clear.
+    expect(block?.querySelector('[data-phone-title]')?.className).toContain('dshx:leading-5')
+    const line = block?.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.className).toContain('dshx:text-sm/4')
+    expect(line?.className).toContain('dshx:text-muted-foreground')
+    // The parts on screen (the kit's hidden measure copy aside).
+    expect([...(line?.querySelectorAll('[data-attention-meta-part]') ?? [])].filter(part => part.getAttribute('data-attention-meta-part') !== 'sep' && part.closest('[data-attention-meta-measure]') === null).map(part => [part.getAttribute('data-attention-meta-part'), part.textContent])).toEqual([
+      ['mark', 'BA'],
+      ['name', 'billing-api'],
+      ['kind', 'Working'],
+      ['kind-mark', ''],
+    ])
+    // The children in the one count formula after the state (round 22 items 2 and 3): `· 6 working · ✕ 1 failed`, the
+    // failed clause in the failed ink after the list's ✕. It never drops; the project's name gives way first.
+    const children = line?.querySelector<HTMLElement>('[data-phone-children]')
+    expect(children?.className).toContain('dshx:shrink-0')
+    expect([...(children?.querySelectorAll('[data-phone-children-part]') ?? [])].map(part => [part.getAttribute('data-phone-children-part'), part.textContent])).toEqual([
+      ['working', '6 working'],
+      ['failed', '1 failed'],
+    ])
+    const failed = children?.querySelector<HTMLElement>('[data-phone-children-part="failed"]')
+    expect(failed?.className).toContain('dshx:text-destructive')
+    expect(failed?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    expect(children?.querySelector('[data-phone-children-part="working"]')?.className).not.toContain('dshx:text-destructive')
+    // Each clause after a muted "·" that assistive tech hears as a comma.
+    expect(children?.textContent).toBe('·, 6 working·, 1 failed')
+    // The line says Working after the list's 12px working ring (council round 18 B2.3): one glyph, in the kind, none
+    // before the title, and the bar stays one 44px row.
+    const ring = line?.querySelector<HTMLElement>('[data-attention-meta-part="kind"] [data-attention-meta-part="kind-mark"] [data-slot="status-glyph"]')
+    expect(ring?.getAttribute('data-status')).toBe('working')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(ring?.className).toContain('dshx:size-3')
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
+    cleanup()
+    // An unknown project draws no mark and no name; a page never draws the line.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', working: false, children: [] } })
+    expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="mark"]')).toBeNull()
+    // Not working: no ring before the word.
+    expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="kind-mark"]')).toBeNull()
+    expect(document.querySelector('[data-phone-subtitle]')?.textContent).toContain('Idle')
+    cleanup()
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', working: true, children: [] } })
+    expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
+  })
+
+  it('draws no state word or ring where the children count says the thread works (round 22 follow-up)', () => {
+    setPhone(true)
+    const children = [
+      { key: 'working', count: 6, text: '6 working', tone: 'plain' },
+      { key: 'failed', count: 1, text: '1 failed', tone: 'failed' },
+    ] as const
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Audit money rounding',
+      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: undefined, working: false, children },
+    })
+    // `BA billing-api · 6 working · ✕ 1 failed`: no kind part, no ring.
+    const line = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.querySelector('[data-attention-meta-part="kind"]')).toBeNull()
+    expect(line?.querySelector('[data-status="working"]')).toBeNull()
+    expect(line?.querySelector('[data-phone-children]')?.textContent).toBe('·, 6 working·, 1 failed')
+    cleanup()
+    // A subagent with working children of its own: the count follows the model with one "·".
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Fix',
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'claude-sonnet-5-5' },
+        status: undefined,
+        working: false,
+        children: [children[0]],
+      },
+    })
+    const route = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect([...(route?.children ?? [])].map(part => part.getAttribute('data-slot') ?? part.getAttribute('data-phone-children') ?? part.textContent)).toEqual(['route-model', ''])
+    expect(route?.textContent).toBe('claude-sonnet-5-5·, 6 working')
+  })
+
+  it('names a subagent by its call, its model on line 2, and goes Back to its parent thread in a 44px seat (round 21 D3)', async () => {
+    setPhone(true)
+    const openThread = vi.fn()
+    const shell = renderShell({
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Compare the ledger export to invoiceTotal for the last 100 invoices.',
+      openThread,
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'claude-sonnet-5-5' },
+        status: 'Working',
+        working: true,
+        children: [],
+        parent: { id: 'session-parent', title: 'Audit money rounding' },
+        title: 'Diff the ledger export against totals',
+      },
+    })
+    // The title is the name its parent gave it, not its prompt.
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Diff the ledger export against totals')
+    // Line 2: `[mark] model · state`, the kit's RouteModel where the project would be, no project mark.
+    const line = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.className).toContain('dshx:text-sm/4')
+    expect(line?.className).toContain('dshx:text-muted-foreground')
+    const model = line?.querySelector('[data-slot="route-model"]')
+    expect(model?.querySelector('[data-model-mark="claude"]')).not.toBeNull()
+    expect(model?.textContent).toBe('claude-sonnet-5-5')
+    expect(line?.querySelector('[data-attention-meta-part="mark"]')).toBeNull()
+    expect(line?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe('Working')
+    // The model leads the line, then one "·", then the state word.
+    expect([...(line?.children ?? [])].map(part => part.getAttribute('data-slot') ?? part.textContent)).toEqual(['route-model', '·, ', 'attention-meta'])
+    // Back opens the parent from the 44px chevron seat, and says where it goes.
+    const back = screen.getByRole('button', { name: 'Back to Audit money rounding' })
+    expect(back.className).toContain('dshx:w-11')
+    expect(back.className).toContain('dshx:h-11')
+    fireEvent.click(back)
+    await waitFor(() => expect(openThread).toHaveBeenCalledWith('session-parent'))
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+    cleanup()
+    // Without a parent to open, Back is the list's as before.
+    renderShell({ collapsed: true, selectedThreadId: 'child-1', stageThreadId: 'child-1', stageTitle: 'Fix', openThread })
+    expect(screen.getByRole('button', { name: 'Back to Threads' })).toBeTruthy()
+  })
+
+  it('names a subagent\'s parent on a tappable 13px strip under the bar, its 44px hit reaching into the bar edge (round 22 item 4)', async () => {
+    setPhone(true)
+    const openThread = vi.fn()
+    const root = document.documentElement
+    const child = {
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Check how credit notes round tax.',
+      openThread,
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'deepseek/deepseek-v4-flash' },
+        status: 'Working',
+        working: true,
+        children: [],
+        parent: { id: 'session-parent', title: 'Audit money rounding' },
+        title: 'Check credit note rounding',
+      },
+    } as const
+    renderShell(child)
+    // The bar keeps the whole title and line 2; the parent gets its own line under them, inside the bar's plate.
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Check credit note rounding')
+    const strip = screen.getByRole('button', { name: 'Subagent of Audit money rounding' })
+    expect(strip.closest('[data-phone-top-bar]')).not.toBeNull()
+    expect(strip.hasAttribute('data-phone-parent-strip')).toBe(true)
+    expect(strip.textContent).toBe('Subagent of Audit money rounding')
+    // 13px secondary ink on a 32px line, a 12px hit extension up into the bar's title block: 44px to tap, never over
+    // the bar's Back or ⋯ (the strip starts at the title's x and stops at the ⋯ seat, the header's padding).
+    expect(strip.className).toContain('dshx:text-xs')
+    expect(strip.className).toContain('dshx:text-muted-foreground')
+    expect(strip.className).toContain('dshx:h-8')
+    expect(strip.className).toContain('dshx:before:-top-3')
+    expect(strip.className).toContain('dshx:ml-11')
+    // The stage starts under the strip: the shell publishes its height on its own and inside the top height, so the
+    // thread's ⋯ (rich-composer) keeps the bar row: top = top height - 44px - strip.
+    expect(root.style.getPropertyValue('--dsh-phone-top-strip')).toBe('32px')
+    expect(root.style.getPropertyValue('--dsh-phone-top-height')).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+    expect(document.querySelector<HTMLElement>('[data-phone-top-bar]')?.style.height).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+    fireEvent.click(strip)
+    await waitFor(() => expect(openThread).toHaveBeenCalledWith('session-parent'))
+    cleanup()
+    // A root thread has no strip: the bar is its one 44px row again.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', openThread })
+    expect(document.querySelector('[data-phone-parent-strip]')).toBeNull()
+    expect(root.style.getPropertyValue('--dsh-phone-top-strip')).toBe('0px')
+    expect(root.style.getPropertyValue('--dsh-phone-top-height')).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+  })
+
+  it('moves Thread panels into the thread\'s ⋯ menu, keeping the bar button only without that menu (council round 17 B2.2)', () => {
+    setPhone(true)
+    const togglePanels = vi.fn()
+    const thread = { collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race', togglePanels } as const
+    renderShell(thread)
+    expect(screen.getByRole('button', { name: 'Thread panels' })).toBeTruthy()
+    cleanup()
+    const tools: PhoneMenuTool[] = []
+    const snapshot: PhoneMenuSnapshot = { readers: [{ id: 'reader-1', sessionId: 'session-1' }], tools: [], launcherReader: 'reader-1', openReader: null, closeReason: 'dismiss' }
+    threadMenu.service = {
+      scope: createContext<string | null>(null),
+      state: { get: () => snapshot, subscribe: () => () => undefined },
+      registerReader: () => () => undefined,
+      registerTool: tool => {
+        tools.push(tool)
+        return () => tools.splice(tools.indexOf(tool), 1)
+      },
+      attachLauncher: () => () => undefined,
+      toggle: () => undefined,
+      returnFocus: () => false,
+      close: () => undefined,
+      pick: tool => tool.open(),
+    }
+    try {
+      renderShell(thread)
+      expect(document.querySelector('[data-phone-panels]')).toBeNull()
+      expect(tools.map(tool => [tool.id, tool.label, tool.readerId])).toEqual([['thread-sidebar.thread-panels', 'Thread panels', 'reader-1']])
+      tools[0]?.open()
+      expect(togglePanels).toHaveBeenCalledTimes(1)
+      cleanup()
+      // A page offers no thread panel.
+      renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', togglePanels })
+      expect(tools).toEqual([])
+    } finally {
+      threadMenu.service = undefined
+    }
+  })
+
+  it('gives every phone bar one seat rule: 44px leading and trailing seats 4px in from the edges, published for pages (council round 17 B2.2)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const root = document.documentElement.style
+    expect(root.getPropertyValue('--dsh-phone-seat-left')).toBe('max(4px, env(safe-area-inset-left, 0px))')
+    expect(root.getPropertyValue('--dsh-phone-seat-right')).toBe('max(4px, env(safe-area-inset-right, 0px))')
+    const header = (): string => document.querySelector('header[data-phone-top-bar]')?.className ?? ''
+    // Threads: the bar pads by the published insets on both sides, the + is a 44px seat.
+    expect(header()).toContain('dshx:pl-[var(--dsh-phone-seat-left,4px)]')
+    expect(header()).toContain('dshx:pr-[var(--dsh-phone-seat-right,4px)]')
+    expect(header()).not.toMatch(/(^| )dshx:pr-1( |$)/u)
+    expect(document.querySelector('[data-phone-new]')?.className).toContain('dshx:size-11')
+    cleanup()
+    // Settings: Back's chevron centres in the leading seat (12px in, a 20px glyph), its label after it.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    const back = screen.getByRole('button', { name: 'Back to More' })
+    expect(back.className).toContain('dshx:pl-3')
+    expect(back.className).toContain('dshx:min-w-11')
+    expect(back.className).toContain('dshx:h-11')
+    cleanup()
+    // A thread keeps the trailing corner for its menu bar, which sits on the same right inset.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
+    expect(header()).toContain('dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+var(--dsh-phone-seat-right,4px))]')
+    cleanup()
+    expect(document.documentElement.style.getPropertyValue('--dsh-phone-seat-left')).toBe('')
+  })
+
+  it('on a phone, titles a thread 17/600 on one 44px line, its status glyph before the title, no subagent line (council round 13 B6)', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Fix invoice tax rounding',
+      stageWorking: true,
+    })
+    const title = document.querySelector('[data-phone-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    // 17px from the bar row it sits in, at 600.
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:text-[17px]')
+    expect(title?.className).toContain('dshx:font-semibold')
+    expect(title?.className).not.toContain('dshx:font-bold')
+    expect(title?.className).not.toMatch(/dshx:text-(xl|lg|title|\[20px\])/u)
+    // The Live work strip counts the subagents; the bar keeps one line, the working glyph leading the title.
+    expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
+    expect(title?.firstElementChild?.getAttribute('data-status')).toBe('working')
+    expect(title?.className).toContain('dshx:flex')
+    expect(title?.querySelector('[data-phone-title-text]')?.className).toContain('dshx:truncate')
+    cleanup()
+    // A quiet thread draws no glyph.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix invoice tax rounding' })
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
+    cleanup()
+    // A page keeps its one centred line, no glyph.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageWorking: true })
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
   })
 })
 

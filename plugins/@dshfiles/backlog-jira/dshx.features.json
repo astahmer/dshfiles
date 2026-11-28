@@ -5,7 +5,8 @@
     {
       "id": "jira-provider",
       "title": "Sync backlog items with a Jira Cloud project",
-      "summary": "Serves the backlog's backlog-provider Host API as the jira kind: a connection (site base URL, account email, API token reference) names the Atlassian account and discovers the projects it can browse; a binding to a project pulls issues changed since an updated checkpoint through POST /rest/api/3/search/jql with nextPageToken paging, reading the minute again in the account's time zone, and maps summary, the ADF description as markdown, the status category, labels, priority names, parent, Blocks/Relates/Duplicate links, the due date and two optional custom fields (acceptance criteria, summary) both ways. Status changes go through workflow transitions planned towards the target category or the binding's status name, refusing an unreachable one with the reachable statuses; comments flow both ways in ADF; deleting a linked item transitions its issue to a Won't Do-like status. Requests of a connection are spaced 100 ms apart and wait for Retry-After on 429 and 503.",
+      "summary": "Sync backlog items with a Jira Cloud project, both ways, through a remote sync connection.",
+      "details": "Serves the backlog's backlog-provider Host API as the jira kind: a connection (site base URL, account email, API token reference) names the Atlassian account and discovers the projects it can browse; a binding to a project pulls issues changed since an updated checkpoint through POST /rest/api/3/search/jql with nextPageToken paging, reading the minute again in the account's time zone, and maps summary, the ADF description as markdown, the status category, labels, priority names, parent, Blocks/Relates/Duplicate links, the due date and two optional custom fields (acceptance criteria, summary) both ways. Status changes go through workflow transitions planned towards the target category or the binding's status name, refusing an unreachable one with the reachable statuses; comments flow both ways in ADF; deleting a linked item transitions its issue to a Won't Do-like status. Requests of a connection are spaced 100 ms apart and wait for Retry-After on 429 and 503.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -190,7 +191,7 @@
           "testName": "records one jira request span per call, with the operation and status only"
         }
       ],
-      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Backlog settings\"", "expect button \"Add Jira connection\""]
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"More backlog actions\"", "click menuitem \"Settings\"", "expect button \"Add Jira connection\""]
     }
   ]
 }

@@ -7,6 +7,23 @@
   gap: 6px;
 }
 
+/* dshfiles (unslop r5 C3, council round 5): on a hover device a prompt's actions row (its clock, copy, ⋯) shows on hover,
+   so where "Worked for" follows the prompt it overlays the space under the bubble instead of holding 34px of the flow
+   open; ChatView.module.css then puts "Worked for" 24px under the bubble. The row stays at the trailing edge, clear of
+   "Worked for" at the start edge. */
+@media (hover: hover) {
+  :global([data-chat-flow-kind='user']):has(+ :global([data-chat-flow-kind='turn-process'])) .userRow {
+    position: relative;
+  }
+
+  :global([data-chat-flow-kind='user']):has(+ :global([data-chat-flow-kind='turn-process'])) .userRow > :global([data-clock]) {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 1;
+  }
+}
+
 .userStack {
   display: flex;
   flex-direction: column;
@@ -26,7 +43,9 @@
      keeps narrow windows sane. */
   max-width: 100%;
   box-sizing: border-box;
-  background: var(--dsw-specific-bubble);
+  /* dshfiles (council round 6, C4): the kit's faint cool prompt tint (hue 230, kept 40°+ from the attention indigo), so
+     a prompt reads as the user's without a second accent; the Host fill stays the fallback without ui-styles. */
+  background: var(--dshx-prompt-fill, var(--dsw-specific-bubble));
   /* dshfiles (visual refresh T2.1): xl is the 12px step of the P0 scale; the fill is the raised tone. */
   border-radius: var(--dsw-radius-xl);
   /* dshfiles (b:d5wg): over a theme's backdrop scene the raised fill can match the scene behind the veil; the theme
@@ -303,7 +322,7 @@
 
 .turnErrorRow {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   padding: 2px 0;
@@ -315,6 +334,15 @@
   margin-top: 5px;
 }
 
+/* dshfiles (unslop C15): the failure card leads with the 16px status glyph instead of the 10px dot. */
+.turnErrorRow:has(> .turnErrorGlyph) {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.turnErrorGlyph {
+  margin-top: 2px;
+}
+
 .turnErrorCopy {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -322,7 +350,7 @@
 
 .turnErrorTitle {
   margin-right: 6px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-label-primary);
   font-weight: 600;
 }
 
@@ -330,9 +358,48 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* dshfiles (unslop T8): the one row of recovery actions, under the sentence. */
+.turnErrorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.turnErrorActions:empty {
+  display: none;
+}
+
+.turnErrorDetails {
+  margin-top: 4px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.turnErrorDetailsSummary {
+  width: fit-content;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.turnErrorDetailsSummary:focus-visible {
+  outline: 1.5px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
 .turnErrorCode {
+  display: block;
+  margin-top: 4px;
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-markdown-code-block-small);
+}
+
+.turnErrorRaw {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-markdown-code-block-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .maxTokensTitle {
@@ -510,4 +577,12 @@
   flex: 1;
   height: 0.5px;
   background: var(--dsw-alias-border-l2);
+}
+
+/* Council round 9 (lane B's phone gutter, B4): the prompt bubble is a fill, so on a phone it ends at the 12px fill edge,
+   out of the transcript's 24px text column (ChatView.module.css). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .userStack {
+    margin-right: -12px;
+  }
 }

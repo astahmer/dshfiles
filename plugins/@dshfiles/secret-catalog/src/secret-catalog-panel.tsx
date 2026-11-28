@@ -349,7 +349,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           heading={t('title')}
           description={t('subtitle')}
           {...(showCatalog ? { count: rows.length } : {})}
-          actions={[
+          // While the list failed, the alert's Retry is the one way back: no second verb for the same action.
+          actions={listFailed ? [] : [
             {
               id: 'refresh',
               label: t('refresh'),
@@ -365,6 +366,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           fill
           bodyClassName="dshx:gap-3"
         >
+          {/* Filters over a list that did not load filter nothing: they wait for the list. */}
+          {listFailed ? null : (
           <section aria-label={t('catalogFilters')} className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Select disabled value={displayedMachineName}>
               <SelectTrigger aria-label={t('machineSelectorHint')} className="dshx:w-56 dshx:@max-pane-narrow:w-full">
@@ -411,12 +414,14 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               ))}
             </ToggleGroup>
           </section>
+          )}
           <div className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-3">
-            {cwd === null && (
-              <Alert role="status" variant="info">
-                <AlertDescription>{t('globalOnlyNotice')}</AlertDescription>
-              </Alert>
+            {cwd === null && !listFailed && (
+              <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
+                {t('globalOnlyNotice')}
+              </p>
             )}
+            {listFailed ? null : (
             <SearchInput
               className="dshx:h-9 dshx:bg-muted/50"
               aria-label={t('filterAliases')}
@@ -427,6 +432,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               placeholder={t('filterPlaceholder')}
               value={search}
             />
+            )}
             {error !== null && (
               <Alert className="dshx:pr-24" variant="destructive">
                 <AlertDescription>{error}</AlertDescription>

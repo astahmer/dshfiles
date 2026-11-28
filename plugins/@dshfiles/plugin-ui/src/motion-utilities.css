@@ -1,0 +1,83 @@
+/*
+ * Motion utilities (DESIGN.md › Motion): two state-change motions plugins share instead of each writing its own.
+ *
+ * - `dshx-reveal` opens a block by its height, with `grid-template-rows` 0fr → 1fr: a dock entry, a notice that joins
+ *   a stack. Its one child is the clipped content. It enters in 120ms when it mounts or loses `data-state="closed"`,
+ *   and leaves in 100ms when it gains it.
+ * - `dshx-pop-in` is an overlay that appears in place: opacity and 4px of travel (down from above; set
+ *   `--dshx-pop-in-travel` on the element to come from below) in 120ms, out in 100ms on `data-state="closed"`. It
+ *   owns the `translate` property: centre it with `inset-x-0 mx-auto w-fit`, not a `translate-*` utility.
+ *
+ * A closed element is also `visibility: hidden`, so its content leaves the tab order once the exit ends. Under reduced
+ * motion both are an opacity change only: nothing travels or resizes.
+ *
+ * Kept in its own file, imported by one line of styles.css, as color-roles.css is.
+ */
+@layer components {
+  .dshx-reveal {
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transition-property: grid-template-rows, opacity, visibility;
+    transition-duration: var(--dshx-duration-fade);
+    transition-timing-function: var(--dshx-motion-ease-enter);
+  }
+
+  .dshx-reveal > * {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .dshx-reveal[data-state='closed'] {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition-duration: var(--dshx-duration-exit);
+    transition-timing-function: var(--dshx-motion-ease-exit);
+  }
+
+  @starting-style {
+    .dshx-reveal {
+      grid-template-rows: 0fr;
+      opacity: 0;
+    }
+  }
+
+  .dshx-pop-in {
+    --dshx-pop-in-travel: -4px;
+    opacity: 1;
+    translate: 0 0;
+    transition-property: opacity, translate, visibility;
+    transition-duration: var(--dshx-duration-fade);
+    transition-timing-function: var(--dshx-motion-ease-enter);
+  }
+
+  .dshx-pop-in[data-state='closed'] {
+    opacity: 0;
+    translate: 0 var(--dshx-pop-in-travel);
+    visibility: hidden;
+    transition-duration: var(--dshx-duration-exit);
+    transition-timing-function: var(--dshx-motion-ease-exit);
+  }
+
+  @starting-style {
+    .dshx-pop-in {
+      opacity: 0;
+      translate: 0 var(--dshx-pop-in-travel);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dshx-reveal,
+    .dshx-reveal[data-state='closed'],
+    .dshx-pop-in,
+    .dshx-pop-in[data-state='closed'] {
+      transition-property: opacity, visibility;
+    }
+
+    .dshx-pop-in,
+    .dshx-pop-in[data-state='closed'] {
+      translate: none;
+    }
+  }
+}

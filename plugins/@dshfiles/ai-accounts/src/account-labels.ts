@@ -12,6 +12,9 @@ export const KIND_LABEL = {
   vibe: 'Vibe CLI',
 } satisfies Record<AccountProfile['kind'], string>
 
+/** Vibe is Mistral's own CLI, so it keeps the Mistral brand orange (white glyphs stay legible on it). */
+const MISTRAL_ACCENT = '#FA520F'
+
 export const KIND_ACCENT = {
   codex: '#10A37F',
   claude: '#D97757',
@@ -19,9 +22,9 @@ export const KIND_ACCENT = {
   commandcode: '#0E7490',
   'github-copilot': '#24292F',
   cursor: '#6B7280',
-  mistral: '#FA520F',
+  mistral: MISTRAL_ACCENT,
   antigravity: '#4285F4',
-  vibe: '#FF7000',
+  vibe: MISTRAL_ACCENT,
 } satisfies Record<AccountProfile['kind'], string>
 
 /** Rail group headings, in the order the groups are listed. */
@@ -38,7 +41,7 @@ export const KIND_GROUPS: readonly AccountProfile['kind'][] = [
 ]
 
 /** Kinds that publish a model route; the rest only track identity and quota. */
-export const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
+const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
 
 export const STATE_LABEL = {
   healthy: 'Authenticated',
@@ -65,7 +68,7 @@ export const DISTRIBUTION_HINT = {
 } satisfies Record<AccountsFile['distribution'], string>
 
 /** What connects a new account, for the notice the rail shows after creating one. */
-export const connectHintFor = (kind: AccountProfile['kind']): string => {
+const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'codex') return 'Sign in with the copied command (Session section) and the identity fills itself in.'
   if (kind === 'claude') return 'Sign in with the copied command (Session section); quota and identity fill themselves in.'
   if (kind === 'cursor') return 'Run cursor-agent login; this account tracks quota while sessions use the Cursor Agent runtime.'
@@ -77,4 +80,24 @@ export const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'vibe')
     return 'Run `vibe --setup` (Launch browser) on the Host; this route drives that signed-in CLI, so its steps draw the Vibe & Studio allowance.'
   return 'Set OPENCODE_API_KEY (or a shared key on the ai-accounts entry) and the route serves.'
+}
+
+/**
+ * A provider's plan as a plain name. Providers report either a name written for people ("Pro+", "ChatGPT Team"),
+ * kept as it is, or an id ("individual-pro", "pro_200"), which reads as words here: "Individual Pro", "Pro 200".
+ */
+const planLabel = (plan: string): string => {
+  const trimmed = plan.trim()
+  if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u.test(trimmed)) return trimmed
+  return trimmed
+    .split(/[-_]/u)
+    .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
+}
+
+/** The account kind and plan names the accounts page shows, and whether a kind routes models. */
+export class AccountLabels {
+  static readonly routedKind = routedKind
+  static readonly connectHintFor = connectHintFor
+  static readonly planLabel = planLabel
 }

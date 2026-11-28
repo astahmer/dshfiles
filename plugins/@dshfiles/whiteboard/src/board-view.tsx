@@ -63,7 +63,7 @@ function BoardEditor(props: {
     const left = actor.on('left', () => onBack())
     // The back button reports a save it cannot finish here instead of silently staying on the board.
     const blocked = actor.on('leaveBlocked', () =>
-      setLeaveNotice('This board has unsaved changes the Host has not accepted yet. Use the controls below, then press Boards again.'),
+      setLeaveNotice('This board has changes DSH has not saved yet. Use the controls below, then press Boards again.'),
     )
     return () => {
       saved.unsubscribe()
@@ -201,7 +201,7 @@ function BoardEditor(props: {
         <Alert variant="warning" className="dshx:rounded-none dshx:border-x-0 dshx:border-t-0">
           <AlertTitle>The queued diagram could not be drawn</AlertTitle>
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            {snapshot.context.conversionError} Ask the agent to fix the source with whiteboard_write, or discard it.
+            {snapshot.context.conversionError} Ask the agent to fix the diagram's source, or discard it.
             <Button size="sm" variant="outline" onClick={() => send({ type: 'DISCARD_PENDING' })}>
               Discard queued diagram
             </Button>
@@ -242,7 +242,7 @@ export function BoardView(props: { readonly api: WhiteboardClient; readonly boar
         <Alert variant="destructive">
           <AlertTitle>{board.isError ? 'This whiteboard could not be opened' : 'The whiteboard editor could not be loaded'}</AlertTitle>
           <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            {errorMessage(failure, 'The Host did not answer.')}
+            {errorMessage(failure, 'DSH did not answer.')}
             <Button
               variant="outline"
               size="sm"

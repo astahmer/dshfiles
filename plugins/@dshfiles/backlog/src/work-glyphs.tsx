@@ -30,7 +30,7 @@ const PriorityIcon = (props: { readonly priority: BacklogPriority; readonly clas
   const lit = { none: 0, urgent: 0, high: 3, medium: 2, low: 1 }[props.priority]
   if (props.priority === 'urgent')
     return (
-      <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-warning', props.className)}>
+      <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-foreground', props.className)}>
         <rect x="1" y="1" width="12" height="12" rx="3" fill="currentColor" />
         <path d="M7 3.8v4" style={{ stroke: 'var(--dsw-alias-bg-base)' }} strokeWidth="1.6" strokeLinecap="round" />
         <circle cx="7" cy="10.2" r="0.9" style={{ fill: 'var(--dsw-alias-bg-base)' }} />
@@ -177,7 +177,7 @@ const BlockedBadge = (props: { readonly blockedBy: readonly string[] }): JSX.Ele
 const runStateLabels = {
   working: 'Working',
   'awaiting-input': 'Awaiting input',
-  error: 'Error',
+  error: 'Failed',
   done: 'Done',
   stale: 'Stale',
 } satisfies Record<AgentRunState, string>
@@ -197,7 +197,7 @@ const RunStateChip = (props: { readonly run: { readonly state: AgentRunState } |
   return (
     <WithTooltip tip={`Agent: ${runStateLabels[props.run.state]}`}>
       <span aria-label={`Agent ${runStateLabels[props.run.state].toLowerCase()}`} className={cn(chip, runStateTone[props.run.state])}>
-        <Icon aria-hidden className={cn('dshx:size-3', props.run.state === 'working' && 'dshx:animate-spin')} />
+        <Icon aria-hidden className={cn('dshx:size-3', props.run.state === 'working' && 'dshx:animate-spin dshx:motion-reduce:animate-none')} />
         {props.compact === true ? null : runStateLabels[props.run.state]}
       </span>
     </WithTooltip>

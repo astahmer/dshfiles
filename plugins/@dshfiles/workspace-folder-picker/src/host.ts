@@ -13,6 +13,7 @@ import { ProjectIdentities } from './project-identities.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { registeredProjects } from './registered-projects.js'
+import { workspaceFolderPickerSettings } from './settings.js'
 
 const inspectionLayer = FolderInspector.layer
 
@@ -45,6 +46,8 @@ const pickerCapabilities = Effect.fn('directory picker read capability')(functio
 export default DshxPlugin.make({
   name: 'dshfiles-workspace-folder-picker',
   inject: ['subprocess', 'workspaceController', 'workspaceRegistry'],
+  // Project names and colours (upstream #287) are only writable once the Host registers their namespace.
+  settings: [workspaceFolderPickerSettings],
   layer: Layer.mergeAll(projectLayer, DirectoryBrowser.layer, ProjectRemover.layer),
   apis: [
     Api.bind(workspaceFolderBrowserApi, {

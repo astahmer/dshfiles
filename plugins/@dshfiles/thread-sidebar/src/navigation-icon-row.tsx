@@ -3,7 +3,8 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { EllipsisVerticalIcon, SettingsIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
+import { SettingsIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { SidebarOrganization, type NavigationOverflow } from './organization.js'
@@ -228,7 +229,7 @@ export const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element =>
               aria-label={props.labels.more}
               title={props.labels.more}
             >
-              <EllipsisVerticalIcon className="dshx:size-4" aria-hidden="true" />
+              <OverflowGlyph />
             </Button>
           </PopoverTrigger>
           <PopoverContent align={vertical ? 'start' : 'end'} side={vertical ? 'right' : 'bottom'} sideOffset={6} className="dshx-root dshx:w-60 dshx:p-0">

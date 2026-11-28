@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { animate, everyFrame, motionSafe, presets, springs } from '../../motion/index.js'
 import { useEnter } from '../../motion/react.js'
+import { formatElapsed } from '../../lib/format-duration.js'
 import { cn } from '../../lib/utils.js'
 import type { LucideIcon } from '../../icons.js'
 import {
@@ -73,13 +74,6 @@ const stepIcons = {
 
 const statusLabel = { working: 'Working', done: 'Done', failed: 'Failed', stopped: 'Stopped' } as const satisfies Record<AgentRunStatus, string>
 
-const clock = (ms: number) => {
-  const seconds = Math.max(0, Math.floor(ms / 1000))
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-const seconds = (ms: number) => `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`
-
 /**
  * One agent run as a live step list: title, model, a ticking clock and status, then each tool step with a shimmering
  * label while it runs, its duration and a popped check when it lands, and an expandable output. Subagent cards,
@@ -91,12 +85,12 @@ export function AgentRunSteps({ heading, model, status, startedAt, endedAt, step
     const element = clockRef.current
     if (element == null) return
     if (status !== 'working' || endedAt !== undefined) {
-      element.textContent = clock((endedAt ?? Date.now()) - startedAt)
+      element.textContent = formatElapsed((endedAt ?? Date.now()) - startedAt)
       return
     }
     let last = ''
     return everyFrame(() => {
-      const text = clock(Date.now() - startedAt)
+      const text = formatElapsed(Date.now() - startedAt)
       if (text !== last) element.textContent = last = text
     })
   }, [status, startedAt, endedAt])
@@ -127,7 +121,7 @@ export function AgentRunSteps({ heading, model, status, startedAt, endedAt, step
             </>
           )}
           <RunStatus status={status} />
-          <span ref={clockRef} aria-label="Elapsed" className="dshx:w-10 dshx:text-right dshx:tabular-nums" />
+          <span ref={clockRef} aria-label="Elapsed" className="dshx:min-w-10 dshx:text-right dshx:tabular-nums" />
         </div>
       </header>
       <PresenceList
@@ -186,7 +180,7 @@ function StepRow({ step }: { readonly step: AgentRunStep }) {
             <span className={cn(step.status === 'failed' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')}>{text}</span>
           )}
         </span>
-        {step.durationMs !== undefined && !running ? <StepDuration ms={step.durationMs} /> : null}
+        {step.durationMs !== undefined && step.durationMs >= 1000 && !running ? <StepDuration ms={step.durationMs} /> : null}
         {running && step.startedAt !== undefined ? <StepElapsed startedAt={step.startedAt} /> : null}
         {step.status === 'done' ? <PopIcon tone="success" /> : null}
         {step.status === 'failed' ? <PopIcon tone="destructive" /> : null}
@@ -223,9 +217,9 @@ function StepElapsed({ startedAt }: { readonly startedAt: number }) {
   React.useLayoutEffect(() => {
     const element = ref.current
     if (element == null) return
-    element.textContent = clock(Date.now() - startedAt)
+    element.textContent = formatElapsed(Date.now() - startedAt)
     return everyFrame(() => {
-      const text = clock(Date.now() - startedAt)
+      const text = formatElapsed(Date.now() - startedAt)
       if (element.textContent !== text) element.textContent = text
     })
   }, [startedAt])
@@ -237,7 +231,7 @@ function StepDuration({ ms }: { readonly ms: number }) {
   useEnter(ref, 'slideInRight', { duration: 0.25 })
   return (
     <span ref={ref} className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">
-      {seconds(ms)}
+      {formatElapsed(ms)}
     </span>
   )
 }

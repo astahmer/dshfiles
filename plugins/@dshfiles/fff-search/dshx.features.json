@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "resident-grep-glob",
-      "title": "Answer agent grep and glob from a resident fff index",
-      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.",
+      "title": "Faster grep and glob for agents",
+      "summary": "The agent's grep and glob tools answer from a file index kept in memory.",
+      "details": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.",
       "surfaces": ["host", "tool"],
       "surface": "agentToolOnly",
       "destination": "none",

@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -11,10 +12,13 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { workbenchPanels, type WorkbenchPanelProps } from '@dshfiles/workbench/registry'
 import { useCallback, useMemo, useState, useSyncExternalStore, type JSX } from 'react'
 import { whiteboardApi } from './api.js'
-import { BoardView } from './board-view.js'
-import { BoardsPanel } from './boards-panel.js'
 import { projectPreferences } from './project-preferences.js'
 import type { ProjectChoice, WhiteboardClient } from './ui-model.js'
+
+/** The boards list and a board load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const BoardView = lazyView(() => views().then(module => module.LazyViews.BoardView), { label: 'Board' })
+const BoardsPanel = lazyView(() => views().then(module => module.LazyViews.BoardsPanel), { label: 'Boards' })
 
 const PANEL_ID = 'dshfiles-whiteboard'
 

@@ -3,7 +3,8 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from '../locales.js'
-import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState } from './subagent-feed.js'
+import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState, type SubagentTerminal } from './subagent-feed.js'
+import { ToolSteps } from '../tool-steps.js'
 import { failureMessage, useSubagentStop } from './subagent-stop.js'
 
 export type SubagentPreviewTranslate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
@@ -24,8 +25,8 @@ const STATE_KEY = {
   'failed-to-start': 'subagentPreviewFailedToStart',
   working: 'subagentPreviewWorking',
   finished: 'subagentPreviewFinished',
+  failed: 'subagentPreviewFailed',
   interrupted: 'subagentPreviewInterrupted',
-  idle: 'subagentPreviewIdle',
 } as const satisfies Record<SubagentPreviewState, string>
 
 export const subagentStateLabel = (t: SubagentPreviewTranslate, state: SubagentPreviewState): string => t(STATE_KEY[state])
@@ -96,17 +97,17 @@ const StopChild = (props: { readonly binding: SessionBinding; readonly t: Subage
 const FeedLine = (props: {
   readonly store: SubagentFeedStore
   readonly t: SubagentPreviewTranslate
-  readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
+  readonly onTurnState: (lastTurnEnd: SubagentTerminal | undefined) => void
 }): JSX.Element => {
   const feed: SubagentFeed = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot)
   const { onTurnState } = props
-  useEffect(() => onTurnState(feed.lastTurnCompleted), [feed.lastTurnCompleted, onTurnState])
+  useEffect(() => onTurnState(feed.lastTurnEnd), [feed.lastTurnEnd, onTurnState])
   return (
     <>
       <p className="dshx:text-muted-foreground" data-dshfiles-live-preview-progress="">
         {feed.tool === undefined
           ? props.t('subagentPreviewToolCalls', { count: String(feed.toolCalls) })
-          : props.t('subagentPreviewInTool', { tool: feed.tool, count: String(feed.toolCalls) })}
+          : props.t('subagentPreviewInTool', { tool: ToolSteps.ofName(feed.tool).words, count: String(feed.toolCalls) })}
       </p>
       {feed.text === '' ? null : (
         <pre
@@ -124,10 +125,12 @@ const FeedLine = (props: {
 export const SubagentLivePreview = (
   props: SubagentPreviewBindings & {
     readonly childId: string
-    readonly state: SubagentPreviewState
-    readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
-    /** Off when the surface around the preview already renders Stop and Open thread (the run card does). */
+    readonly state: SubagentPreviewState | undefined
+    readonly onTurnState: (lastTurnEnd: SubagentTerminal | undefined) => void
+    /** Off when the surface around the preview already renders Stop and Open thread. */
     readonly showActions?: boolean
+    /** Off when the row around the preview already has Open thread (the dock row does). */
+    readonly showOpenThread?: boolean
   },
 ): JSX.Element => {
   const { t, childId, state } = props
@@ -140,11 +143,14 @@ export const SubagentLivePreview = (
       {feed.kind === 'ready' ? <FeedLine store={feed.store} t={t} onTurnState={props.onTurnState} /> : null}
       {showActions ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
-            {t('subagentPreviewOpenThread')}
-          </Button>
+          {props.showOpenThread === false ? null : (
+            <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
+              {t('subagentPreviewOpenThread')}
+            </Button>
+          )}
+          {/* A phone has no side panel to open beside (its thread panel is a sheet over the thread). */}
           {props.canOpenAside(childId) ? (
-            <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => props.openChildAside(childId)}>
+            <Button size="xs" variant="ghost" className="dshx:shrink dshx:phone:hidden" data-subagent-open-aside="" onClick={() => props.openChildAside(childId)}>
               {t('subagentPreviewOpenAside')}
             </Button>
           ) : null}

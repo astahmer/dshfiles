@@ -19,7 +19,7 @@ export interface PaletteInput {
   readonly hue: number
   /** Chroma of dark-scheme fills and borders; text gets 5/7 of it and light mode half of both (D1). */
   readonly chroma: number
-  /** Hue of the accent (focus, selection, Needs you). */
+  /** Hue of the accent (Needs you, the focus ring, links). */
   readonly accentHue: number
   /** 1 is the standard spread; above 1 pushes borders and text away from the background (high contrast). */
   readonly contrast: number
@@ -46,17 +46,133 @@ export interface Palette {
   readonly warning: Trio
   readonly danger: Trio
   readonly info: Trio
+  /**
+   * The selection fill (round five K2): the selected list row, the settings category, a pressed toggle, the palette's
+   * highlighted row, a chosen card. Neutral since council round 3 (A1): a warm grey step with no accent hue, so indigo
+   * fills mean attention only and the attention washes outrank it by colour. Text on it stays ink; a list row adds the
+   * `selected-marker` bar (ink since council round 6 A1) and a card the `selected-card` edge and check.
+   */
+  readonly selectedWash: Oklch
+  /**
+   * The selected edge (council round 12 A1): a neutral 1px inset edge on top of the wash, for a selected row that leads
+   * with a glyph, tile or mark and so draws no `selected-marker` pill (`dshx:selected-edge`). 3:1 against the wash on the
+   * page, the nav column and a dialog (dark dialogs lift the wash to L 0.30). Council round 14 A2: its own value, darker
+   * than the field edge so a selected row never reads as a resting text field: light oklch(0.50 0.01 65), dark
+   * oklch(0.68 0.01 65).
+   */
+  readonly selectedEdge: Oklch
+  /**
+   * Attention at the tint rung (round five A2): the persistent wash of a Needs-you row (accent hue) and of a Failed row
+   * (danger hue). Opaque and stronger than `selectedWash`, so what waits on you outranks what you selected.
+   */
+  readonly needsYouWash: Oklch
+  /**
+   * The Needs-you wash for a full-width band (council round 3 A2): an Inbox card's head band spans the list, so in dark
+   * it drops to chroma 0.035 where a row keeps 0.045. Light is already at the gamut edge and the band equals the row wash.
+   */
+  readonly needsYouBandWash: Oklch
+  readonly failedWash: Oklch
+  /**
+   * A field's boundary (council round 6 A2, WCAG 1.4.11): the edge of an input, select, textarea, checkbox or radio,
+   * 3:1 against bg, panel, raised, the dark nav column and the dark dialog fill, with the primary's warmth. Council
+   * round 18 A1: the lightest edge that still holds that 3:1 (`fitFieldBorder`), light #898480 (oklch 0.6175), dark
+   * #75706C (oklch 0.5475); raised (light) and the dialog fill (dark) are the surfaces that stop it. Dividers and card
+   * hairlines keep the subtle border steps (4 and 5).
+   */
+  readonly fieldBorder: Oklch
+  /**
+   * A quiet trigger's fill (council round 10 A1): a select, combobox or value-picker trigger (`Button variant="field"`)
+   * is a filled chip with no edge at rest, so a filter row stops reading as wireframe; the 3:1 `fieldBorder` edge shows
+   * on hover and while open. Text-entry fields keep the edge at rest. The ink at 5% (5.2% dark), so it paints the
+   * council's oklch(0.955 0.004 65) light and oklch(0.235 0.006 65) dark on the page and stays one step off every other
+   * surface it sits on (the light nav column at 0.962 would swallow an opaque 0.955; a dark dialog at 0.27 would sink it).
+   */
+  readonly triggerFill: Oklch
+  /**
+   * The selected segment (council round 10 A3), one rule for the kit's segmented Tabs, the page's sliding tab indicator
+   * and `SlidingSegments`: paper on the raised track in light (#FEFCFA on #EBE9E7), a raised #302C28 on the #23201D track
+   * in dark, inset 3px at a 6px radius under a 550 ink label.
+   */
+  readonly segmentThumb: Oklch
+  /**
+   * The selected segment's quiet 1px edge: the ink at 10% in light; in dark an opaque #4D4843 (council round 28, item
+   * 14), so the thumb reads on its darker track.
+   */
+  readonly segmentEdge: Oklch
+  /**
+   * A segmented control's track on the page and a card: the raised step in both schemes (#EBE9E7 light, #23201D dark;
+   * council round 34 B3). Round 28's #1A1715 sat on the dark page at 1.05:1 and under a card at 1.01:1.
+   */
+  readonly segmentTrack: Oklch
+  /**
+   * The track inside a popover (council round 28, item 14): the popover's dark fill is the raised step, so there the track
+   * drops below it to #1A1715 and the #302C28 thumb stands off it; light keeps the raised step. `PopoverContent` points
+   * `--dshx-segment-track` at it.
+   */
+  readonly segmentTrackFloating: Oklch
+  /**
+   * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
+   * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
+   * AA on it. Fixed hue: a prompt is neither the accent nor a status.
+   */
+  readonly promptFill: Oklch
+  /**
+   * The navigation column (council round 6 A4): the thread list, the Settings categories, a master list, the Host
+   * sidebar. Light keeps the panel step; dark lifts it from the panel's 0.21 to oklch(0.225 0.006 60), so column and
+   * page separate without relying on a hairline. Every text role holds AA on it (tests/surface-roles).
+   */
+  readonly navSurface: Oklch
+  /**
+   * The Ready dot (council round 6 A6): in light a lighter green than the status text (L 0.55, chroma 0.13) so the dot is
+   * not the heaviest mark in a list; 3:1 on bg, panel, raised, nav and the selection wash. Dark keeps the success tone.
+   */
+  readonly readyMark: Oklch
+  /**
+   * The primary button's fill: in light a soft warm near-black (council round 4 A2: oklch 0.30 0.01 on the grey hue, a
+   * step off the 0.22 ink so it is not a black slab); in dark a softened warm light grey (council round 3 A3: oklch 0.88
+   * 0.006), so the one primary stops being the brightest thing on the screen. Its label is the page colour, AA at rest
+   * and on hover.
+   */
+  readonly primaryFill: Oklch
+  /** The primary's hover: darker in light (L 0.24), 86% of the fill toward the page in dark. */
+  readonly primaryHover: Oklch
 }
 
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
 
-/** Lightness per step at contrast 1. Steps 0–3 are fills, 4–6 borders, 7–8 strong, 9–10 text. */
+/**
+ * Lightness per step at contrast 1. Steps 0–3 are fills, 4–6 borders, 7–8 strong, 9–10 text. Round five (K1) widened
+ * the surface steps, mostly in dark, so panel and raised read apart from the page, and softened the dark ink. Faint text
+ * (step 8) reads at AA on bg, panel, raised and every row wash in both schemes (round five A3).
+ */
 const LIGHTNESS = {
-  dark: [0.165, 0.19, 0.225, 0.25, 0.27, 0.31, 0.37, 0.45, 0.6, 0.72, 0.955],
-  light: [0.992, 0.972, 0.945, 0.925, 0.905, 0.87, 0.8, 0.7, 0.6, 0.5, 0.22],
+  dark: [0.185, 0.21, 0.245, 0.27, 0.295, 0.335, 0.37, 0.45, 0.66, 0.72, 0.93],
+  light: [0.992, 0.962, 0.935, 0.915, 0.895, 0.87, 0.8, 0.7, 0.52, 0.5, 0.22],
 } as const satisfies Record<Scheme, readonly number[]>
 
 const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const
+
+/**
+ * The quiet trigger's ink share (council round 10 A1): over the page it paints L 0.959 light, 0.233 dark (the council's
+ * 0.955 / 0.235 within one 8-bit step), and secondary text holds AA on it over every surface up to the selection wash.
+ */
+const TRIGGER_FILL_ALPHA = { light: 0.05, dark: 0.052 } as const
+
+/**
+ * Where the selected edge starts before it is fitted to 3:1 on the wash (council round 12 A1). Council round 14 A2: its
+ * own value, a clear step past the field edge (light 0.61, dark 0.55), so a selected row never matches a resting field.
+ */
+const SELECTED_EDGE_L = { light: 0.5, dark: 0.68 } as const
+
+/**
+ * Where the field edge starts before it is fitted back to 3:1 (council round 18 A1): the council's lighter resting edge
+ * (light 0.665, dark 0.50). `fitFieldBorder` steps it toward contrast until it holds 3:1 on every surface a field sits on,
+ * so the edge is as light as WCAG 1.4.11 allows and follows the contrast setting.
+ */
+const FIELD_BORDER_L = { light: 0.665, dark: 0.5 } as const
+
+/** The dark dialog fill (surfaces.css `--dshx-dialog-fill`); light dialogs take the page. */
+const DARK_DIALOG_FILL: Oklch = { l: 0.27, c: 0.006, h: 60 }
 
 /** Default warm-stone input (D1). */
 export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 } as const
@@ -92,8 +208,24 @@ function palette(input: PaletteInput): Palette {
     return { l: round(spread, 4), c: round(step >= 7 ? tint.text : tint.fill, 4), h: hue }
   })
   const dark = scheme === 'dark'
-  // SAFETY: `neutral` maps LIGHTNESS, whose ramps have all eleven steps, so steps 0 and 2 exist.
-  const [bg, , raised] = neutral as [Oklch, Oklch, Oklch]
+  // SAFETY: `neutral` maps LIGHTNESS, whose ramps have all eleven steps, so steps 0, 1 and 2 exist.
+  const [bg, panel, raised] = neutral as [Oklch, Oklch, Oklch]
+  // The light primary's warmth: 0.01 for warm stone (grey chroma 0.007), none for a neutral preset.
+  const primaryChroma = round(chroma / 0.7, 4)
+  const selectedWash: Oklch = dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 }
+  const navSurface: Oklch = dark ? { l: 0.225, c: 0.006, h: 60 } : panel
+  const triggerFill = withAlpha(neutral[10] ?? { l: dark ? 0.93 : 0.22, c: 0, h: hue }, TRIGGER_FILL_ALPHA[scheme])
+  // The field edge also bounds a quiet trigger on hover and while open, so it holds 3:1 on that chip's own fill too.
+  const chips = [bg, panel, navSurface].map(under => paintOver(under, triggerFill))
+  const fieldBorder = fitFieldBorder(
+    { l: round(clamp(base + (FIELD_BORDER_L[scheme] - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
+    [bg, panel, raised, navSurface, ...(dark ? [DARK_DIALOG_FILL] : []), ...chips],
+    dark,
+  )
+  // A selected row never matches a resting field (council round 14 A2): the selected edge starts at least 0.08 L past it
+  // (0.085, so the 0.08 holds after rounding).
+  const selectedStart = round(clamp(base + (SELECTED_EDGE_L[scheme] - base) * contrast, 0, 1), 4)
+  const selectedL = dark ? Math.max(selectedStart, round(fieldBorder.l + 0.085, 4)) : Math.min(selectedStart, round(fieldBorder.l - 0.085, 4))
   const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, raised, dark)
   const status = (h: number): Oklch => (dark ? { l: 0.75, c: 0.14, h } : { l: 0.5, c: 0.15, h })
   return {
@@ -105,6 +237,26 @@ function palette(input: PaletteInput): Palette {
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
+    // Neutral (council round 3 A1): the fill carries no hue; the row marker is ink (council round 6 A1).
+    selectedWash,
+    selectedEdge: fitSelectedEdge({ l: selectedL, c: 0.01, h: hue }, selectedWash, dark),
+    // Light washes sit on the sRGB edge (council round 5 A8): at L 0.94 a 0.035 blue clipped to 0.029, so each light
+    // wash takes the lowest L where faint text still holds AA and the most chroma that L renders unclipped.
+    needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
+    needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
+    // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
+    failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.94, c: 0.031, h: STATUS_HUES.danger },
+    readyMark: dark ? status(STATUS_HUES.success) : { l: 0.55, c: 0.13, h: STATUS_HUES.success },
+    navSurface,
+    promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
+    fieldBorder,
+    triggerFill,
+    segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
+    segmentEdge: dark ? { l: 0.4049, c: round((chroma * 23) / 15, 4), h: hue + 2.5 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
+    segmentTrack: raised,
+    segmentTrackFloating: dark ? { l: 0.2074, c: round((chroma * 13) / 15, 4), h: hue - 9 } : raised,
+    primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
+    primaryHover: dark ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue } : { l: 0.24, c: primaryChroma, h: hue },
   }
 }
 
@@ -116,6 +268,47 @@ function palette(input: PaletteInput): Palette {
 function fitAccent(accent: Oklch, raised: Oklch, dark: boolean): Oklch {
   let fitted = accent
   for (let i = 0; i < 40 && contrastRatio(fitted, raised) < 4.6; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
+  return fitted
+}
+
+/**
+ * Moves the selected edge away from the wash until it holds 3:1 on it wherever it is painted: the page and the nav column
+ * share the opaque wash; a dark dialog lifts it to L 0.30 (surfaces.css). The warm-stone default already passes.
+ */
+function fitSelectedEdge(edge: Oklch, wash: Oklch, dark: boolean): Oklch {
+  const under = dark ? [wash, { ...wash, l: Math.max(wash.l, 0.3) }] : [wash]
+  let fitted = edge
+  for (let i = 0; i < 40 && Math.min(...under.map(back => contrastRatio(fitted, back))) < 3.05; i += 1)
+    fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
+  return fitted
+}
+
+/** `over` at its alpha on an opaque `under`, mixed in 8-bit gamma sRGB as a browser paints it. */
+function paintOver(under: Oklch, over: Oklch): Oklch {
+  const alpha = over.alpha ?? 1
+  const channels = (color: Oklch): readonly number[] => [1, 3, 5].map(at => Number.parseInt(toHex(color).slice(at, at + 2), 16))
+  const [u, o] = [channels(under), channels(over)]
+  return hexToOklch(
+    `#${u
+      .map((value, i) =>
+        Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`,
+  )
+}
+
+/**
+ * Moves the field edge toward contrast until it holds 3:1 on every surface a field sits on (council round 18 A1), measured
+ * on the 8-bit colours a screen paints as well as on the exact ones, so the rendered edge never rounds under 3:1.
+ */
+function fitFieldBorder(edge: Oklch, surfaces: readonly Oklch[], dark: boolean): Oklch {
+  const painted = (color: Oklch): Oklch => hexToOklch(toHex(color))
+  const weakest = (color: Oklch): number =>
+    Math.min(...surfaces.flatMap(surface => [contrastRatio(color, surface), contrastRatio(painted(color), painted(surface))]))
+  let fitted = edge
+  for (let i = 0; i < 200 && weakest(fitted) < 3; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.0025 : -0.0025), 4) }
   return fitted
 }
 
@@ -167,6 +360,11 @@ function hexToOklch(hex: string): Oklch {
   const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
   const h = (Math.atan2(B, A) * 180) / Math.PI
   return { l: L, c: Math.hypot(A, B), h: h < 0 ? h + 360 : h }
+}
+
+/** Whether a colour is inside sRGB, so `toHex` paints it without clipping a channel (and shifting its hue). */
+function inGamut(color: Oklch): boolean {
+  return toLinearSrgb(color).every(x => x >= -1e-4 && x <= 1 + 1e-4)
 }
 
 /** WCAG 2 relative luminance of an opaque colour after gamut clipping. */
@@ -256,6 +454,7 @@ export class PaletteMath {
   static readonly hexToOklch = hexToOklch
   static readonly luminance = luminance
   static readonly contrastRatio = contrastRatio
+  static readonly inGamut = inGamut
   static readonly toCss = toCss
   static readonly standaloneColours = standaloneColours
 }

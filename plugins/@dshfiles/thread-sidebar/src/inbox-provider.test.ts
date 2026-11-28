@@ -29,6 +29,15 @@ describe('thread-sidebar inbox provider', () => {
     expect(drafts.every(draft => draft.subject.kind === 'session' && draft.verbs.includes('Open'))).toBe(true)
   })
 
+  it('keeps a turn that was stopped or ran no step out of Ready: nothing in it is yours to collect', () => {
+    const drafts = FinishedTurnAttention.draftsOf([finished('session-a', 10, 'aborted'), finished('session-b', 11, 'blocked'), finished('session-c', 12, 'max-tokens')])
+    expect(drafts.map(draft => [draft.dedupeKey, draft.severity])).toEqual([
+      ['session-a:turn:10', 'info'],
+      ['session-b:turn:11', 'info'],
+      ['session-c:turn:12', 'failed'],
+    ])
+  })
+
   it('leads the headline with the thread title, and keeps the plain sentence without one', () => {
     const titles = new Map([
       ['session-a', 'Fix auth callback'],

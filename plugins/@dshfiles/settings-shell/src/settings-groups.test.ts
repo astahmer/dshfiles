@@ -1,3 +1,7 @@
+// @vitest-environment node
+// Pure placement logic, and the guard at the end reads the plugins' sources from disk.
+import { readdirSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -78,7 +82,7 @@ describe('settings groups', () => {
 
   it('titles pages for people, never with a package or row id', () => {
     for (const label of labels) expect(label).not.toMatch(/^[a-z0-9@][a-z0-9@/._-]*$/u)
-    expect(labels).toEqual(expect.arrayContaining(['Agent loop', 'Shell sandbox', 'Subagent models', 'Plugin updates', 'Web server']))
+    expect(labels).toEqual(expect.arrayContaining(['Agent loop', 'Shell sandbox', 'Subagent models', 'Plugin updates', 'Web search and fetch']))
   })
 
   it('shows AI accounts once: the section, its plugin settings and a link to the accounts page', () => {
@@ -92,13 +96,19 @@ describe('settings groups', () => {
     expect(accounts[0]?.pages.map(current => current.ns)).toEqual(['ai-accounts'])
   })
 
-  it('puts the frame layout status bar section in General', () => {
+  it('puts the frame layout status bar section in General › Layout', () => {
     const withStatusBar = SettingsGroups.group({
       sections: [...sections, { id: 'dshfiles-status-bar', order: 45, label: 'Status bar' }],
       pages,
       panels,
     }).flatMap(group => group.entries.map(entry => ({ ...entry, groupId: group.group.id })))
-    expect(withStatusBar.find(entry => entry.sectionId === 'dshfiles-status-bar')).toMatchObject({ groupId: 'general', label: 'Status bar' })
+    // One block of General › Layout, under its own name.
+    expect(withStatusBar.find(entry => entry.sectionId === 'dshfiles-status-bar')).toMatchObject({
+      groupId: 'general',
+      id: 'layout',
+      label: 'Layout',
+      sectionLabel: 'Status bar',
+    })
   })
 
   it('puts the dshmarket section in Plugins, next to the built-in plugins it extends', () => {
@@ -219,5 +229,210 @@ describe('settings groups', () => {
     expect(labelled.find(entry => entry.id === 'plugin:agent-loop')).toMatchObject({ origin: 'dsh', bundleName: undefined })
     expect(labelled.find(entry => entry.id === 'plugin:tool-community-thing')).toMatchObject({ origin: 'plugin', bundleName: 'community-thing' })
     expect(labelled.find(entry => entry.id === 'plugin:tool-unlabelled')?.origin).toBe('dsh')
+  })
+})
+
+// Every section and settings namespace of the default web profile, read from a scratch DSH on 2026-11-16.
+const PROFILE_SECTIONS = [
+  ['general', 'General'],
+  ['thread-sidebar', 'Thread list'],
+  ['dshfiles-status-bar', 'Status bar'],
+  ['ai-accounts', 'AI accounts'],
+  ['models', 'Models'],
+  ['agent-presets', 'Agent presets'],
+  ['dshfiles-mcp-endpoint', 'MCP endpoint'],
+  ['dshfiles-network-access', 'Network access'],
+  ['thread-notifications', 'Thread notifications'],
+  ['plugins', 'Built-in plugins'],
+  ['dshfiles-update-dsh', 'Update DSH'],
+  ['dshfiles-workspace-folder-picker-projects', 'Projects'],
+] as const
+const PROFILE_NAMESPACES = [
+  'dshfiles-ui-styles',
+  'dshfiles-shortcuts',
+  'thread-sidebar',
+  'dshfiles-main-tabs',
+  'dshfiles-workbench',
+  'dshfiles-command-palette',
+  'dshfiles-rich-composer',
+  'queue-reorder',
+  'dshfiles-turn-summary',
+  'dshfiles-tool-meta',
+  'dshfiles-annotations',
+  'dshfiles-editor',
+  'dshfiles-settings-shell',
+  'ai-accounts',
+  'dshfiles-model-effort-picker',
+  'llm-deepseek-account',
+  'ui-settings-account',
+  'subagent',
+  'subagent-model-selection-settings',
+  'dshfiles-memory',
+  'dshfiles-web-search-brave',
+  'web-search-deepseek',
+  'web-deepseek-api',
+  'dshfiles-backlog',
+  'jj-integration',
+  'dshfiles-git-worktrees',
+  'dshfiles-jujutsu',
+  'dshfiles-test-runs',
+  'dshfiles-preview',
+  'web',
+  'secret-catalog',
+  'dshfiles-policies',
+  'bash-sandbox',
+  'session-log-deepseek',
+  'dshfiles-agent-telemetry',
+  'dshfiles-traces',
+  'dshfiles-agent-plan',
+  'dshfiles-background-jobs',
+  'mcp-manager',
+  'dshfiles-onboarding',
+  'dshfiles-project-automations',
+  'dshfiles-prompt-stash',
+  'dshfiles-pull-requests',
+  'dshfiles-session-undo',
+  'dshfiles-sidebar-right',
+  'dshfiles-web-fetch-readable',
+  'dshfiles-worktree-memory',
+] as const
+
+const PROFILE_PANELS = new Set(['ai-accounts', 'mcp-servers', 'secret-catalog', 'dshfiles-multi-host-hosts', 'plugins', 'dshfiles-agents'])
+const profile = SettingsGroups.group({
+  sections: PROFILE_SECTIONS.map(([id, label], order) => ({ id, label, order })),
+  // Listed last to first, so a page never joins its entry by the luck of the Host's order.
+  pages: PROFILE_NAMESPACES.map(ns => page(ns, ns, ['example'])).toReversed(),
+  panels: PROFILE_PANELS,
+})
+const entriesOf = (groupId: string): readonly string[] => profile.find(group => group.group.id === groupId)?.entries.map(entry => entry.label) ?? []
+const profileEntry = (id: string) => profile.flatMap(group => group.entries).find(entry => entry.id === id)
+
+describe('settings groups: the default profile', () => {
+  it('leaves nothing under Other', () => {
+    expect(entriesOf('other')).toEqual([])
+  })
+
+  it('keeps every group short enough to read at a glance', () => {
+    expect(entriesOf('general')).toEqual(['General', 'Appearance', 'Keyboard shortcuts', 'Thread list', 'Layout', 'Composer', 'Transcript', 'Editor'])
+    expect(entriesOf('models')).toEqual(['AI accounts', 'Models', 'Model picker', 'DeepSeek account'])
+    expect(entriesOf('agents')).toEqual(['Agent definitions', 'Agent presets', 'Subagents', 'Background jobs', 'Memory'])
+    expect(entriesOf('tools')).toEqual(['MCP servers', 'MCP endpoint', 'Web search and fetch'])
+    expect(entriesOf('projects')).toEqual([
+      'Projects',
+      'Thread workspaces',
+      'Repository history',
+      'Checks and tests',
+      'Preview and dev servers',
+      'Backlog',
+      'Pull requests',
+      'Automations',
+    ])
+    expect(entriesOf('hosts')).toEqual(['Hosts', 'Network access'])
+    expect(entriesOf('about')).toEqual(['Update DSH', 'Getting started', 'Diagnostics'])
+    expect(entriesOf('security')).toEqual(['Secrets', 'Policies', 'Shell sandbox', 'Thread log sharing'])
+    // 62 rows before the regroup (audit 2026-11-16).
+    expect(profile.flatMap(group => group.entries)).toHaveLength(40)
+  })
+
+  it('puts Projects first in Projects & workspaces, the group a new user opens first', () => {
+    expect(entriesOf('projects')[0]).toBe('Projects')
+    expect(profileEntry('dshfiles-workspace-folder-picker-projects')?.group).toBe('projects')
+  })
+
+  it('gathers one task under one entry: layout, composer and transcript', () => {
+    const layout = profileEntry('layout')
+    expect(layout?.pages.map(current => current.title)).toEqual(['Main tabs', 'Docked panes', 'Thread panel'])
+    expect(layout).toMatchObject({ label: 'Layout', sectionId: 'dshfiles-status-bar', sectionLabel: 'Status bar' })
+    expect(profileEntry('composer')?.pages.map(current => current.title)).toEqual(['Composer', 'Message queue', 'Saved prompts'])
+    expect(profileEntry('transcript')?.pages.map(current => current.title)).toEqual(['Turn summary', 'Tool details', 'Agent plan'])
+    expect(profileEntry('plugin:jj-integration')?.pages.map(current => current.title)).toEqual(['Thread workspaces', 'Git worktrees', 'Undo a turn'])
+    expect(profileEntry('link:mcp-servers')).toBeUndefined()
+    expect(profileEntry('plugin:mcp-manager')).toMatchObject({ label: 'MCP servers', link: { panelId: 'mcp-servers' } })
+  })
+
+  it('opens a merged page, its section and its fields from their own ids', () => {
+    expect(SettingsGroups.entryFor(profile, 'plugin:dshfiles-main-tabs')?.id).toBe('layout')
+    expect(SettingsGroups.entryFor(profile, 'dshfiles-status-bar')?.id).toBe('layout')
+    expect(SettingsGroups.entryForField(profile, 'dshfiles-main-tabs', ['example'])?.id).toBe('layout')
+    expect(SettingsGroups.searchablePages(profile).map(current => current.ns)).toEqual(expect.arrayContaining([...PROFILE_NAMESPACES]))
+  })
+
+  it('names a task entry the same with one member loaded, and gives a page whose entry is absent its own row', () => {
+    const small = SettingsGroups.group({
+      sections: [],
+      pages: [page('dshfiles-main-tabs', 'x', ['maxTabs']), page('dshfiles-git-worktrees', 'x', ['isolate'])],
+      panels: new Set(),
+    })
+    expect(small.flatMap(group => group.entries.map(entry => [group.group.id, entry.id, entry.label]))).toEqual([
+      ['general', 'layout', 'Layout'],
+      ['projects', 'plugin:dshfiles-git-worktrees', 'Git worktrees'],
+    ])
+  })
+})
+
+type PluginSource = readonly [name: string, file: string, text: string]
+
+/** Every non-test source file of the owned plugins. */
+const pluginSources = (): readonly PluginSource[] => {
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  return readdirSync(root).flatMap(name => {
+    const src = `${root}${name}/src`
+    let files: readonly string[]
+    try {
+      files = readdirSync(src, { recursive: true, encoding: 'utf8' })
+    } catch {
+      return []
+    }
+    return files
+      .filter(file => /\.tsx?$/u.test(file) && !/\.test\.|generated|\.d\.ts$/u.test(file))
+      .map((file): PluginSource => [name, `plugins/@dshfiles/${name}/src/${file}`, readFileSync(`${src}/${file}`, 'utf8')])
+  })
+}
+
+/** Ids a call site declares as a literal or through a constant of the same package, each with the file declaring it. */
+const declaredIds = (sources: readonly PluginSource[], pattern: RegExp): ReadonlyArray<readonly [id: string, file: string]> =>
+  sources.flatMap(([name, file, text]) =>
+    [...text.matchAll(pattern)].flatMap((match): ReadonlyArray<readonly [string, string]> => {
+      const constant = match[2]
+      if (match[1] !== undefined) return [[match[1], file]]
+      if (constant === undefined) return []
+      const declaration = new RegExp(`const ${constant}\\s*=\\s*'([^']+)'`, 'u')
+      const value = sources.filter(([owner]) => owner === name).flatMap(([, , candidate]) => declaration.exec(candidate)?.[1] ?? [])[0]
+      return value === undefined ? [] : [[value, file]]
+    }),
+  )
+
+const DECLARED_NAMESPACE = /defineSettings\(\{\s*namespace:\s*(?:'([^']+)'|([A-Z][A-Z0-9_]*))/gu
+const DECLARED_SECTION = /name:\s*'settings\.section',\s*(?:registrant:\s*'[^']+',\s*)?id:\s*(?:'([^']+)'|([A-Z][A-Z0-9_]*))/gu
+const GROUPS_FILE = 'plugins/@dshfiles/settings-shell/src/settings-groups.ts'
+
+describe('settings groups: every owned plugin is placed', () => {
+  const sources = pluginSources()
+
+  it('finds the settings namespaces and sections the plugins declare', () => {
+    const namespaces = declaredIds(sources, DECLARED_NAMESPACE).map(([id]) => id)
+    expect(namespaces).toEqual(expect.arrayContaining(['dshfiles-main-tabs', 'dshfiles-ui-styles', 'thread-sidebar', 'jj-integration']))
+    expect(namespaces.length).toBeGreaterThan(30)
+    expect(declaredIds(sources, DECLARED_SECTION).map(([id]) => id)).toEqual(expect.arrayContaining(['general', 'thread-sidebar', 'dshfiles-status-bar']))
+  })
+
+  it('places every settings namespace in a task group, never under Other', () => {
+    const unplaced = declaredIds(sources, DECLARED_NAMESPACE)
+      .filter(([ns]) => SettingsGroups.groupOfNamespace(ns) === 'other')
+      .map(
+        ([ns, file]) =>
+          `Settings namespace "${ns}" (${file}) has no task group, so its page would show under "Other". ` +
+          `Add it to NAMESPACE_PLACEMENT in ${GROUPS_FILE}: a group and label of its own, or the entry of the task it belongs to.`,
+      )
+    expect(unplaced).toEqual([])
+  })
+
+  it('places every settings section in a task group, never under Other', () => {
+    const unplaced = declaredIds(sources, DECLARED_SECTION)
+      .filter(([id]) => SettingsGroups.groupOfSection(id) === 'other')
+      .map(
+        ([id, file]) => `Settings section "${id}" (${file}) has no task group, so it would show under "Other". Add it to SECTION_PLACEMENT in ${GROUPS_FILE}.`,
+      )
+    expect(unplaced).toEqual([])
   })
 })

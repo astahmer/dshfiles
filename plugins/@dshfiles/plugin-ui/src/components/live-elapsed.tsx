@@ -1,10 +1,14 @@
 import * as React from 'react'
+import { formatElapsed } from '../lib/format-duration.js'
+import { HostConnection } from '../lib/host-connection.js'
 import { cn } from '../lib/utils.js'
 
 /**
  * The page's one second clock for elapsed times (transcript run folds, b:7rv2). Every visible clock subscribes to the
  * same timer, aligned to whole seconds and stopped while the tab is hidden or nothing listens, and each clock writes its
- * own span's text directly, so twenty ticking rows cost one timer and no React render per second.
+ * own span's text directly, so twenty ticking rows cost one timer and no React render per second. While DSH is away
+ * (`html[data-host-connection]`, lib/host-connection) the tick skips, so every clock stops at its last value instead of
+ * counting time nobody can vouch for; it writes at once when the connection is back.
  */
 
 type TickListener = (now: number) => void
@@ -17,8 +21,10 @@ const schedule = (): void => {
   timer = setTimeout(
     () => {
       timer = undefined
-      const now = Date.now()
-      for (const listener of listeners) listener(now)
+      if (HostConnection.isOnline()) {
+        const now = Date.now()
+        for (const listener of listeners) listener(now)
+      }
       schedule()
     },
     1000 - (Date.now() % 1000),
@@ -32,9 +38,16 @@ if (typeof document !== 'undefined') {
       timer = undefined
       return
     }
+    if (HostConnection.isOnline()) {
+      const now = Date.now()
+      for (const listener of listeners) listener(now)
+    }
+    schedule()
+  })
+  HostConnection.subscribe(state => {
+    if (state !== 'online') return
     const now = Date.now()
     for (const listener of listeners) listener(now)
-    schedule()
   })
 }
 
@@ -51,14 +64,8 @@ export const subscribeSecondTick = (listener: TickListener): (() => void) => {
   }
 }
 
-/** "12s", "1m 12s", "1h 04m". */
-export const formatElapsed = (ms: number): string => {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  if (total < 60) return `${String(total)}s`
-  const minutes = Math.floor(total / 60)
-  if (minutes < 60) return `${String(minutes)}m ${String(total % 60).padStart(2, '0')}s`
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, '0')}m`
-}
+/** "12s", "1m 12s", "1h 04m"; the kit's duration grammar, re-exported for the callers that import it from here. */
+export { formatElapsed }
 
 export interface LiveElapsedProps {
   /** Epoch ms the clock counts from. */
@@ -70,7 +77,10 @@ export interface LiveElapsedProps {
   readonly className?: string
 }
 
-/** An elapsed time ticking on the shared clock while `active`; the text is written straight into the span. */
+/**
+ * An elapsed time ticking on the shared clock while `active`; the text is written straight into the span. A clock is
+ * `role="timer"` and silent (`aria-live="off"`, DESIGN.md Announcements): a screen reader never hears it tick.
+ */
 export const LiveElapsed = React.memo(function LiveElapsed(props: LiveElapsedProps): React.JSX.Element {
   const ref = React.useRef<HTMLSpanElement | null>(null)
   const formatRef = React.useRef(props.format)
@@ -87,5 +97,5 @@ export const LiveElapsed = React.memo(function LiveElapsed(props: LiveElapsedPro
     if (!props.active) return undefined
     return subscribeSecondTick(write)
   }, [props.active, props.since])
-  return <span ref={ref} className={cn('dshx:tabular-nums', props.className)} data-live-elapsed="" />
+  return <span ref={ref} role="timer" aria-live="off" className={cn('dshx:tabular-nums', props.className)} data-live-elapsed="" />
 })

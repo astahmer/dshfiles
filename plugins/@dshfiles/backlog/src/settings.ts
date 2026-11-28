@@ -11,7 +11,7 @@ export const backlogSettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs the Jev key in Settings › Tools & MCP › Jev, or TYPESAFE_API_KEY in the Host environment.",
+        'Ask TypeSafe\'s Jev whether an item is real work and whether it repeats an open item (needs the Jev key).',
       ),
     // Moved to the one shared key in Settings › Tools & MCP › Jev (settings-shell). Kept, hidden, as the fallback while
     // the shared key is empty, so moving it loses nothing and clearing the shared key restores this value.
@@ -27,7 +27,7 @@ export const backlogSettings = defineSettings({
     imageTitle: Schema.boolean()
       .default(false)
       .description(
-        'Title image-only items with a vision model: after you capture an image with no text, the triage model reads it and writes a short title. Off keeps the image label and spends no tokens; the item’s Try again button and the backlog_regenerate_title tool still run when you ask. Needs a triage provider and model whose route accepts image input.',
+        'Title image-only captures with a vision model (needs a triage model that accepts images).',
       ),
     applyThreshold: Schema.number()
       .min(0)
@@ -38,7 +38,7 @@ export const backlogSettings = defineSettings({
     lifecycleSignals: Schema.boolean()
       .default(true)
       .description(
-        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked, and its next finished turn clears that flag; an answered question settles the request for input its own thread raised. Never overrides a status or attention you set by hand.',
+        'Update item status from thread mentions, landed revisions and failed turns, never over a status you set.',
       ),
     idleThreadNudgeDays: Schema.natural()
       .max(3_650)
@@ -49,7 +49,7 @@ export const backlogSettings = defineSettings({
       .max(1_440)
       .default(30)
       .description(
-        'How long an agent keeps an item it claimed with backlog_claim without writing to it again. The claim also ends when its thread is archived, settled or gone, and when the item is done.',
+        'Minutes an agent keeps a claimed item without writing to it before the claim lapses.',
       ),
     threadResolution: Schema.union([
       Schema.const('off').description('Off: a finished thread never suggests anything'),
@@ -57,27 +57,27 @@ export const backlogSettings = defineSettings({
     ])
       .default('off')
       .description(
-        'When a thread finishes a turn while its items are still In progress, Jev can suggest closing them. Needs jevEnabled and a key; the suggestion waits on the item, it never moves one on its own.',
+        'Let Jev suggest closing In progress items when their thread ends a turn, never closing one by itself.',
       ),
     reuseCaptureProject: Schema.boolean()
       .default(true)
       .description(
-        'Remember the project of the last capture, so the next item lands in the same project. Off starts every capture with no project unless the header filters by one.',
+        'Put the next capture in the project of the last one.',
       ),
     startThreadOpensCreated: Schema.boolean()
       .default(false)
       .description(
-        'Open threads started from a backlog item as soon as they exist, including threads started by an @agent comment. Off leaves you where you were and the report offers to open the thread; the dialog checkbox overrides this setting for one thread.',
+        'Open a thread started from a backlog item as soon as it exists.',
       ),
     smartThreadRouting: Schema.boolean()
       .default(false)
       .description(
-        'When enabled, classify plain item replies as discussion or work requests. Work requests start a linked @dsh thread; other messages remain replies. Uses Jev when enabled and conservative keyword matching otherwise. Off keeps every plain reply as context; @agent remains an explicit dispatch.',
+        'Start a linked @dsh thread when a plain item reply asks for work (other replies stay replies).',
       ),
     threadStartNotifications: Schema.union([Schema.const('off'), Schema.const('in-app'), Schema.const('system'), Schema.const('both')])
       .default('in-app')
       .description(
-        'Deliver a notice when a reply starts a thread. System delivery uses this browser’s notification permission; in-app notices include an Open action.',
+        'Show a notice when a reply starts a thread.',
       ),
     replyThreadThreshold: Schema.number()
       .min(0)
@@ -102,17 +102,17 @@ export const backlogSettings = defineSettings({
       .max(120)
       .default(5)
       .description(
-        'How often main is checked, linked pull requests are matched to item watches and linked issues are read. A check that finds main unchanged costs one jj call.',
+        'How often main, linked pull requests and linked issues are checked.',
       ),
     watchLinkedPullRequests: Schema.boolean()
       .default(true)
       .description(
-        'Keep the state of every pull request an open item links current, with no thread: the item watches it through the Pull requests plugin until the item is done or dropped. Each watch costs one gh call per Pull requests sweep. A `fixes` PR that merges closes its item.',
+        'Track pull requests that open items link, and close an item when its `fixes` PR merges.',
       ),
     linkedIssueStates: Schema.boolean()
       .default(true)
       .description(
-        'Read the open or closed state of GitHub issues open items link, in batches of fifty per gh call, on the main-check interval above. A `fixes` issue closed as completed closes its item. Needs the Pull requests plugin and a signed-in gh.',
+        'Read the state of GitHub issues that open items link, and close an item when its `fixes` issue is completed.',
       ),
     dormantAfterDays: Schema.object({
       note: Schema.natural().max(3_650).default(14),
@@ -121,7 +121,7 @@ export const backlogSettings = defineSettings({
       task: Schema.natural().max(3_650).default(30),
       bug: Schema.natural().max(3_650).default(30),
     }).description(
-      'Idle days before an open item of each kind leaves the default views (it stays searchable). 0 keeps that kind visible forever. Items asking for attention, pinned items and work in progress never go dormant.',
+      'Idle days before an open item of this kind leaves the default views (0 keeps it visible).',
     ),
     inboxThreads: Schema.union([
       Schema.const('off').description('Off: the Inbox shows backlog items only'),
@@ -138,17 +138,17 @@ export const backlogSettings = defineSettings({
     )
       .default([])
       .hidden()
-      .description('Multi-host runtimes whose backlog this Host pulls. Turn them on in Backlog settings › Hosts.'),
+      .description('Other hosts whose backlog this host pulls. Turn them on in Backlog settings › Hosts.'),
     peerPullSeconds: Schema.natural()
       .min(10)
       .max(3_600)
       .default(60)
-      .description('How often each enabled peer Host is asked for backlog changes. Hosts that are offline are skipped and caught up later.'),
+      .description('How often each enabled host is asked for backlog changes. Offline hosts catch up later.'),
     automationHost: Schema.string()
       .default('')
       .hidden()
       .description(
-        'The backlog Host that runs gate checks and main polling when Hosts share the backlog. Empty: this Host. Pick it in Backlog settings › Hosts.',
+        'The host that runs checks when hosts share the backlog. Empty: this host. Pick it in Backlog settings › Hosts.',
       ),
     publishActivity: Schema.boolean()
       .default(true)
@@ -163,7 +163,7 @@ export const backlogSettings = defineSettings({
           .role('secret-ref')
           .default('')
           .description(
-            'Secret Catalog reference to a Linear personal API key or a GitHub token, as secret:ALIAS. Empty uses LINEAR_API_KEY or GITHUB_TOKEN from the Host environment.',
+            'A Linear API key or GitHub token as secret:ALIAS, or empty to use LINEAR_API_KEY or GITHUB_TOKEN.',
           ),
         autoSyncMinutes: Schema.natural()
           .max(1_440)
@@ -177,7 +177,7 @@ export const backlogSettings = defineSettings({
       .default([])
       .hidden()
       .description(
-        'Earlier remote sync rows. The first start after connections and bindings moves them into Backlog settings › Remote sync once; edits here are no longer read.',
+        'Earlier remote sync rows, moved once into Backlog settings › Remote sync and no longer read.',
       ),
     savedViews: Schema.array(
       Schema.object({
@@ -219,8 +219,17 @@ export const backlogSettings = defineSettings({
     )
       .default([])
       .description(
-        'Standing instructions per project for agents: they open the first message of a thread started from one of its items, and backlog_get / backlog_ready return them. Edit them from the project overview in the Projects view.',
+        'Standing instructions per project that open each thread started from its items, edited in the Projects view.',
       ),
+    tagColors: Schema.array(
+      Schema.object({
+        tag: Schema.string().required().description('The tag as items store it, without the #.'),
+        slot: Schema.natural().max(5).required().description('A colour of the active theme’s identity palette, 0 to 5.'),
+      }),
+    )
+      .default([])
+      .hidden()
+      .description('Colours chosen for tags from a tag chip’s menu, shared by every browser. A tag without one keeps its default colour.'),
   }),
   applies: 'live',
 })

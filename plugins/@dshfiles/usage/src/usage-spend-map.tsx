@@ -1,8 +1,11 @@
+import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { SpendMap, type SpendDimension, type SpendLeaf } from '@dshfiles/plugin-ui/components/motion/spend-map'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BoxIcon, FolderIcon, KeyRoundIcon, TargetIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import type { ChartQuery, ChartView } from './api.js'
+import { DATA_SERIES } from './data-series.js'
 import { UsageFormattingModel } from './format.js'
 
 type SpendMetric = 'cost' | 'tokens' | 'requests'
@@ -11,23 +14,27 @@ type BreakdownRow = ChartView['breakdown']['model'][number]
 const LEAF_LIMIT = 6
 const REST_ID = 'other:rest'
 
-const DIMENSIONS = [
-  { id: 'model', label: 'Models', icon: <BoxIcon aria-hidden /> },
-  { id: 'provider', label: 'Accounts', icon: <KeyRoundIcon aria-hidden /> },
-  { id: 'project', label: 'Projects', icon: <FolderIcon aria-hidden /> },
-  { id: 'purpose', label: 'Purposes', icon: <TargetIcon aria-hidden /> },
-] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode }[]
+/** The caption names the measure the chart card picked and its unit (council round 10, D1). */
+const METRIC_CAPTIONS = {
+  cost: 'Cost · USD, list-price estimate',
+  tokens: 'Tokens · input, cache and output',
+  requests: 'Requests · model calls',
+} satisfies Record<SpendMetric, string>
 
-const METRICS = [
-  { value: 'cost', label: 'Cost' },
-  { value: 'tokens', label: 'Tokens' },
-  { value: 'requests', label: 'Requests' },
-] as const satisfies readonly { readonly value: SpendMetric; readonly label: string }[]
+/**
+ * Each breakdown's card tone on the data ramp, in order, so Accounts and Projects read as their own series instead of
+ * grey (council round 7, D3). The grouped breakdown takes its top entry's chart colour instead.
+ */
+const DIMENSIONS = [
+  { id: 'model', label: 'Models', icon: <BoxIcon aria-hidden />, tone: DATA_SERIES[0] },
+  { id: 'provider', label: 'Accounts', icon: <KeyRoundIcon aria-hidden />, tone: DATA_SERIES[1] },
+  { id: 'project', label: 'Projects', icon: <FolderIcon aria-hidden />, tone: DATA_SERIES[2] },
+  { id: 'purpose', label: 'Purpose', icon: <TargetIcon aria-hidden />, tone: DATA_SERIES[3] },
+] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode; readonly tone: string }[]
 
 const purposeLabels = new Map<string, string>(Object.entries(UsageFormattingModel.purposeLabels))
 
 const isGroupBy = (value: string): value is ChartQuery['groupBy'] => DIMENSIONS.some(dimension => dimension.id === value)
-const isMetric = (value: string): value is SpendMetric => METRICS.some(metric => metric.value === value)
 
 const amountOf = (row: { readonly cost: number; readonly tokens: number; readonly requests: number }, metric: SpendMetric): number =>
   metric === 'cost' ? row.cost : metric === 'tokens' ? row.tokens : row.requests
@@ -37,7 +44,8 @@ const formatterFor = (metric: SpendMetric): ((value: number) => string) =>
 
 /**
  * One SpendMap dimension per breakdown the Host returns: its largest entries by the chosen measure, the rest folded
- * into one entry. Only the grouped dimension has per-bucket series, so only its entries get a sparkline.
+ * into one entry. Only the grouped dimension has per-bucket series, so only its entries get a sparkline and the colour
+ * the chart above gives the same key (its index in `view.keys` on the data ramp), so one model keeps one colour.
  */
 export const spendDimensions = (input: {
   readonly view: ChartView
@@ -56,6 +64,10 @@ export const spendDimensions = (input: {
     }
     return starts.map(start => byStart.get(start) ?? 0)
   }
+  const colorOf = (key: string): string | undefined => {
+    const index = input.view.keys.indexOf(key)
+    return index < 0 ? undefined : DATA_SERIES[index % DATA_SERIES.length]
+  }
   return DIMENSIONS.flatMap(dimension => {
     const rows: readonly BreakdownRow[] | undefined = input.view.breakdown[dimension.id]
     if (rows === undefined) return []
@@ -66,33 +78,62 @@ export const spendDimensions = (input: {
     const rest = sorted.slice(LEAF_LIMIT)
     const leaves: SpendLeaf[] = shown.map(row => {
       const amount = amountOf(row, input.metric)
+      const color = dimension.id === input.groupBy ? colorOf(row.key) : undefined
+      // A model or an account named after a provider shows that provider's mark in its seat instead of a letter.
+      const branded = (dimension.id === 'model' || dimension.id === 'provider') && modelFamily(row.key) !== undefined
       return {
         id: row.key,
+        ...(branded && { icon: <ModelMark modelId={row.key} /> }),
         label: dimension.id === 'purpose' ? (purposeLabels.get(row.key) ?? row.key) : row.key,
         amount,
         share: shareOf(amount),
         ...(input.metric === 'cost' && (row.unpriced ?? 0) > 0 && { flag: { label: 'Unpriced', tone: 'warning' as const } }),
         ...(dimension.id === input.groupBy && { series: seriesOf(row.key) }),
+        ...(color !== undefined && { color }),
       }
     })
     if (rest.length > 0) {
       const amount = rest.reduce((sum, row) => sum + amountOf(row, input.metric), 0)
       leaves.push({ id: REST_ID, label: `${String(rest.length)} more`, amount, share: shareOf(amount) })
     }
-    return [{ id: dimension.id, label: dimension.label, icon: dimension.icon, leaves }]
+    const cardColor = (dimension.id === input.groupBy ? leaves[0]?.color : undefined) ?? dimension.tone
+    return [{ id: dimension.id, label: dimension.label, icon: dimension.icon, leaves, color: cardColor }]
   })
 }
 
 const formatDay = (at: number): string => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
+/**
+ * The kit SpendMap's radial tick gauge reads as decoration on a range with no cap: hide its drawing and keep the total as
+ * a plain value where the connectors start (council round 2, D1). Follow-up: a kit prop for a gauge-less root.
+ */
+const PLAIN_TOTAL =
+  'dshx:[&_[data-node-anchor=root]_svg]:hidden dshx:[&_[data-node-anchor=root]>div]:size-auto dshx:[&_[data-node-anchor=root]>div>div]:static dshx:[&_[data-node-anchor=root]>div>div]:px-1'
+
+/**
+ * The card the numbers and the trend chart take (8 px radius, not the kit map's 16), and a 12 px lead-in from the heading
+ * to the first node: the header's 12 px and none of the map's top padding, so the map's first result shows above the
+ * fold at 1440 × 900 (council round 6, D1). Follow-up: a kit prop for the map's top padding.
+ */
+export const SPEND_MAP_CARD = 'dshx:rounded-lg dshx:[&_[data-spend-map-inset]>div]:pt-0'
+
+/**
+ * The share bar 8 px with a 4 px radius (council round 18, D2): the kit row draws a 4 px bar in an 8 px track, too thin
+ * to read beside 13 px numbers. The track grows to 12 px and keeps its 2 px rim (round 12: a 100 % share still reads as a
+ * measure), so the bar inside is 8 px; `rounded-sm` is the kit's 4 px radius. Follow-up: a kit prop for the share bar's weight.
+ */
+export const SHARE_BAR = 'dshx:[&_span:has(>[data-spend-share])]:h-3 dshx:[&_[data-spend-share]]:rounded-sm'
+
 export const UsageSpendMap = (props: {
   readonly view: ChartView
+  /** The chart's measure: the page has one metric switch, on the chart card. */
+  readonly metric: SpendMetric
   readonly range: { readonly from: number; readonly to: number }
   readonly groupBy: ChartQuery['groupBy']
   readonly onGroupBy: (groupBy: ChartQuery['groupBy']) => void
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
 }): JSX.Element => {
-  const [metric, setMetric] = useState<SpendMetric>('cost')
+  const metric = props.metric
   const [leafId, setLeafId] = useState<string | null>(null)
   const dimensions = spendDimensions({ view: props.view, metric, groupBy: props.groupBy })
   const dimension = dimensions.find(entry => entry.id === props.groupBy) ?? dimensions[0]
@@ -106,6 +147,12 @@ export const UsageSpendMap = (props: {
   return (
     <SpendMap
       data-usage-spend-map
+      className={cn(PLAIN_TOTAL, SPEND_MAP_CARD, SHARE_BAR)}
+      inset="flush"
+      // One dimension at a time: a "Share by" control in the header and only that dimension's flow, its entries
+      // across the card so labels show in full (council round 10, D1).
+      picker="segments"
+      subtitle={METRIC_CAPTIONS[metric]}
       detailPeriod="this range"
       dimensionId={dimension?.id ?? props.groupBy}
       dimensions={dimensions}
@@ -119,16 +166,11 @@ export const UsageSpendMap = (props: {
       format={formatterFor(metric)}
       heading="Where it went"
       leafId={leaf?.id ?? null}
-      metric={metric}
-      metrics={METRICS}
       onDimensionChange={id => {
         if (isGroupBy(id)) props.onGroupBy(id)
         setLeafId(null)
       }}
       onLeafChange={setLeafId}
-      onMetricChange={value => {
-        if (isMetric(value)) setMetric(value)
-      }}
       owner={props.view.appliedProvider ?? 'All accounts'}
       period={period}
       total={total}

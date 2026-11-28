@@ -1,26 +1,39 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { MergeConflictGraph, type MergeRevision } from '@dshfiles/plugin-ui/components/motion/merge-conflict-graph'
-import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  CopyIcon,
+  FolderGit2Icon,
+  GitMergeIcon,
+  PanelRightIcon,
+  RefreshCwIcon,
+  Undo2Icon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
+import { useRegistry } from '@dshfiles/dshx/client'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import type { ThreadRevisionView, ThreadView } from './api.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import type { HeaderLandPresence } from './header-land-presence.js'
 import { IntegrationRecovery } from './integration-recovery.js'
-import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
-import { threadQueryKeys } from './panel.js'
+import { LandConfirmDialog } from './land-confirm-dialog.js'
+import { announceRepositoryChange, landResultToast, undescribedText } from './land-feedback.js'
+import { REPOSITORY_CHANGED_EVENT } from './repository-change.js'
+import { threadQueryKeys } from './thread-query-keys.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
@@ -28,7 +41,10 @@ import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
+import { usePhoneShell } from './phone-shell.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
+import { WorkspaceControlModel } from './workspace-control-model.js'
+import { arrangeWorkspaceMenuSections, WorkspaceMenuSections } from './workspace-menu-sections.js'
 
 export interface ThreadWorkspaceControlProps {
   readonly sessionId: SessionSummary['id']
@@ -37,6 +53,16 @@ export interface ThreadWorkspaceControlProps {
   readonly bookmark: string
   readonly sessionLog: SessionLogDownloadPort
   readonly openThreadWorkspaces: () => void
+  /** Marked while the header Land shows, so the land card beside it steps back to a secondary button. */
+  readonly headerLand?: HeaderLandPresence | undefined
+  /**
+   * `header` (default): the workspace chip, its menu and, on a desktop shell, Land beside it. `phone-bar`: only Land and
+   * its confirmation, for the phone top bar, which shows the header utilities only inside its ⋯ sheet. `request`: no
+   * button, only the confirmation, open from the start, for a Land another view asked for (`ThreadHeaderLand.confirm`).
+   */
+  readonly seat?: 'header' | 'phone-bar' | 'request' | undefined
+  /** `request` seat: the dialog, its land and its report are done, so the request can unmount. */
+  readonly onRequestDone?: (() => void) | undefined
 }
 
 const noCwd = (): null => null
@@ -84,11 +110,18 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const api = useSessionThreadApi(props.sessionId)
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [confirmingLand, setConfirmingLand] = useState(props.seat === 'request')
+  /** A land this control started and has not reported yet; the request seat stays mounted until it has. */
+  const [landing, setLanding] = useState(false)
+  const [landedMark, setLandedMark] = useState(() => WorkspaceControlModel.initialLandedMark(String(props.sessionId)))
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   const bookmark = useProjectBookmark(cwd, props.bookmark)
   const toast = useToast()
+  const landTrigger = useRef<HTMLButtonElement>(null)
+  const pathCopy = useCopyFeedback()
+  const menuSections = arrangeWorkspaceMenuSections(useRegistry(WorkspaceMenuSections))
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? '', props.sessionId),
     enabled: cwd !== null && cwd.length > 0,
@@ -100,7 +133,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
         if (!Schema.is(contractRejectionSchema)(error)) throw error
         return read({ path: cwd ?? '' })
       })
-      if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
+      // A land or queue change this read reveals (another view, `/rebase`, a queued land) refreshes every inventory view.
+      if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt || WorkspaceControlModel.repositoryMoved(previous?.thread, current.thread))
+        announceRepositoryChange()
       return current
     },
     refetchInterval: query => {
@@ -125,7 +160,11 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       announceRepositoryChange()
       await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
       await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
-      if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
+      if (result?.status === 'landed')
+        setLandedMark(mark => WorkspaceControlModel.landedMark(mark, { sessionId: String(props.sessionId), rebasedAt: mark.seenRebasedAt ?? undefined, unlanded: 0, landedHere: true }))
+      // Round three item 27: a clean land confirms in the header ("✓ Landed"); only a warning or a stop gets a toast.
+      const report = result === undefined || result === null ? undefined : landResultToast(props.t, result)
+      if (report !== undefined) toast.show({ text: report, success: false })
     },
   })
   /** The status refetch runs jj and can take seconds, so the menu shows the Host's answer at once and refreshes behind it. */
@@ -155,6 +194,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     },
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
   })
+  // The header shows a live verb, so a land made anywhere in this browser (the Changes view, the Land page) updates it
+  // at once instead of on the idle poll. A read already in flight is left alone: it announces the change itself.
+  useEffect(() => {
+    if (cwd === null || cwd.length === 0) return
+    const refresh = (): void =>
+      void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true }, { cancelRefetch: false })
+    window.addEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+  }, [cwd, props.sessionId, queryClient])
   /** Opening the menu reads the status again: work landed outside this browser has no mutation to invalidate it. */
   const onWorkspaceMenuOpenChange = (open: boolean): void => {
     setWorkspaceMenuOpen(open)
@@ -209,6 +257,14 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const unlanded = current?.unlanded.length ?? 0
   const conflicted = current?.unlanded.some(revision => revision.conflict) ?? false
   const isThread = current !== null && current !== undefined
+  // The mark follows the land time and the count, not each new thread object a read returns.
+  const observedRebasedAt = current?.rebasedAt
+  const answered = current !== undefined
+  useEffect(() => {
+    if (!answered) return
+    setLandedMark(mark => WorkspaceControlModel.landedMark(mark, { sessionId: String(props.sessionId), rebasedAt: observedRebasedAt, unlanded }))
+  }, [answered, observedRebasedAt, props.sessionId, unlanded])
+  const landed = isThread && unlanded === 0 && landedMark.sessionId === String(props.sessionId) && landedMark.shown
   // `current` is undefined until the status query answers and null when the path is not a thread workspace.
   const loading = current === undefined && cwd !== null
   const name = current?.name ?? (cwd === null || cwd.length === 0 ? props.t('unknownWorkspace') : folderName(cwd))
@@ -220,6 +276,30 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
   const integrationQueued = current?.integrationQueuedAt !== undefined
   const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
+  // H4 (unslop): landing finishes a thread, so the header carries it as its one primary verb while it can run.
+  const showsLand = WorkspaceControlModel.showsLand({ isThread, unlanded: current?.unlanded ?? [], canLand: canRebase, queued: integrationQueued })
+  const seat = props.seat ?? 'header'
+  const phone = usePhoneShell()
+  const landHere = showsLand && WorkspaceControlModel.landSeatShows({ seat, phone })
+  // A dialog left without revisions (the work landed elsewhere meanwhile) closes for good, not until the next change.
+  // Only once the status answered: a request opens before it, with nothing read yet.
+  useEffect(() => {
+    if (answered && unlanded === 0) setConfirmingLand(false)
+  }, [answered, unlanded])
+  // A requested Land gets the header Land's guards: the dialog opens only when the header would show Land, and any
+  // other answer closes the request with the reason the workspace menu gives.
+  const landBlock = WorkspaceControlModel.landBlock({ isThread, unlanded: current?.unlanded ?? [], canLand: canRebase, queued: integrationQueued })
+  const requestBlocked = seat === 'request' && confirmingLand && !landing && (cwd === null || cwd.length === 0 || (answered && landBlock !== undefined))
+  const headerLand = props.headerLand
+  useEffect(() => (landHere && headerLand !== undefined ? headerLand.mark(String(props.sessionId)) : undefined), [headerLand, landHere, props.sessionId])
+  /** Both Land buttons of this control ask first: the dialog lists the revisions that move. */
+  const askToLand = (): void => {
+    setWorkspaceMenuOpen(false)
+    setConfirmingLand(true)
+    // Work landed outside this browser (a terminal, the agent's own land) has no event: the dialog lists what is left.
+    if (cwd !== null && cwd.length > 0)
+      void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true }, { cancelRefetch: false })
+  }
   const blockedReason =
     isThread && !canRebase
       ? clientCanRebase === undefined
@@ -232,34 +312,78 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 .join(', '),
             })
       : undefined
+  const landBlockText = (): string => {
+    if (!isThread) return props.t('sharedCheckoutHint')
+    switch (landBlock) {
+      case 'nothing-to-land':
+        return props.t('upToDateNoChanges')
+      case 'queued':
+        return props.t('integrationQueuedHint', { bookmark })
+      case 'conflicts':
+        return statusText()
+      case 'undescribed':
+        return undescribedText(props.t, (current?.unlanded ?? []).filter(revision => revision.description.trim().length === 0).length)
+      case 'busy':
+        return blockedReason ?? props.t('rebaseBlockedUnknownThread')
+      default:
+        return statusText()
+    }
+  }
+  useEffect(() => {
+    if (!requestBlocked) return
+    setConfirmingLand(false)
+    toast.show({ text: landBlockText(), success: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the reason is read once, when the request is refused
+  }, [requestBlocked])
+  const requestDone = seat === 'request' && !confirmingLand && !landing && toast.element === null
+  const onRequestDone = props.onRequestDone
+  useEffect(() => {
+    if (requestDone) onRequestDone?.()
+  }, [onRequestDone, requestDone])
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
     if (!isThread) return props.t('sharedCheckoutHint')
-    if (conflicted) return props.t('conflictHint', { count: unlanded })
+    if (conflicted) return props.t(unlanded === 1 ? 'conflictHintOne' : 'conflictHintMany', { count: unlanded })
     if (unlanded > 0) return props.t('toRebase', { count: unlanded })
     if (current.behind) return props.t('behind', { bookmark })
     return props.t('upToDate')
   }
 
+  const workspacePath = current?.path ?? (cwd !== null && cwd.length > 0 ? cwd : null)
   const glyph = <FolderGit2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
-  // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its badge and chevron over the elapsed
+  // b:czs9: the chip never shrinks below what it shows. A shrunk chip centred its count and chevron over the elapsed
   // time and the ⋯ beside it. It sheds parts instead, by the header row's width (an inline-size container): its label
   // below 32rem (after the live activity's elapsed time, 36rem), then its count below 26rem. The count stays in this
-  // chip's menu ("458 to rebase"), which the same tap opens.
-  const countBadge =
+  // chip's menu, which the same tap opens.
+  // H5 (unslop): the count is the phrase the thread list and the menu use ("1 to land"), never a bare number.
+  const countLabel =
     unlanded > 0 ? (
-      <Badge
-        className={cn('dshx:h-4 dshx:px-1.5 dshx:text-2xs dshx:@max-[26rem]:hidden', conflicted && 'dshx:bg-warning/20 dshx:text-warning')}
-        variant={conflicted ? 'ghost' : 'secondary'}
+      <span
+        className={cn('dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground dshx:@max-[26rem]:hidden', conflicted && 'dshx:text-warning')}
+        data-workspace-count=""
       >
-        <RollingNumber value={unlanded} />
-      </Badge>
+        {props.t('toRebase', { count: unlanded })}
+      </span>
     ) : null
+  // Round two item 19: a land seen here confirms in green, glyph only; the word stays ink (DESIGN.md colour rule 3).
+  // Round three item 27: it fades in over the count it replaces (120ms, opacity only, so reduced motion keeps it).
+  const landedLabel = (className?: string): JSX.Element => (
+    <span
+      className={cn(
+        'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:animate-in dshx:fade-in-0 dshx:duration-(--dshx-duration-fade) dshx:ease-(--dshx-motion-ease-enter)',
+        className,
+      )}
+      data-workspace-landed=""
+    >
+      <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
+      <span className="dshx:@max-[26rem]:sr-only">{props.t('landedMark')}</span>
+    </span>
+  )
 
   const trigger = (
     <Button
       aria-label={triggerLabel}
-      className="dshx-root dshx:max-w-44 dshx:gap-1.5 dshx:px-2"
+      className="dshx-root dshx:max-w-60 dshx:gap-1.5 dshx:px-2"
       data-workspace-name={isThread ? current.name : undefined}
       data-workspace-place={ownWorkspace ? 'own' : 'project'}
       size="sm"
@@ -268,11 +392,67 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     >
       {glyph}
       <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:@max-[32rem]:hidden">{placeLabel}</span>
-      {countBadge}
+      {landed ? landedLabel() : countLabel}
       {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
     </Button>
   )
+
+  const landButton = landHere ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={props.t('landThreadLabel')}
+          // The phone bar is 44px tall: the 32px button takes the rest of the bar's height as its touch target.
+          className={cn(
+            seat === 'phone-bar' && 'dshx-root dshx:relative dshx:ml-1.5 dshx:after:absolute dshx:after:-inset-y-1.5 dshx:after:inset-x-0 dshx:after:content-[""]',
+          )}
+          data-workspace-land={seat === 'phone-bar' ? 'phone' : ''}
+          disabled={rebasesPending}
+          onClick={askToLand}
+          ref={landTrigger}
+          size="sm"
+          type="button"
+        >
+          {rebasesPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5 dshx:@max-[26rem]:hidden" />}
+          {props.t('landThreadVerb')}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{`${label} (${props.t('toRebase', { count: unlanded })})`}</TooltipContent>
+    </Tooltip>
+  ) : null
+  const landDialog = isThread ? (
+    <LandConfirmDialog
+      bookmark={bookmark}
+      onConfirm={() => {
+        setLanding(true)
+        rebase.mutate({ path: current.path }, { onSettled: () => setLanding(false) })
+      }}
+      onOpenChange={setConfirmingLand}
+      open={confirmingLand && unlanded > 0 && (seat !== 'request' || landBlock === undefined)}
+      revisions={current.unlanded}
+      sessionId={String(props.sessionId)}
+      t={props.t}
+      trigger={() => landTrigger.current}
+    />
+  ) : null
+
+  if (seat === 'request')
+    return (
+      <TooltipProvider>
+        {landDialog}
+        {toast.element}
+      </TooltipProvider>
+    )
+
+  if (seat === 'phone-bar')
+    return (
+      <TooltipProvider>
+        {landButton ?? (landed && phone ? <span role="status">{landedLabel('dshx-root dshx:ml-1.5 dshx:px-1')}</span> : null)}
+        {landDialog}
+        {toast.element}
+      </TooltipProvider>
+    )
 
   return (
     <TooltipProvider>
@@ -300,14 +480,34 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 <FolderGit2Icon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{placeLabel}</span>
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-                    {current?.path ?? cwd ?? props.t('unknownWorkspace')}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="dshx:max-w-96">{current?.path ?? cwd ?? ''}</TooltipContent>
-              </Tooltip>
+              {/* H6 (unslop): the end of the path names the workspace; the whole path is in the tooltip and behind Copy. */}
+              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" data-workspace-path="">
+                      {workspacePath === null ? props.t('unknownWorkspace') : WorkspaceControlModel.pathTail(workspacePath)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="dshx:max-w-96 dshx:break-all">{workspacePath ?? props.t('unknownWorkspace')}</TooltipContent>
+                </Tooltip>
+                {workspacePath === null ? null : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={props.t('copyWorkspacePath')}
+                        className="dshx-root dshx:shrink-0 dshx:text-muted-foreground"
+                        onClick={() => void pathCopy.copy(workspacePath)}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        {pathCopy.copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{pathCopy.copied ? props.t('copied') : props.t('copyWorkspacePath')}</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
             {conflicted && isThread ? (
               <div className="dshx:px-3 dshx:pt-2 dshx:pb-3">
@@ -327,6 +527,16 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             ) : (
               <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
             )}
+            {loading
+              ? null
+              : menuSections.map(section => (
+                  <section.Component
+                    dismiss={() => onWorkspaceMenuOpenChange(false)}
+                    key={section.id}
+                    ownWorkspace={ownWorkspace}
+                    sessionId={String(props.sessionId)}
+                  />
+                ))}
             {isThread &&
               (integrationQueued ? (
                 <div className="dshx:px-3 dshx:pb-3">
@@ -383,7 +593,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         aria-label={label}
                         className="dshx-root dshx:w-full"
                         disabled={rebaseDisabled}
-                        onClick={() => rebase.mutate({ path: current.path })}
+                        onClick={askToLand}
                         size="sm"
                         type="button"
                         variant="outline"
@@ -421,7 +631,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             </div>
           </PopoverContent>
         </Popover>
+        {landButton}
       </span>
+      {landDialog}
       {toast.element}
     </TooltipProvider>
   )

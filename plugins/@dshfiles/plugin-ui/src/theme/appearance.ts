@@ -7,6 +7,7 @@
  */
 import { DRACULA_THEME } from './dracula.ts'
 import { GALLERY_IDS, GALLERY_THEMES } from './gallery.ts'
+import { GENERIC_IDENTITY_NAMES, type IdentityNames } from './identity-palette.ts'
 import { WARM_STONE, type PaletteInput } from './palette.ts'
 import { ThemeCss } from './theme-css.ts'
 import { READING_BOUNDS, ThemeDefinitionModel, type ReadingVeil, type SceneSources, type ThemeDefinition } from './theme-definition.ts'
@@ -245,6 +246,21 @@ function readingVeil(settings: Partial<AppearanceSettings> | undefined): Reading
   return { blur: bounded(settings?.readingBlur, 'blur'), tint: bounded(settings?.readingTint, 'tint') }
 }
 
+/**
+ * The identity slot names the active theme gives, per scheme it defines (round eight): its `paletteNames`, or
+ * "Colour 1"… for a palette without names. Empty while the default slots apply (no pinned theme), so the swatches keep
+ * the default names; the client writes it to `PALETTE_NAMES_ATTRIBUTE`.
+ */
+function identityNames(settings: Partial<AppearanceSettings> | undefined): IdentityNames {
+  const input = resolveAppearance(settings)
+  const { base, definition } = activeTheme(settings)
+  if (definition === undefined || !isPresetInput(base, input)) return {}
+  let names: IdentityNames = {}
+  if (definition.light !== undefined) names = { ...names, light: definition.light.paletteNames ?? GENERIC_IDENTITY_NAMES }
+  if (definition.dark !== undefined) names = { ...names, dark: definition.dark.paletteNames ?? GENERIC_IDENTITY_NAMES }
+  return names
+}
+
 /** The built-in scenes the active theme paints, so the client can ask the Host for their SVG. */
 function scenesNeeded(settings: Partial<AppearanceSettings> | undefined): string[] {
   const input = resolveAppearance(settings)
@@ -266,6 +282,7 @@ export class AppearanceModel {
   static readonly isDefaultInput = isDefaultInput
   static readonly runtimeThemeCss = runtimeThemeCss
   static readonly scenesNeeded = scenesNeeded
+  static readonly identityNames = identityNames
   static readonly sceneFrameRate = sceneFrameRate
   static readonly presetThemeCss = presetThemeCss
 }

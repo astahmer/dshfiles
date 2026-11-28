@@ -65,7 +65,10 @@
 }
 
 /* The frame's inner scroller: no visible scrollbar, no scroll chaining into
-   the transcript, and gradient fades over the ends that can still scroll. */
+   the transcript, and gradient fades over the ends that can still scroll.
+   dshfiles (council round 34 B2): the marks rest on a neutral track, 8% ink at a full radius, the rail inset (6px)
+   above the first mark and below the last, so the rail reads as one control; never the accent. A theme's backdrop
+   draws its own pill (`.track`) and clears this fill. */
 .scroller {
   position: relative;
   flex: 0 1 auto;
@@ -73,6 +76,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+  border-radius: 999px;
+  background: var(--dshx-backdrop-rail-fill, color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent));
 }
 
 .scroller::-webkit-scrollbar {
@@ -117,15 +122,15 @@
 .mark::before {
   position: absolute;
   top: 50%;
-  /* dshfiles (b:d5wg): centred on the backdrop pill; flush right elsewhere. */
-  right: var(--dshx-backdrop-rail-inset, 0px);
+  /* dshfiles (b:d5wg, council round 34 B2): centred on the backdrop pill or the resting track. */
+  right: var(--dshx-backdrop-rail-inset, 4px);
   width: 20px;
   height: 2px;
   border-radius: 2px;
   background: var(--dsw-alias-border-l4);
   content: '';
   transform: translateY(-50%) scaleX(0.6);
-  transform-origin: var(--dshx-backdrop-rail-origin, right) center;
+  transform-origin: var(--dshx-backdrop-rail-origin, center) center;
   transition: transform 140ms ease, background-color 140ms ease;
 }
 
@@ -182,7 +187,7 @@
 /* The Turns on screen: one quiet band behind their marks. */
 .band {
   position: absolute;
-  right: calc(var(--dshx-backdrop-rail-inset, 0px) / 2);
+  right: calc(var(--dshx-backdrop-rail-inset, 4px) / 2);
   width: 24px;
   border-radius: var(--dshx-backdrop-rail-band-radius, var(--dsw-radius-sm));
   background: var(--dsw-alias-interactive-bg-hover-solid, var(--dsw-alias-interactive-bg-hover));
@@ -194,10 +199,9 @@
    divider uses between the seen ticks and the unseen ones. */
 .seenBoundary {
   position: absolute;
-  right: var(--dshx-backdrop-rail-inset, 0px);
+  right: var(--dshx-backdrop-rail-inset, 4px);
   width: 20px;
   height: 1px;
-  border-radius: 1px;
   background: var(--dsw-alias-border-l2);
   pointer-events: none;
 }
@@ -206,8 +210,8 @@
 .controls {
   display: flex;
   flex-direction: column;
-  /* dshfiles (b:d5wg): centred in the backdrop pill. */
-  align-items: var(--dshx-backdrop-rail-align, flex-end);
+  /* dshfiles (b:d5wg, council round 34 B2): centred over the backdrop pill or the resting track. */
+  align-items: var(--dshx-backdrop-rail-align, center);
   gap: 2px;
   padding-block: 2px;
   opacity: 0;
@@ -296,7 +300,7 @@
 
 .mark:focus-visible::after {
   position: absolute;
-  inset: 0 0 0 auto;
+  inset: 0 var(--dshx-backdrop-rail-inset, 4px) 0 auto;
   width: 20px;
   border-radius: inherit;
   outline: 1px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));

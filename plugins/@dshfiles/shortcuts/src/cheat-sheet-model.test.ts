@@ -140,6 +140,26 @@ describe('Host rows in the cheat sheet (productivity pass Q5)', () => {
     expect(app?.rows.map(row => row.label)).toEqual(['Search threads', 'Rename thread', 'Split'])
   })
 
+  it('shows a chord only on the row it runs: a Host row on a chord a global command claims first stays out', () => {
+    const sections = CheatSheetModel.sections({
+      commands: [
+        command({ id: '@a/x.new', title: 'New thread', keys: ['Mod+Shift+O'], hidden: true }),
+        command({ id: '@a/x.next', title: 'Next thread', keys: ['Mod+Shift+L'], scope: 'list' }),
+      ],
+      keys: new Map(),
+      host: [
+        { id: 'workspace.openLocally', label: 'Open locally', keys: ['⇧', '⌘', 'O'] },
+        { id: 'workspace.add', label: 'Add workspace', keys: ['⌥', '⌘', 'O'] },
+        { id: 'session.lock', label: 'Lock thread', keys: ['⇧', '⌘', 'L'] },
+      ],
+      singleKeys: true,
+      mac: true,
+    })
+    expect(sections.find(section => section.title === 'App')?.rows.map(row => row.label)).toEqual(['Add workspace', 'Lock thread'])
+    const shiftCmdO = sections.flatMap(section => section.rows).filter(row => row.keys.includes('Mod+Shift+O') || row.keys.join('') === '⇧⌘O')
+    expect(shiftCmdO.map(row => row.label)).toEqual(['New thread'])
+  })
+
   it('writes the replacement in sentence case', () => {
     expect(CheatSheetModel.glossary('New Session')).toBe('New thread')
     expect(CheatSheetModel.glossary('Session history')).toBe('Thread history')

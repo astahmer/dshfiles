@@ -8,7 +8,7 @@ import { AccountWriteQueue } from './account-write-queue.js'
 import type { AccountRemovalTarget } from './account-remove-machine.js'
 import { accountEditorMachine, type AccountEditorActor } from './account-editor-machine.js'
 import { createAutoSaver, type AutoSaver } from './auto-save.js'
-import { connectHintFor } from './account-labels.js'
+import { AccountLabels } from './account-labels.js'
 import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
@@ -282,7 +282,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
     try {
       await saveMutation.mutateAsync({ draft: next, renamesSelection: false })
-      setNotice(`Added ${next.displayName}. ${connectHintFor(kind)}`)
+      setNotice(`Added ${next.displayName}. ${AccountLabels.connectHintFor(kind)}`)
     } catch (error) {
       setNotice(`Could not add the account: ${String(error)}`)
     }

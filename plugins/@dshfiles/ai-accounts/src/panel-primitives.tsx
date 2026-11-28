@@ -1,3 +1,4 @@
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ProviderGlyph as ProviderLogo } from './provider-glyph.js'
@@ -29,13 +30,16 @@ export const ActionHint = (props: { readonly label: string; readonly children: J
   </Tooltip>
 )
 
-/** Branded marks match the account rail/header, independently of editable picker tags. */
-export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean }): JSX.Element => (
+/** Branded marks match the account rail/header, independently of editable picker tags: each provider keeps its colour. */
+export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean; readonly list?: boolean }): JSX.Element => (
   <span
     aria-hidden
+    // A list row leads with this mark, so its selection shows no marker pill beside it (council round 11, A1).
+    {...(props.list === true ? LEADING_GLYPH_ATTRIBUTE : undefined)}
     className={cn(
       'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-foreground dshx:text-background dshx:shadow-sm',
-      props.large ? 'dshx:size-16' : 'dshx:size-11',
+      // A list row's mark is 28 px, the detail header's 32 (council round 5, D2).
+      props.large ? 'dshx:size-16' : props.list === true ? 'dshx:size-7' : 'dshx:size-8',
       props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
     )}
     style={
@@ -44,7 +48,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
         : undefined
     }
   >
-    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-7'} />
+    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : props.list === true ? 'dshx:size-4.5' : 'dshx:size-5'} />
   </span>
 )
 

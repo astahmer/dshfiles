@@ -109,6 +109,44 @@ describe('AgentsRegistry', () => {
   })
 
   it.layer(storageHost)(it => {
+    it.effect('keeps a chosen tone across a restart and a save that omits it, and clears it with null', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(2_500)
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            const saved = yield* registry.save({ ...draftOf('reviewer'), tone: 4 })
+            if (saved.kind !== 'applied') return expect.fail('the agent should be saved')
+            expect(saved.agent.tone).toBe(4)
+            // An agent tool that edits the instructions without naming the colour keeps it.
+            const edited = yield* registry.save({ ...draftOf('reviewer'), instructions: 'Be brief.' })
+            if (edited.kind !== 'applied') return expect.fail('the edit should be saved')
+            expect(edited.agent.tone).toBe(4)
+            // The sparse tool-access and subagent verbs replace one field and keep the colour.
+            const tools = yield* registry.editToolAccess('reviewer', [{ target: { kind: 'tool', key: 'bash' }, entry: { enabled: false } }])
+            if (tools.kind !== 'applied') return expect.fail('the tool edit should be saved')
+            expect(tools.agent.tone).toBe(4)
+            const subagents = yield* registry.setSubagents('reviewer', { allowed: 'any', default: null })
+            if (subagents.kind !== 'applied') return expect.fail('the subagents should be saved')
+            expect(subagents.agent.tone).toBe(4)
+          }),
+        )
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const restored = yield* openRegistry
+            expect((yield* restored.resolve('reviewer'))?.tone).toBe(4)
+            const cleared = yield* restored.save({ ...draftOf('reviewer'), tone: null })
+            if (cleared.kind !== 'applied') return expect.fail('the clear should be saved')
+            expect(cleared.agent).not.toHaveProperty('tone')
+          }),
+        )
+        const reopened = yield* Effect.scoped(Effect.flatMap(openRegistry, registry => registry.resolve('reviewer')))
+        expect(reopened).not.toHaveProperty('tone')
+      }),
+    )
+  })
+
+  it.layer(storageHost)(it => {
     it.effect('removes a custom agent durably and reports a missing one', () =>
       Effect.gen(function* () {
         yield* TestClock.setTime(3_000)

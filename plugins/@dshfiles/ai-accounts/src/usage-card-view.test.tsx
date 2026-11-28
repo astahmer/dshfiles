@@ -20,7 +20,9 @@ describe('quota window captions', () => {
       history: [],
     })
     expect(category?.caption).toBe(`${money(21.53)} of ${money(25.5)} · ${reset}`)
-    expect(category?.formatTotal?.(15.6)).toBe('16% left')
+    // The percent rolls on its own and "left" is the card's unit word beside it, never glued into one string.
+    expect(category?.formatTotal?.(15.6)).toBe('16%')
+    expect(category?.unit).toBe('left')
   })
 
   it('keeps the reset alone for a window that reports only a percentage', () => {
@@ -71,5 +73,7 @@ describe('quota window captions', () => {
     expect(markup).toContain('Vibe &amp; Studio allowance')
     expect(markup).toContain(`${money(21.53)} of ${money(25.5)}`)
     expect(markup).toContain(`${money(0)} of ${money(255)}`)
+    expect(markup).toContain('aria-label="API credit: 16% left"')
+    expect(markup).toMatch(/<span class="[^"]*">left<\/span>/)
   })
 })

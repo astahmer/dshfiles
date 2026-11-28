@@ -1,7 +1,6 @@
 import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
-import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -28,7 +27,7 @@ import { BacklogSelection } from './selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { boardColumnsFor, boardStatuses } from './panel-preferences.js'
@@ -51,20 +50,20 @@ type Drag = {
 }
 
 /** The card's state line, as the video's footer: what it is doing now, not its metadata. */
-const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element => {
+export const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element => {
   const item = props.item
   if (item.attention !== 'none') return <ItemGlyphs.AttentionBadge attention={item.attention} />
   if (item.status === 'doing')
     return (
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
-        <LoaderCircleIcon aria-hidden className="dshx:size-3 dshx:animate-spin dshx:text-info dshx:[animation-duration:2.4s]" />
+        <StatusGlyph status="working" decorative className="dshx:size-3" />
         {ItemGlyphs.ago(item.lastActivityAt)}
       </span>
     )
   if (item.status === 'done')
     return (
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
-        <StatusDot size="sm" tone="success" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
+        <StatusGlyph status="done" decorative className="dshx:size-3" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
       </span>
     )
   return <span className="dshx:text-2xs dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
@@ -109,7 +108,12 @@ const CardFace = (props: {
             className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
             onPointerDown={event => event.stopPropagation()}
           >
-            <ItemPickers.Status itemLabel={BacklogReference.labelOf(item)} status={item.status} onPick={props.onPickStatus} />
+            <ItemPickers.Status
+              itemLabel={BacklogReference.labelOf(item)}
+              status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
+              onPick={props.onPickStatus}
+            />
           </span>
         )}
       </div>
@@ -152,8 +156,9 @@ const CardFace = (props: {
   )
 }
 
-const cardClass =
-  'dshx:group/card dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:p-3 dshx:shadow-xs dshx:transition-[border-color,box-shadow,opacity] dshx:duration-150 dshx:select-none'
+/** A bordered card declares its depth once: border, no shadow, the card radius. */
+export const cardClass =
+  'dshx:group/card dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3 dshx:transition-[border-color,opacity] dshx:duration-150 dshx:select-none'
 
 const BoardCard = (props: {
   readonly item: BacklogSummaryView
@@ -196,7 +201,7 @@ const BoardCard = (props: {
         style={{ viewTransitionName: itemTransitionName('card', item.id) }}
         className={cn(
           cardClass,
-          'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          'dshx:cursor-grab dshx:hover:border-input dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
           item.id === props.openId || props.selected
             ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25'
             : props.cursor
@@ -441,22 +446,25 @@ export const BoardView = (props: {
               data-backlog-column={status}
               aria-label={`${ItemGlyphs.statusLabels[status]} column`}
               className={cn(
-                'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
+                'dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:rounded-lg dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
                 target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
               )}
             >
               <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
                 <ItemGlyphs.StatusIcon status={status} />
-                <h3 className="dshx:text-xs dshx:font-semibold dshx:text-muted-foreground">{ItemGlyphs.statusLabels[status]}</h3>
-                <RollingNumber value={column.length} className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground" />
-                <button
+                <h3 className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{ItemGlyphs.statusLabels[status]}</h3>
+                {/* A zero is not drawn; the empty column stays a drop target. */}
+                {column.length === 0 ? null : <RollingNumber value={column.length} className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" />}
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
                   onClick={() => props.captureInto(status)}
-                  className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                  className="dshx:ml-auto dshx:text-muted-foreground"
                 >
-                  <PlusIcon className="dshx:size-3.5" />
-                </button>
+                  <PlusIcon />
+                </Button>
               </header>
               <div
                 data-backlog-column-scroll
@@ -473,7 +481,6 @@ export const BoardView = (props: {
                   })
                 }}
               >
-                {column.length === 0 ? <EmptyState className="dshx:py-6">Nothing here.</EmptyState> : null}
                 {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
                   <BoardCard
                     key={item.id}

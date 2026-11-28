@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -32,7 +33,6 @@ describe('account page cards', () => {
           kind="codex"
           onMove={noop}
           onSelect={noop}
-          onToggle={noop}
           reorderingDisabled={false}
           selectedId="second"
           visibleIds={['second']}
@@ -43,9 +43,32 @@ describe('account page cards', () => {
     expect(markup).toContain('data-account-priority="2"')
     expect(markup).toContain('aria-current="true"')
     expect(markup).toContain('aria-label="Actions for second"')
-    expect(markup).toContain('aria-label="Hide second in the model picker"')
-    expect(markup).toMatch(/role="switch"[^>]*data-state="checked"/u)
     expect(markup).not.toContain('title=')
+  })
+  it('draws each row as a selector only: brand tile, name, one health dot (round five P5)', () => {
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <AccountGroup
+          accounts={[account('first'), account('second')]}
+          kind="codex"
+          onMove={noop}
+          onSelect={noop}
+          reorderingDisabled={false}
+          selectedId="second"
+          visibleIds={['first', 'second']}
+        />
+      </TooltipProvider>,
+    )
+    expect(markup).toContain('aria-label="Select second"')
+    // Show in picker, rename and the Models / Settings / Usage sections live once, in the detail.
+    expect(markup).not.toContain('role="switch"')
+    expect(markup).not.toContain('aria-label="Rename second"')
+    expect(markup).not.toMatch(/sections"/u)
+    expect(markup).not.toContain('Activity and subscription quota')
+  })
+  it('keeps the built-in provider switch out of the rail, where the row selects', () => {
+    const source = readFileSync(new URL('native-providers-list.tsx', import.meta.url), 'utf8')
+    expect(source).toMatch(/props\.onSelect === undefined \? \(\s*<Switch/u)
   })
   it('shows real identity and plan without fabricated metadata', () => {
     const markup = renderToStaticMarkup(
@@ -55,7 +78,6 @@ describe('account page cards', () => {
           kind="codex"
           onMove={noop}
           onSelect={noop}
-          onToggle={noop}
           reorderingDisabled={false}
           selectedId={null}
           visibleIds={['work']}
@@ -63,7 +85,7 @@ describe('account page cards', () => {
       </TooltipProvider>,
     )
     expect(markup).toContain('real@example.test')
-    expect(markup).toContain('business')
+    expect(markup).toContain('Business')
     expect(markup).not.toContain('Last checked')
     expect(markup).not.toContain('Token valid')
   })
@@ -89,5 +111,25 @@ describe('account page model curation', () => {
     expect(markup).not.toContain('<select')
     expect(markup).not.toContain('title=')
     expect(markup).toContain('High')
+  })
+})
+
+describe('account rows lead with a provider glyph (council round 11, A1/D2)', () => {
+  it('marks the row glyph as leading, so the selected row draws no marker pill beside it', () => {
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <AccountGroup
+          accounts={[account('first')]}
+          kind="codex"
+          onMove={noop}
+          onSelect={noop}
+          reorderingDisabled={false}
+          selectedId="first"
+          visibleIds={['first']}
+        />
+      </TooltipProvider>,
+    )
+    expect(markup).toContain('dshx:selected-marker')
+    expect(markup).toMatch(/<span aria-hidden="true" data-leading-glyph=""/u)
   })
 })

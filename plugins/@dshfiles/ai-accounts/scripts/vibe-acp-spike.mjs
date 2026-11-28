@@ -110,7 +110,7 @@ const request = (method, params, id = nextId++) =>
 
 const updates = []
 
-/** Answer one session/prompt and collect every update it produced. */
+/** Answer one session/prompt and collect every update it produced: ACP answers the prompt after its last update. */
 const prompt = async text => {
   updates.length = 0
   const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text }] })

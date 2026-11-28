@@ -32,6 +32,8 @@ type LayoutInfo = {
    * instead of the contract default (local delta; see README "Local delta").
    */
   sidebarLastOpen: number
+  /** Local delta (dshfiles, round five B4): the user set this width (a drag or a restored one); until then the frame uses its default. */
+  sidebarCustom: boolean
   /** Last positive frame measurement; window width bootstraps the first render. */
   viewportWidth: number
   narrowExpanded: boolean
@@ -112,6 +114,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         mainSurfaceMode: 'native',
         sidebar: SIDEBAR_DEFAULT,
         sidebarLastOpen: SIDEBAR_DEFAULT,
+        sidebarCustom: false,
         viewportWidth: window.innerWidth,
         narrowExpanded: false,
         rightbar: null,
@@ -139,6 +142,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         const width = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX)
         d.layoutInfo.sidebar = width
         d.layoutInfo.sidebarLastOpen = width
+        d.layoutInfo.sidebarCustom = true
       },
       // Narrow toggles flip only the override: the width preference survives
       // untouched, so re-widening restores the pre-squeeze layout.

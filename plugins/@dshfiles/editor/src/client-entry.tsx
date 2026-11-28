@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
@@ -14,12 +15,10 @@ import { threadOnScreen } from '@dshfiles/workbench/thread-on-screen'
 import { useEffect, useSyncExternalStore } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { ArtifactsPanel } from './artifacts-panel.js'
 import { createEditorStore, type EditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
 import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
-import { EditorPanel } from './editor-panel.js'
 import {
   EDITOR_FILES_PANE_ID,
   OpenFileAddress,
@@ -36,6 +35,11 @@ import { createFollowedSession } from './followed-session.js'
 import { MarkdownPreview } from './markdown-preview.js'
 import { createSessionScreen } from './session-screen.js'
 import { createWorkspaceFileIndex } from './workspace-files.js'
+
+/** The editor and Artifacts pages load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const ArtifactsPanel = lazyView(() => views().then(module => module.LazyViews.ArtifactsPanel), { label: 'Artifacts' })
+const EditorPanel = lazyView(() => views().then(module => module.LazyViews.EditorPanel), { label: 'Editor' })
 
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'

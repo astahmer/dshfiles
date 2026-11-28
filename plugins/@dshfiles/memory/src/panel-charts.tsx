@@ -1,6 +1,4 @@
 import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, tooltip } from '@dshfiles/plugin-ui/chart'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import type { LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
@@ -24,57 +22,6 @@ export type DayPoint = {
   readonly jevCalls: number
   readonly jevUsd: number
 }
-
-/** A compact bar sparkline; empty days keep their slot so the shape matches the range. */
-const Sparkline = (props: { readonly values: readonly number[]; readonly tone?: string | undefined }): JSX.Element => {
-  const max = Math.max(...props.values, 1)
-  return (
-    <span aria-hidden className="dshx:flex dshx:h-8 dshx:items-end dshx:gap-[2px]">
-      {props.values.map((value, index) => (
-        <span
-          key={index}
-          className={cn('dshx:w-[3px] dshx:rounded-xs dshx:bg-primary/70', props.tone)}
-          style={{ height: value === 0 ? '0%' : `${String(Math.max(Math.round((value / max) * 100), 8))}%` }}
-        />
-      ))}
-    </span>
-  )
-}
-
-export const StatCard = (props: {
-  readonly label: string
-  readonly value: string
-  readonly detail?: ReactNode
-  readonly Icon?: LucideIcon
-  readonly iconTile?: string
-  readonly spark?: readonly number[]
-  readonly sparkTone?: string | undefined
-  readonly hint?: string
-}): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card/60 dshx:p-3">
-    <div className="dshx:flex dshx:items-start dshx:gap-2">
-      {props.Icon === undefined ? null : (
-        <span
-          className={cn(
-            'dshx:flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg',
-            props.iconTile ?? 'dshx:bg-muted dshx:text-muted-foreground',
-          )}
-        >
-          <props.Icon className="dshx:size-4" />
-        </span>
-      )}
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:text-2xs dshx:leading-tight dshx:text-muted-foreground">{props.label}</span>
-      {props.spark === undefined ? null : <Sparkline values={props.spark} tone={props.sparkTone} />}
-    </div>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="dshx:text-xl dshx:font-semibold dshx:tabular-nums">{props.value}</span>
-      </TooltipTrigger>
-      {props.hint === undefined ? null : <TooltipContent>{props.hint}</TooltipContent>}
-    </Tooltip>
-    {props.detail === undefined ? null : <span className="dshx:min-h-4 dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
-  </div>
-)
 
 const ChartPanel = (props: {
   readonly heading: string

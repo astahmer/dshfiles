@@ -102,7 +102,7 @@ export const threadActionsApi = defineApi({
                 thread.running ? 'running' : 'idle',
                 thread.archived ? 'archived' : undefined,
                 thread.pinned ? 'pinned' : undefined,
-                thread.settled ? 'settled' : undefined,
+                thread.settled ? 'done' : undefined,
               ].filter(Boolean)
               return `${thread.sessionId} · ${thread.title ?? '(untitled)'} · ${thread.projectTitle ?? 'no project'} · ${flags.join(', ')}`
             })
@@ -131,13 +131,13 @@ export const threadActionsApi = defineApi({
       input: Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) }),
       output: Schema.Struct({ sessionId: Schema.String }),
       description: `Settle one thread: it stays listed and openable, but no model step starts — not from a message, a subagent settlement, a reminder or a queued follow-up — until thread_unsettle. Refuse while its own turn runs; stop it first. Defaults to the calling thread when sessionId is omitted. ${ONLY_WHEN_ASKED}`,
-      tool: { name: 'thread_settle', render: output => `Settled thread ${output.sessionId}.` },
+      tool: { name: 'thread_settle', render: output => `Marked thread ${output.sessionId} done.` },
     }),
     unsettle: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
       output: Schema.Struct({ sessionId: Schema.String }),
       description: `Unsettle a settled thread so it can run model steps again. ${ONLY_WHEN_ASKED}`,
-      tool: { name: 'thread_unsettle', render: output => `Unsettled thread ${output.sessionId}.` },
+      tool: { name: 'thread_unsettle', render: output => `Restored thread ${output.sessionId} from Done.` },
     }),
     pin: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
@@ -189,7 +189,7 @@ export const threadActionsApi = defineApi({
         name: 'thread_continue_in',
         render: output => {
           const head = `Thread ${output.sessionId} continues as ${output.continuedSessionId} in project ${output.projectId}${output.workspaceId === output.projectId ? '' : ` (workspace ${output.workspaceId})`}.`
-          const settled = output.settled ? ' The original thread is settled.' : ' The original thread could not be settled; settle it with thread_settle.'
+          const settled = output.settled ? ' The original thread is done.' : ' The original thread could not be marked done; mark it done with thread_settle.'
           if (output.prompt === 'accepted') return `${head}${settled} Its first message was accepted.`
           if (output.prompt === 'refused') return `${head}${settled} Its first message was refused: ${output.promptError ?? 'no reason given'}.`
           return `${head}${settled}`
@@ -318,7 +318,7 @@ export const threadActionsApi = defineApi({
         readOnly: true,
         render: output =>
           output.threads
-            .map(thread => `${thread.sessionId} · ${thread.exists ? (thread.archived ? 'archived' : thread.settled ? 'settled' : 'open') : 'gone'}`)
+            .map(thread => `${thread.sessionId} · ${thread.exists ? (thread.archived ? 'archived' : thread.settled ? 'done' : 'open') : 'gone'}`)
             .join('\n'),
       },
     }),

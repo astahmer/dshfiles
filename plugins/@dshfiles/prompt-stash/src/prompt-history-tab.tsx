@@ -66,7 +66,7 @@ export const PromptHistoryTab = (props: {
       <CommandInput placeholder="Search every prompt you sent" value={search} onValueChange={setSearch} autoFocus />
       <CommandList className="dshx:max-h-80 dshx:p-1" label="Prompt history">
         {status === 'loading' ? emptyLine('Searching sent prompts…') : null}
-        {status === 'error' ? emptyLine('Prompt history could not be read. Reopen Prompts to try again; restart DSH if it keeps failing.') : null}
+        {status === 'error' ? emptyLine('Prompt history could not be read. Reopen Prompts to try again. Restart DSH if it keeps failing.') : null}
         {status === 'disabled' ? emptyLine('Prompt history is off. Turn it on in Settings › Plugins › Prompt stash, then reopen Prompts.') : null}
         {status === 'unavailable'
           ? emptyLine('Prompt history needs thread search, which this profile does not load. Enable it under Getting started › Packs, then restart DSH.')

@@ -3,19 +3,29 @@ import { defineLocale } from '@dshfiles/dshx/client'
 /** Copy of the picker's fan-out ("Send to several models") controls (b:ysaj). */
 const en = {
   selectSeveral: 'Select several',
-  selectSeveralHint: 'Choose two to six models, then Fan out. Shift-click or long-press a model does the same.',
-  selected: '{count} selected',
+  select: 'Select',
+  done: 'Done',
+  selectedUpTo: '{count} selected · up to {limit}',
+  remove: 'Remove {model}',
+  chooseInList: 'Choose models in the list.',
   clear: 'Clear',
-  fanOut: 'Fan out…',
+  fanOut: 'Continue…',
+  selectModels: 'Select models',
+  cancel: 'Cancel',
   fanOutNeedsTwo: 'Choose at least two models.',
 }
 
 const zh = {
   selectSeveral: '多选',
-  selectSeveralHint: '选择 2 到 6 个模型，然后分发。按住 Shift 点击或长按模型效果相同。',
-  selected: '已选 {count} 个',
+  select: '选择',
+  done: '完成',
+  selectedUpTo: '已选 {count} 个 · 最多 {limit} 个',
+  remove: '移除 {model}',
+  chooseInList: '在列表中选择模型。',
   clear: '清除',
-  fanOut: '分发…',
+  fanOut: '继续…',
+  selectModels: '选择模型',
+  cancel: '取消',
   fanOutNeedsTwo: '至少选择两个模型。',
 } satisfies Record<keyof typeof en, string>
 

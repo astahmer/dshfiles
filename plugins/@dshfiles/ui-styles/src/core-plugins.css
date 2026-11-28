@@ -1,0 +1,381 @@
+/*
+ * The core Plugins page (round five A7; DESIGN.md › Do's and Don'ts, accepted exception). The page is DSH's own
+ * (`@deepseek-ai/dsh-client-ui-plugin-manager`) and has no fork here, so ui-styles restyles it through its stable hooks:
+ * the `data-plugin-*` attributes, the Tag primitive's `data-tone`, and the suffix of its CSS-module class names
+ * (`X_2TxG_cardIcon` → `[class*='_cardIcon']`). Unlayered like the Host module sheets, and every rule out-ranks the
+ * module rule it overrides; tests/core-plugins.test.ts fails when a DSH bump renames a hook.
+ */
+
+/*
+ * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at the kit's lane
+ * (`Page width="lane"`): 880px of content, 960px on a pane of 1280px or more, the inset outside the cap (council round
+ * 6, D7), on the page's left edge instead of a centred 960px column, so the switches line up under the header's actions
+ * and end where Inbox and Backlog content ends. The sticky header bar keeps its full width for its background and
+ * compact rule. Icon seats are 32px with 18px glyphs (council round 4, D5).
+ */
+section[data-plugin-panel][data-plugin-panel] {
+  --plugin-page-inset: 24px;
+  --plugin-page-top-inset: 24px;
+  --card-icon-size: 32px;
+  --card-head-gap: 12px;
+  --dshx-plugin-tone: var(--dshx-identity-7);
+  --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z'%3E%3C/path%3E%3C/svg%3E");
+  align-items: stretch;
+}
+
+@media (width < 28rem) {
+  section[data-plugin-panel][data-plugin-panel] {
+    --plugin-page-inset: 12px;
+  }
+}
+
+section[data-plugin-panel][data-plugin-panel] > * {
+  max-width: none;
+}
+
+/*
+ * The body is the pane container (the kit Page root's role). Its border box is the pane; its content box is the pane
+ * less the two 24px insets, so the kit's 1280px pane threshold reads 1232px here. Named, so the header bar's own
+ * inline-size container (`plugin-page-bar`) does not answer for the header.
+ */
+section[data-plugin-panel] [class*='_pageBody'] {
+  container: dshx-plugin-pane / inline-size;
+  align-items: flex-start;
+  padding-bottom: 24px;
+}
+
+section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
+  max-width: 880px;
+}
+
+section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+  max-width: 880px;
+  align-self: flex-start;
+}
+
+@container dshx-plugin-pane (width >= 1232px) {
+  section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
+    max-width: 960px;
+  }
+
+  section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+    max-width: 960px;
+  }
+}
+
+/*
+ * The page title is set like every kit page h1 (`text-title font-title`): 22/28 at 650, -0.01em (council round 6, D4),
+ * after the kit page title mark (`Page mark`, council round 7 A2/D1): the page's own leaf glyph from the Settings
+ * column, lucide `package` in the Plugins group's teal identity tone at the column's 1.5 stroke (council round 8, D4),
+ * 18px on the title's 28px first line, 8px before the text. A glyph only, no tile.
+ */
+section[data-plugin-panel] [class*='_pageTitle'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+section[data-plugin-panel] [class*='_pageTitle']::before {
+  content: '';
+  flex: 0 0 18px;
+  height: 28px;
+  background-color: var(--dshx-identity-1);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z'/%3E%3Cpath d='M12 22V12'/%3E%3Cpolyline points='3.29 7 12 12 20.71 7'/%3E%3Cpath d='m7.5 4.27 9 5.15'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
+}
+
+/*
+ * Refresh (the outline header button, the one with `aria-busy`) keeps the module's 32px box but draws a full 1px edge
+ * at it, the kit outline button's, instead of a 0.5px hairline inside a 0.5px transparent border that read about 31px
+ * beside the filled Add plugin (council round 7, D5).
+ */
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addButton'][aria-busy] {
+  height: 32px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: none;
+}
+
+/*
+ * The labelled header buttons (Refresh, Add plugin) set like kit buttons: the label at 500 and the kit's 8px icon gap,
+ * not the Host Button's 400 and 4px (council round 17, D3). The chevron half of Add plugin has no label and keeps its box.
+ */
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addButton'],
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addPrimary'] {
+  gap: 8px;
+  font-weight: 500;
+}
+
+/*
+ * The switch sits in a fixed column, so descriptions end at one edge. A row with no switch opens a page (a settings
+ * item): the column holds a 14px chevron in secondary ink, centred on the switch's axis (the 36px Host switch sits flush
+ * right, so its axis is 18px in), and the Host's card-link hover fills the whole row (council round 5, D5).
+ */
+section[data-plugin-panel] [class*='_cardEnd'] {
+  min-width: 44px;
+  justify-content: flex-end;
+}
+
+section[data-plugin-panel] [class*='_cardHead']:not(:has([class*='_cardEnd']))::after {
+  content: '';
+  flex: 0 0 44px;
+  align-self: center;
+  height: 14px;
+  background-color: var(--dsw-alias-label-secondary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E")
+    right 11px center / 14px 14px no-repeat;
+}
+
+/* A quiet rule between rows, from the text edge to the row's end; the full-row hover stays the Host's. */
+section[data-plugin-panel] [class*='_cards'] > li + li::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: calc(var(--card-head-inset) + var(--card-icon-size) + var(--card-head-gap));
+  right: var(--card-head-inset);
+  border-top: 1px solid var(--dsw-alias-border-l3);
+  pointer-events: none;
+}
+
+/*
+ * Icon tiles on identity tones: the tile is the tone at 14% with no border, and the artwork is drawn in the tone itself,
+ * as its own silhouette shifted back into the tile by a drop shadow while the original is clipped away. Any artwork (a
+ * package image or an inline SVG) takes the tone; overlapping translucent parts keep their depth. A row's tone comes from
+ * its plugin name, so it survives reordering and filtering: CSS cannot hash a string, so the name's last character
+ * picks one of identity-1..8 (council round 3, D4). Characters are dealt to the tones in order of how often names end
+ * with them (e s t n r y d l first). Most names end in e and many in -bundle, so two later layers refine those: the
+ * character before a final e, then the character before -bundle (later rules win at equal specificity).
+ */
+section[data-plugin-panel] [class*='_cardIcon'] {
+  --dshx-plugin-tile-shift: 96px;
+  overflow: hidden;
+  border-color: transparent;
+  background: color-mix(in oklab, var(--dshx-plugin-tone) 14%, transparent);
+}
+
+section[data-plugin-panel] [class*='_cardIcon'] > * {
+  /* The artwork draws its glyph at about 0.6 of its box (36px drew ~20px): a 30px box draws the ~18px glyph. */
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(var(--dshx-plugin-tile-shift) 0 0 var(--dshx-plugin-tone));
+  transform: translateX(calc(-1 * var(--dshx-plugin-tile-shift)));
+}
+
+/*
+ * Rows (council round 4, D5). A description wraps to three lines before it clamps, instead of the module's one-line clamp
+ * that cut "an…" and "agent.…" mid-thought; a row with no description keeps a one-line row's height (title 20 + gap 4
+ * + an 18px line), its title centred, so rows are even.
+ */
+section[data-plugin-panel] [class*='_cardDesc'] {
+  /* A first line of at most 70ch reads as the row's summary; the rest wraps, then clamps (council round 6, D4). */
+  max-width: 70ch;
+  /*
+   * Three complete 18px lines, never a partial fourth where the clamp is not honoured (council round 10, D4): a summary
+   * that overruns two lines takes a third instead of ending on an ellipsis while the row has room (council round 12, D4).
+   */
+  max-height: 54px;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  text-wrap: pretty;
+}
+
+/*
+ * A row with a description hangs from its title line (council round 10, D4): the 20px switch in a 20px end column at
+ * the row's top sits on the title's 20px line, and the icon tile starts at the title's top, so a two-line description
+ * no longer pulls the switch half a line below the title. Package rows only (the rows with a switch): a settings item row
+ * keeps its icon and chevron centred, since its description slot may render an empty wrapper, and so does a package
+ * row with no description.
+ */
+section[data-plugin-panel] li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardEnd'] {
+  align-self: flex-start;
+  height: 20px;
+}
+
+section[data-plugin-panel] li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardIcon'] {
+  align-self: flex-start;
+}
+
+section[data-plugin-panel] [class*='_cardMain'] {
+  min-height: 42px;
+  justify-content: center;
+}
+
+/* Section titles (Built-in plugin settings, Experimental plugins, Installed plugins): 14/20 at 650. */
+section[data-plugin-panel] [class*='_sectionTitle'],
+section[data-plugin-panel] [class*='_groupTitle'] {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 650;
+}
+
+section[data-plugin-panel] li[data-plugin-package$='a'], section[data-plugin-panel] li[data-plugin-item$='a'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='b'], section[data-plugin-panel] li[data-plugin-item$='b'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='c'], section[data-plugin-panel] li[data-plugin-item$='c'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='d'], section[data-plugin-panel] li[data-plugin-item$='d'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='e'], section[data-plugin-panel] li[data-plugin-item$='e'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='f'], section[data-plugin-panel] li[data-plugin-item$='f'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='g'], section[data-plugin-panel] li[data-plugin-item$='g'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='h'], section[data-plugin-panel] li[data-plugin-item$='h'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='i'], section[data-plugin-panel] li[data-plugin-item$='i'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='j'], section[data-plugin-panel] li[data-plugin-item$='j'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='k'], section[data-plugin-panel] li[data-plugin-item$='k'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='l'], section[data-plugin-panel] li[data-plugin-item$='l'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='m'], section[data-plugin-panel] li[data-plugin-item$='m'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='n'], section[data-plugin-panel] li[data-plugin-item$='n'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='o'], section[data-plugin-panel] li[data-plugin-item$='o'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='p'], section[data-plugin-panel] li[data-plugin-item$='p'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='q'], section[data-plugin-panel] li[data-plugin-item$='q'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='r'], section[data-plugin-panel] li[data-plugin-item$='r'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='s'], section[data-plugin-panel] li[data-plugin-item$='s'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='t'], section[data-plugin-panel] li[data-plugin-item$='t'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='u'], section[data-plugin-panel] li[data-plugin-item$='u'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='v'], section[data-plugin-panel] li[data-plugin-item$='v'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='w'], section[data-plugin-panel] li[data-plugin-item$='w'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='x'], section[data-plugin-panel] li[data-plugin-item$='x'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='y'], section[data-plugin-panel] li[data-plugin-item$='y'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='z'], section[data-plugin-panel] li[data-plugin-item$='z'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='0'], section[data-plugin-panel] li[data-plugin-item$='0'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='1'], section[data-plugin-panel] li[data-plugin-item$='1'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='2'], section[data-plugin-panel] li[data-plugin-item$='2'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='3'], section[data-plugin-panel] li[data-plugin-item$='3'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='4'], section[data-plugin-panel] li[data-plugin-item$='4'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='5'], section[data-plugin-panel] li[data-plugin-item$='5'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='6'], section[data-plugin-panel] li[data-plugin-item$='6'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='7'], section[data-plugin-panel] li[data-plugin-item$='7'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='8'], section[data-plugin-panel] li[data-plugin-item$='8'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='9'], section[data-plugin-panel] li[data-plugin-item$='9'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+
+/* Names ending in e (most do): the character before it decides, four tones on, so `…ne` and `…n` differ. */
+section[data-plugin-panel] li[data-plugin-package$='ae'], section[data-plugin-panel] li[data-plugin-item$='ae'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='be'], section[data-plugin-panel] li[data-plugin-item$='be'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='ce'], section[data-plugin-panel] li[data-plugin-item$='ce'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='de'], section[data-plugin-panel] li[data-plugin-item$='de'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='ee'], section[data-plugin-panel] li[data-plugin-item$='ee'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='fe'], section[data-plugin-panel] li[data-plugin-item$='fe'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='ge'], section[data-plugin-panel] li[data-plugin-item$='ge'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='he'], section[data-plugin-panel] li[data-plugin-item$='he'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='ie'], section[data-plugin-panel] li[data-plugin-item$='ie'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='je'], section[data-plugin-panel] li[data-plugin-item$='je'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='ke'], section[data-plugin-panel] li[data-plugin-item$='ke'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='le'], section[data-plugin-panel] li[data-plugin-item$='le'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='me'], section[data-plugin-panel] li[data-plugin-item$='me'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='ne'], section[data-plugin-panel] li[data-plugin-item$='ne'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='oe'], section[data-plugin-panel] li[data-plugin-item$='oe'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='pe'], section[data-plugin-panel] li[data-plugin-item$='pe'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='qe'], section[data-plugin-panel] li[data-plugin-item$='qe'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='re'], section[data-plugin-panel] li[data-plugin-item$='re'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='se'], section[data-plugin-panel] li[data-plugin-item$='se'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='te'], section[data-plugin-panel] li[data-plugin-item$='te'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='ue'], section[data-plugin-panel] li[data-plugin-item$='ue'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='ve'], section[data-plugin-panel] li[data-plugin-item$='ve'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='we'], section[data-plugin-panel] li[data-plugin-item$='we'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='xe'], section[data-plugin-panel] li[data-plugin-item$='xe'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='ye'], section[data-plugin-panel] li[data-plugin-item$='ye'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='ze'], section[data-plugin-panel] li[data-plugin-item$='ze'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='0e'], section[data-plugin-panel] li[data-plugin-item$='0e'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='1e'], section[data-plugin-panel] li[data-plugin-item$='1e'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='2e'], section[data-plugin-panel] li[data-plugin-item$='2e'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='3e'], section[data-plugin-panel] li[data-plugin-item$='3e'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='4e'], section[data-plugin-panel] li[data-plugin-item$='4e'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='5e'], section[data-plugin-panel] li[data-plugin-item$='5e'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='6e'], section[data-plugin-panel] li[data-plugin-item$='6e'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='7e'], section[data-plugin-panel] li[data-plugin-item$='7e'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='8e'], section[data-plugin-panel] li[data-plugin-item$='8e'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='9e'], section[data-plugin-panel] li[data-plugin-item$='9e'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+
+/* Bundles (`…-bundle`): the character before the suffix decides, four tones on. */
+section[data-plugin-panel] li[data-plugin-package$='a-bundle'], section[data-plugin-panel] li[data-plugin-item$='a-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='b-bundle'], section[data-plugin-panel] li[data-plugin-item$='b-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='c-bundle'], section[data-plugin-panel] li[data-plugin-item$='c-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='d-bundle'], section[data-plugin-panel] li[data-plugin-item$='d-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='e-bundle'], section[data-plugin-panel] li[data-plugin-item$='e-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='f-bundle'], section[data-plugin-panel] li[data-plugin-item$='f-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='g-bundle'], section[data-plugin-panel] li[data-plugin-item$='g-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='h-bundle'], section[data-plugin-panel] li[data-plugin-item$='h-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='i-bundle'], section[data-plugin-panel] li[data-plugin-item$='i-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='j-bundle'], section[data-plugin-panel] li[data-plugin-item$='j-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='k-bundle'], section[data-plugin-panel] li[data-plugin-item$='k-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='l-bundle'], section[data-plugin-panel] li[data-plugin-item$='l-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='m-bundle'], section[data-plugin-panel] li[data-plugin-item$='m-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='n-bundle'], section[data-plugin-panel] li[data-plugin-item$='n-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='o-bundle'], section[data-plugin-panel] li[data-plugin-item$='o-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='p-bundle'], section[data-plugin-panel] li[data-plugin-item$='p-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='q-bundle'], section[data-plugin-panel] li[data-plugin-item$='q-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='r-bundle'], section[data-plugin-panel] li[data-plugin-item$='r-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='s-bundle'], section[data-plugin-panel] li[data-plugin-item$='s-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='t-bundle'], section[data-plugin-panel] li[data-plugin-item$='t-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='u-bundle'], section[data-plugin-panel] li[data-plugin-item$='u-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='v-bundle'], section[data-plugin-panel] li[data-plugin-item$='v-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='w-bundle'], section[data-plugin-panel] li[data-plugin-item$='w-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='x-bundle'], section[data-plugin-panel] li[data-plugin-item$='x-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='y-bundle'], section[data-plugin-panel] li[data-plugin-item$='y-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='z-bundle'], section[data-plugin-panel] li[data-plugin-item$='z-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='0-bundle'], section[data-plugin-panel] li[data-plugin-item$='0-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='1-bundle'], section[data-plugin-panel] li[data-plugin-item$='1-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='2-bundle'], section[data-plugin-panel] li[data-plugin-item$='2-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='3-bundle'], section[data-plugin-panel] li[data-plugin-item$='3-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='4-bundle'], section[data-plugin-panel] li[data-plugin-item$='4-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='5-bundle'], section[data-plugin-panel] li[data-plugin-item$='5-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='6-bundle'], section[data-plugin-panel] li[data-plugin-item$='6-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='7-bundle'], section[data-plugin-panel] li[data-plugin-item$='7-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='8-bundle'], section[data-plugin-panel] li[data-plugin-item$='8-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='9-bundle'], section[data-plugin-panel] li[data-plugin-item$='9-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+
+/*
+ * Never a solid tile (council round 11, D4): every tile is the 14% tint with an outline glyph in its tone. Filled
+ * artwork (stacked squares, a filled shield, a block with a cut-out) drew a solid silhouette that read as a tile inside
+ * the tile, so the page draws Settings-style glyphs instead: lucide at the Settings column's 1.5 stroke, 18px, masked in
+ * the row's tone. Inline artwork (the built-in items and the default art of a package with no image) is always
+ * redrawn; a package image keeps its silhouette unless it is one of DSH's own filled artworks listed below. The default
+ * glyph is the Built-in plugins puzzle (`--dshx-plugin-glyph` on the page frame).
+ */
+section[data-plugin-panel] [class*='_cardIcon']:has(> svg) > svg,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-auto-review'] [class*='_cardIcon'] > *,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-forge-bundle'] [class*='_cardIcon'] > *,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-plugin-market-bundle'] [class*='_cardIcon'] > * {
+  display: none;
+}
+
+section[data-plugin-panel] [class*='_cardIcon']:has(> svg)::before,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-auto-review'] [class*='_cardIcon']::before,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-forge-bundle'] [class*='_cardIcon']::before,
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-plugin-market-bundle'] [class*='_cardIcon']::before {
+  content: '';
+  flex: 0 0 18px;
+  height: 18px;
+  background-color: var(--dshx-plugin-tone);
+  mask: var(--dshx-plugin-glyph) center / 18px 18px no-repeat;
+}
+
+/*
+ * Named built-ins with a Settings column entry take that entry's glyph and its group's tone, so a feature keeps its
+ * colour across pages: Subagents and Agent loop in the Agents rose, Web search and fetch in the Tools copper. Shell has no
+ * column entry: its terminal glyph keeps the name tone. Later than the name-tone rules, at their specificity.
+ */
+section[data-plugin-panel] li[data-plugin-item='subagent'] { --dshx-plugin-tone: var(--dshx-identity-4); --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='8' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M7 11v4a2 2 0 0 0 2 2h4'%3E%3C/path%3E%3Crect width='8' height='8' x='13' y='13' rx='2'%3E%3C/rect%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-item='agent-loop'] { --dshx-plugin-tone: var(--dshx-identity-4); --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 2 4 4-4 4'%3E%3C/path%3E%3Cpath d='M3 11v-1a4 4 0 0 1 4-4h14'%3E%3C/path%3E%3Cpath d='m7 22-4-4 4-4'%3E%3C/path%3E%3Cpath d='M21 13v1a4 4 0 0 1-4 4H3'%3E%3C/path%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-item='web-search'] { --dshx-plugin-tone: var(--dshx-identity-3); --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'%3E%3C/circle%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'%3E%3C/path%3E%3Cpath d='M2 12h20'%3E%3C/path%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-item='shell'] { --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 11 2-2-2-2'%3E%3C/path%3E%3Cpath d='M11 13h4'%3E%3C/path%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'%3E%3C/rect%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-auto-review'] { --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'%3E%3C/path%3E%3Cpath d='m9 12 2 2 4-4'%3E%3C/path%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-forge-bundle'] { --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='18' cy='18' r='3'%3E%3C/circle%3E%3Ccircle cx='6' cy='6' r='3'%3E%3C/circle%3E%3Cpath d='M13 6h3a2 2 0 0 1 2 2v7'%3E%3C/path%3E%3Cline x1='6' x2='6' y1='9' y2='21'%3E%3C/line%3E%3C/svg%3E"); }
+section[data-plugin-panel] li[data-plugin-package$='/dsh-experimental-plugin-market-bundle'] { --dshx-plugin-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2'%3E%3C/path%3E%3Crect x='14' y='2' width='8' height='8' rx='1'%3E%3C/rect%3E%3C/svg%3E"); }
+
+/* Experimental (and Update available) as a quiet neutral chip at the 11px floor, not an accent pill at 10px. */
+section[data-plugin-panel] [class*='_statusTag'][data-tone='info'] {
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dshx-density-text-min);
+}
+
+/*
+ * A group whose every package row is Experimental already says so in its heading: its rows drop the chip. The chip is
+ * the first tag after a row's title. A group holds a row that is not experimental when a title has no tag after it, or
+ * its first tag is not an info tag (`:has()` cannot nest, so the test is on those two shapes). A non-experimental row
+ * whose only tag is Update available still reads as experimental here; DSH shows no such row on the main list today.
+ */
+section[data-plugin-panel] [data-plugin-group]:not(:has(li[data-plugin-package] [class*='_cardOpen']:last-child, li[data-plugin-package] [class*='_cardOpen'] + [class*='_statusTag']:not([data-tone='info']))) [class*='_cardOpen'] + [class*='_statusTag'][data-tone='info'] {
+  display: none;
+}

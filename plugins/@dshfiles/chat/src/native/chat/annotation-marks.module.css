@@ -16,7 +16,8 @@
   height: 18px;
   padding: 0;
   border: 0;
-  border-radius: 4px 9px 9px 4px;
+  /* A tab: square-ish against the passage, round on the gutter side (50% of the 18px box is its 9px half). */
+  border-radius: var(--dsw-radius-xs) 50% 50% var(--dsw-radius-xs);
   background: var(--dsw-alias-state-business-primary);
   color: var(--dsw-alias-label-primary-foreground);
   font: var(--dsw-font-xs-11);
@@ -25,6 +26,19 @@
   cursor: pointer;
   pointer-events: auto;
   box-shadow: var(--dshx-elevation-1);
+}
+
+/* dshfiles: the tab keeps its 18px drawing; its hit area is 24px, and 44px on a coarse pointer. */
+.marker::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+}
+
+@media (pointer: coarse) {
+  .marker::before {
+    inset: -13px;
+  }
 }
 
 .marker:focus-visible {

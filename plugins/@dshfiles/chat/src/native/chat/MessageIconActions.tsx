@@ -8,8 +8,9 @@
 // dshfiles (b:d5wg): every tooltip passes `portal`. A Workbench pane (`contain: layout paint`) is the containing block
 // of an inline `position: fixed` tooltip, which then lands offset by the pane's viewport origin.
 
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CheckIcon, CopyIcon, EllipsisIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, CopyIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { useId, type ReactNode } from 'react'
 import { Tooltip, useClipboardCopy } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
@@ -86,7 +87,7 @@ export function MessageIconActions({
             <Tooltip label={t('message.more')} side="bottom" portal>
               <PopoverTrigger asChild>
                 <button type="button" className={css.action} aria-label={t('message.more')}>
-                  <EllipsisIcon size={14} strokeWidth={1.5} />
+                  <OverflowGlyph />
                 </button>
               </PopoverTrigger>
             </Tooltip>

@@ -5,6 +5,7 @@
 // stream-delta updates from rerendering the pills.
 
 import { DatabaseIcon, GaugeIcon } from '@dshfiles/plugin-ui/icons'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { memo, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -84,21 +85,6 @@ export function deriveStats(nodes: ChatSnapshot['legacy']['nodes']): WindowStats
     }
   }
   return { turns: turns.size, steps, llmMs, toolMs, ttftMs, ttftSteps, decodeMs, decodeTokens }
-}
-
-/**
- * Compact duration: 45.2s under a minute, 2m42s from there on.
- * @param ms - duration in milliseconds.
- * @returns display string.
- */
-export function formatDuration(ms: number, t: ChatViewSlotProps['t']): string {
-  const s = ms / 1_000
-  if (s < 60) return t('duration.compactSeconds', { seconds: Math.round(s * 10) / 10 })
-  const whole = Math.round(s)
-  return t('duration.compactMinutes', {
-    minutes: Math.floor(whole / 60),
-    seconds: whole % 60,
-  })
 }
 
 /**
@@ -273,19 +259,19 @@ export const ActivityPill = memo(function ActivityPill({ useChat, useProjection,
         {stats.llmMs > 0 && (
           <>
             <dt>{t('stats.dialog.llmTime')}</dt>
-            <dd>{formatDuration(stats.llmMs, t)}</dd>
+            <dd>{formatDurationMs(stats.llmMs)}</dd>
           </>
         )}
         {stats.toolMs > 0 && (
           <>
             <dt>{t('stats.dialog.toolTime')}</dt>
-            <dd>{formatDuration(stats.toolMs, t)}</dd>
+            <dd>{formatDurationMs(stats.toolMs)}</dd>
           </>
         )}
         {stats.ttftSteps > 0 && (
           <>
             <dt>{t('stats.dialog.ttft')}</dt>
-            <dd>{formatDuration(stats.ttftMs / stats.ttftSteps, t)}</dd>
+            <dd>{formatDurationMs(stats.ttftMs / stats.ttftSteps)}</dd>
           </>
         )}
         {sessionSpeed !== null && (

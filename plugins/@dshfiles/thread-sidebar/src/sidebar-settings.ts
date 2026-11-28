@@ -1,12 +1,12 @@
-import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
-import { Clock, Context, Effect, Layer, Schedule, Semaphore, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Layer, Schedule, Semaphore, Stream } from 'effect'
 import type { AutoRestartPolicy } from './auto-restart.js'
 import type { AutoSettlePolicy } from './organization.js'
 import { threadSidebarSettings } from './settings.js'
 import { SidebarSettingsWriteFailed } from './sidebar-errors.js'
-import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
+import { SettledStore } from './settled-store.js'
+import { SettledThreadsModel } from './settled-threads.js'
 import type { SubscriptionDeliveryMode, SubscriptionNoticeLevel } from './subscription-levels.js'
 
 export type SidebarSettingsValue = SettingsValue<typeof threadSidebarSettings.schema>
@@ -33,16 +33,14 @@ const policyOf = (value: SidebarSettingsValue): AutoSettlePolicy => ({
   scanIntervalMinutes: value.scanIntervalMinutes,
 })
 
-const statusOf = (value: SidebarSettingsValue): SettledStatus => ({ settledSessionIds: [...value.settledSessionIds], settledAt: { ...value.settledAt } })
-
 export const autoSettlePolicyKey = (policy: AutoSettlePolicy): string => JSON.stringify(policy)
 
 /** A write based on a revision another writer (or this one, not yet refreshed) moved past is retried on a fresh read. */
 const CONFLICT_RETRY = { schedule: Schedule.spaced('50 millis'), times: 20 } as const
 
 /**
- * The settled status, the auto-settle policy and the restart-resume switch, read from and written to the sidebar's
- * settings namespace, so the settled-thread gate, the auto-settle scan and the Agent's settle verbs use the values
+ * The settled status (in the sidebar's {@link SettledStore}), the auto-settle policy and the restart-resume switch (in
+ * its settings namespace), so the settled-thread gate, the auto-settle scan and the Agent's settle verbs use the values
  * the sidebar shows instead of a second copy.
  */
 export class SidebarSettings extends Context.Service<
@@ -65,7 +63,7 @@ export class SidebarSettings extends Context.Service<
     readonly settle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
     /** Drop the settled status of several threads in one write, for a reminder that needs its thread awake. */
     readonly unsettle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
-    /** Add or drop one settled id, returning the ids the namespace now holds. */
+    /** Add or drop one settled id, returning the ids the store now holds. */
     readonly setSettled: (input: { readonly sessionId: string; readonly settled: boolean }) => Effect.Effect<ReadonlyArray<string>, SidebarSettingsWriteFailed>
   }
 >()('@dshfiles/thread-sidebar/SidebarSettings') {
@@ -73,33 +71,48 @@ export class SidebarSettings extends Context.Service<
     SidebarSettings,
     Effect.gen(function* () {
       const settings = yield* ThreadSidebarSettings
+      const store = yield* SettledStore
       const exclusive = (yield* Semaphore.make(1)).withPermits(1)
-      const settled = yield* SubscriptionRef.make<ReadonlyArray<string>>((yield* settings.get).settledSessionIds)
-      yield* DshxPlugin.worker(settings.changes.pipe(Stream.runForEach(value => SubscriptionRef.set(settled, value.settledSessionIds))))
 
+      /** Write a settings patch on the revision it was planned against, retried on a conflict. */
       const write = (change: (value: SidebarSettingsValue, now: number) => Partial<SidebarSettingsValue>) =>
         exclusive(
           Effect.gen(function* () {
             const snapshot = yield* settings.snapshot
             const now = yield* Clock.currentTimeMillis
             const patch = change(snapshot.value, now)
-            yield* settings.update(patch, snapshot.revision)
-            return { ...snapshot.value, ...patch }
+            if (Object.keys(patch).length > 0) yield* settings.update(patch, snapshot.revision)
           }).pipe(
             Effect.retry({ ...CONFLICT_RETRY, while: error => error._tag === 'SettingsConflict' }),
-            Effect.tap(next => SubscriptionRef.set(settled, next.settledSessionIds)),
             Effect.mapError(cause => new SidebarSettingsWriteFailed({ cause })),
           ),
         )
 
-      const settleAndUnpark = (value: SidebarSettingsValue, sessionIds: ReadonlyArray<string>, now: number): Partial<SidebarSettingsValue> => {
-        const next = SettledThreadsModel.settleAndUnpark({ status: statusOf(value), parkedSessionIds: value.parkedSessionIds, sessionIds, now })
-        return { settledSessionIds: next.settledSessionIds, settledAt: next.settledAt, parkedSessionIds: next.parkedSessionIds }
-      }
+      /** Settle in the store, then drop the parked mark of each newly settled id from Settings when one holds it. */
+      const settleAndUnpark = (sessionIds: ReadonlyArray<string>) =>
+        Effect.gen(function* () {
+          const next = yield* store.update((status, now) => {
+            const settled = SettledThreadsModel.settle(status, sessionIds, now)
+            return { status: settled, result: settled.settledSessionIds }
+          })
+          const targets = new Set(sessionIds)
+          yield* write(value =>
+            value.parkedSessionIds.some(sessionId => targets.has(sessionId))
+              ? { parkedSessionIds: value.parkedSessionIds.filter(sessionId => !targets.has(sessionId)) }
+              : {},
+          )
+          return next
+        })
+
+      const unsettle = (sessionIds: ReadonlyArray<string>) =>
+        store.update(status => {
+          const unsettled = SettledThreadsModel.unsettle(status, sessionIds)
+          return { status: unsettled, result: unsettled.settledSessionIds }
+        })
 
       return SidebarSettings.of({
-        settledSessionIdsNow: () => SubscriptionRef.getUnsafe(settled),
-        settledSessionIds: SubscriptionRef.get(settled),
+        settledSessionIdsNow: () => store.current().settledSessionIds,
+        settledSessionIds: Effect.map(store.snapshot, snapshot => snapshot.settledSessionIds),
         policy: Effect.map(settings.get, policyOf),
         policyChanges: settings.changes.pipe(
           Stream.map(policyOf),
@@ -116,25 +129,17 @@ export class SidebarSettings extends Context.Service<
         subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
         remindersWake: Effect.map(settings.get, value => value.remindersWakeEnabled),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {
-          yield* write((value, now) => settleAndUnpark(value, sessionIds, now))
+          yield* settleAndUnpark(sessionIds)
         }),
         unsettle: Effect.fn('settled threads unsettle')(function* (sessionIds) {
-          yield* write(value => {
-            const unsettled = SettledThreadsModel.unsettle(statusOf(value), sessionIds)
-            return { settledSessionIds: unsettled.settledSessionIds, settledAt: unsettled.settledAt }
-          })
+          yield* unsettle(sessionIds)
         }),
         setSettled: Effect.fn('settled thread set')(function* (input) {
-          const next = yield* write((value, now) => {
-            if (input.settled) return settleAndUnpark(value, [input.sessionId], now)
-            const unsettled = SettledThreadsModel.unsettle(statusOf(value), [input.sessionId])
-            return { settledSessionIds: unsettled.settledSessionIds, settledAt: unsettled.settledAt }
-          })
-          return next.settledSessionIds
+          return yield* input.settled ? settleAndUnpark([input.sessionId]) : unsettle([input.sessionId])
         }),
       })
     }),
-  )
+  ).pipe(Layer.provideMerge(SettledStore.layer))
 }
 
 /** The namespace as DSH holds it; a Host without its settings entry runs on the schema defaults. */

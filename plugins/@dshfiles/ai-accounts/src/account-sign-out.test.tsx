@@ -164,11 +164,49 @@ describe('real account sign-out confirmation component with fake Host', () => {
     const view = await mount()
     expect(button(view.container, 'Sign out').disabled).toBe(true)
     expect(view.container.textContent).toBe('Sign out')
-    expect(view.container.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('updated Host')
+    expect(view.container.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('updated DSH')
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000)
     })
     expect(api.capability).toHaveBeenCalledOnce()
+    expect(api.signOut).not.toHaveBeenCalled()
+  })
+})
+
+describe('sign-out opened from the account actions menu (council round 4, D2)', () => {
+  const mountControlled = async (account = profile(), onOpenChange = vi.fn()) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    views.push({ root, container, client })
+    await act(async () => {
+      root.render(
+        <PluginQueryProvider client={client}>
+          <AccountSignOut account={account} open onOpenChange={onOpenChange} />
+        </PluginQueryProvider>,
+      )
+    })
+    await flush()
+    return { container, onOpenChange }
+  }
+  it('draws no header button and opens the same scoped confirmation', async () => {
+    const view = await mountControlled()
+    expect(view.container.querySelector('button')).toBeNull()
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog?.textContent).toContain('Sign out of Synthetic Work?')
+    if (dialog === null) throw new Error('Expected confirmation')
+    await click(button(dialog, 'Sign out'))
+    expect(api.signOut).toHaveBeenCalledExactlyOnceWith({ instanceId: 'synthetic', confirm: true })
+    expect(view.onOpenChange).toHaveBeenCalledWith(false)
+  })
+  it('says why sign-out is unavailable inside the confirmation, and never signs out', async () => {
+    api.capability.mockRejectedValue(new Error('Unknown API'))
+    await mountControlled()
+    const dialog = document.querySelector('[role="alertdialog"]')
+    expect(dialog?.querySelector('[role="status"]')?.textContent).toContain('updated DSH')
+    if (dialog === null) throw new Error('Expected confirmation')
+    expect(button(dialog, 'Sign out').disabled).toBe(true)
     expect(api.signOut).not.toHaveBeenCalled()
   })
 })

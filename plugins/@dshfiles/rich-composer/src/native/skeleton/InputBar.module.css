@@ -94,10 +94,17 @@
   cursor: pointer;
 }
 
-.meterMore:hover,
+/* dshfiles (round four R12): hover styles sit behind (hover: hover), so a tap does not leave them stuck on a phone. */
 .meterMore:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+@media (hover: hover) {
+  .meterMore:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-secondary);
+  }
 }
 
 .dock:not(:has(> :global([data-run-summary]), :global([data-composer-stat]), :global([data-composer-meta]), .queued)) {
@@ -107,8 +114,10 @@
 /* A narrow bar keeps the location on one line, truncating it before ⋯ (shown only when there are readings), and moves
    the readings behind ⋯. A phone wrapped "project / Own workspace · ahead of <bookmark> / ⋯" onto three lines. */
 @container (max-width: 560px) {
+  /* Round five C1 (council round 5): one 24px line, its 22px items 2px under the card. */
   .dock:not([data-meter-expanded]) {
     flex-wrap: nowrap;
+    padding-top: 2px;
   }
 
   .dock:not([data-meter-expanded]) > :global([data-run-summary]),
@@ -122,6 +131,13 @@
   .dock:not([data-meter-expanded]) > :global([data-run-summary]) {
     flex-shrink: 0;
     max-width: 45%;
+  }
+
+  /* Council round 11 C4: the location clips its own overflow here, which cut the "·" pulled 8px out of its box, so a
+     phone read "billing-api   In the project". The dot sits inside the box, 6px before the words. */
+  .dock:not([data-meter-expanded]):has(> :global([data-run-summary])) :global([data-composer-meta='location'])::before {
+    margin-left: 0;
+    margin-right: 6px;
   }
 
   .dock:not([data-meter-expanded]) :global([data-composer-stat]) {
@@ -153,6 +169,22 @@
 
 .hero .dock:empty {
   display: none;
+}
+
+/* Council round 13 C5: on a phone the passive line under the composer ("billing-api · In the project · 1 ahead of
+   main") repeats what the header and the thread list already say and costs a line over the keyboard. It shows only
+   when an entry flags a state worth seeing (`data-meter-alert`: jujutsu's conflict, behind or detached) or messages
+   wait in the queue. Hidden from the first paint, so readings landing never move the composer. Its readings stay
+   reachable: the thread bar's ⋯ sheet lists "Show usage and cost", which expands the line (InputBar), and the line's
+   own toggle, shown here even with no reading yet, folds it away again. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .root:not(.hero) > .dock:not([data-meter-expanded]):not(:has(:global([data-meter-alert]), .queued)) {
+    display: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .dock[data-meter-expanded] .meterMore {
+    display: inline-flex;
+  }
 }
 
 .hero {
@@ -217,8 +249,10 @@
   cursor: pointer;
 }
 
-.largePasteAction:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .largePasteAction:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* The held send's Cancel is the phone's way out besides the waiting Send: a full touch target. */
@@ -243,14 +277,20 @@
   /* Visual refresh T3.1: the composer is the ONE elevated resting object. A 12px card (the composer step of the
      radius scale), one hairline drawn as a ring so it costs no layout, the s1 shadow and an inner top highlight
      (dark's s1 carries its own, so the light highlight is switched off there). Fill: the input surface token (the
-     raised step in dark). Everything else around it stays flat. */
+     raised step in dark). Everything else around it stays flat. Council round 11 C3: the hairline is the kit's 3:1
+     field edge (`--dshx-field-border`, #88827D light, #76706C dark), empty or not, so the main input reads as a text
+     field like the sidebar's search; the controls inside it stay unboxed. */
   border: 0;
   --dsh-composer-card-fill: var(--dsw-specific-input-major);
   --dsh-composer-card-highlight: var(--dshx-tone-bg, transparent);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsh-composer-card-fill);
+  /* Council round 18 C4: a seam layer above the elevation, transparent unless the phone's Live work strip sits on the
+     card's top (ConversationRoot.module.css), where it takes the card fill and covers dark's s1 top highlight, so the
+     ring is the one line between them. */
   box-shadow:
-    0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2)),
+    0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
+    inset 0 1px 0 var(--dsh-composer-card-seam, transparent),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
   transition: box-shadow var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
@@ -273,10 +313,11 @@
   --dsh-composer-card-highlight: transparent;
 }
 
-/* Focus inside the card strengthens the ring one step (a signal of where typing goes), never the accent. */
+/* Typing keeps the field edge (council round 11 C3: it is already the 3:1 step), never the accent. */
 .card:focus-within {
   box-shadow:
-    0 0 0 1px var(--dshx-tone-border-strong, var(--dsw-alias-border-l3)),
+    0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
+    inset 0 1px 0 var(--dsh-composer-card-seam, transparent),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
 }
@@ -392,6 +433,12 @@
   caret-color: var(--dsw-alias-state-business-primary);
 }
 
+/* Council round 16 C1: the New thread composer reads as a place to write: its empty writing area is 10px taller (54px:
+   a 24px line, 10px above it, 20px under it) than a started thread's, still growing with the draft. */
+.hero .input {
+  min-height: 54px;
+}
+
 /* Lexical paragraphs are <p> blocks: strip the UA margins so the surface
    keeps the textarea's line rhythm. */
 .input p {
@@ -451,13 +498,13 @@
 }
 
 /* The muted sigil hint after "Ask anything" (InputBar sets the variable only for the default placeholder). It leaves
-   first when the line gets short: narrow bars and touch screens show "Ask anything" alone. */
+   first when the line gets short: narrow bars and touch screens show "Ask anything" alone. Council round 13 C4: the
+   caption at 0.8 opacity measured 2.7-3.5:1; the faint step at full opacity holds AA on the card in both schemes. */
 .placeholder::after {
   content: var(--dsh-composer-placeholder-hint, '');
   margin-left: 12px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-tertiary);
   font-size: var(--dshx-density-text-meta, 12px);
-  opacity: 0.8;
 }
 
 @container (max-width: 560px) {
@@ -480,8 +527,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* The bar's line (its 32px model chip) and its pads, which a narrow card's Send is placed from (council round 35 P1). */
+  --dsh-composer-row-line: 32px;
+  --dsh-composer-row-pad: 8px;
+  --dsh-composer-row-pad-top: 0px;
   /* Composer redesign (b:v9yh): the bar sits right under the text line, 8px off the card's edges. */
-  padding: 0 8px 8px;
+  padding: var(--dsh-composer-row-pad-top) 8px var(--dsh-composer-row-pad);
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (PermissionSelect @container rule). Anonymous
@@ -498,16 +549,49 @@
 /* The icon step (b:gyk7): the model is an icon now, so its seat keeps that icon's width instead of shrinking away,
    and the ghost buttons drop the gaps between them (each keeps its own padding), so + · mode · ⋯ · model fit the
    ~112px a 176px docked pane leaves before Send's seat. */
-.row[data-model-icon] .modelSeat,
-.row[data-model-icon] .standardControls {
+.row:is([data-model-icon], [data-model-mark]) .modelSeat,
+.row:is([data-model-icon], [data-model-mark]) .standardControls {
   flex: none;
 }
 
-.row[data-model-icon],
-.row[data-model-icon] .tools,
-.row[data-model-icon] .modes,
-.row[data-model-icon] .trailing,
-.row[data-model-icon] .standardControls {
+/* The mark step (unslop r5 C3): a phone's bar shows the model as its brand mark in a 24px chip instead of "gpt-…". The
+   model picker is its own plugin; this reads the markers its trigger already carries (`data-model-trigger`, the mark's
+   `svg[data-brand]`, or since council round 18 C3 the kit's `[data-model-mark]`, `data-model-picker-text`), and a
+   model without a mark keeps its truncating name. Round five C1
+   (council round 5): the mark alone read as an unnamed glyph, so the short name stays beside it, truncated at 96px; a
+   bar it would wrap (`data-model-mark-tight`, control-row-layout.ts) keeps the mark alone. */
+.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) {
+  min-width: 0;
+  gap: 0;
+  padding-inline: 4px;
+}
+
+.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) :global([data-model-picker-text]) {
+  max-width: 96px;
+}
+
+/* Council picker round 1, N8: a tight bar truncates the name to 4rem instead of dropping it (the mode chip's words go
+   first), and the account tag stays, so the bar still says which model and, after a swap, which account answers. */
+.row[data-model-mark-tight] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) :global([data-model-picker-text]) {
+  max-width: 4rem;
+}
+
+.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) > svg:last-child {
+  display: none;
+}
+
+.row[data-model-mark] :global([data-model-trigger]) :global(:is(svg[data-brand], [data-model-mark])) {
+  width: 16px;
+  height: 16px;
+}
+
+/* Both icon steps drop the gaps: the bar's zero-width plugin anchors each cost one, which left + · mode · ⋯ · model
+   unevenly spaced; each ghost control keeps its own padding. */
+.row:is([data-model-icon], [data-model-mark]),
+.row:is([data-model-icon], [data-model-mark]) .tools,
+.row:is([data-model-icon], [data-model-mark]) .modes,
+.row:is([data-model-icon], [data-model-mark]) .trailing,
+.row:is([data-model-icon], [data-model-mark]) .standardControls {
   column-gap: 0;
 }
 
@@ -602,14 +686,15 @@
 
 /* Primary send (visual refresh T3.3): ONE round button in ink, not the accent (colour is a signal for Needs you and
    Failed only). Its glyph morphs with what a click does now: send, queue behind the running turn, steer into it, or
-   stop. Composer redesign (b:v9yh): 32px on a fine pointer, 36pt on touch; with nothing to send it is no disc at all,
-   only a muted arrow. */
+   stop. Council round 13 C3: a 28px circle on a fine pointer (the + control's size) and 32px on touch, where the bar's
+   44pt hit area still centres on it; with nothing to send it keeps its disc, the + control's raised fill with a faint
+   glyph, so the seat never empties. */
 .primary {
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 999px;
   corner-shape: round;
@@ -637,10 +722,28 @@
   outline-offset: 2px;
 }
 
+/* Council round 14 C5: the resting disc is rimmed with the border-l2 hairline, drawn inside it (no layout shift), so a
+   disabled send stays findable on the composer card's fill. The ready ink circle needs none. */
 .primary:disabled {
-  background: transparent;
-  color: var(--dsw-alias-label-caption);
+  background: var(--dsw-specific-selector, var(--dshx-tone-raised));
+  box-shadow: inset 0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  color: var(--dsw-alias-label-tertiary);
   cursor: default;
+}
+
+/* Council round 25, item 6: Stop is quiet. Ink is the colour of the one thing to do next (send); stopping a running
+   turn is a ghost circle on the card's fill, rimmed with the 3:1 field edge (drawn inside, no layout shift) around a
+   10px ink square. Send's seat and the separate Stop a continuable child keeps beside a typed draft look the same. */
+.primary:is([data-send-mode='stop'], [data-stop]):not(:disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3));
+  color: var(--dshx-tone-text, var(--dsw-alias-label-primary));
+}
+
+@media (hover: hover) {
+  .primary:is([data-send-mode='stop'], [data-stop]):not(:disabled):hover {
+    background: var(--dsw-specific-selector, var(--dshx-tone-raised));
+  }
 }
 
 /* The glyph enters with a short scale-and-fade when the mode changes (the glyph is keyed by mode). */
@@ -665,8 +768,14 @@
 
 @media (pointer: coarse) {
   .primary {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Stop beside Send (a continuable child with a typed draft): 12px apart, the circles' 44pt touch areas meet without
+     overlapping, and the pair still fills the phone's 92px two-button seat exactly (8 + 32 + 12 + 32 + 8). */
+  .send {
+    gap: 12px;
   }
 
   /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
@@ -744,6 +853,14 @@
 .rowHero .runRow,
 .rowHero .modes {
   display: contents;
+}
+
+/* dshfiles (unslop r5 C5, council round 5): the New thread bar's chips come from several owners (the project, multi-host's
+   host, jj-integration's workspace, the access mode, the model); their icons all take the secondary ink, as the project
+   chip's and the mode chip's already did, so no chip's glyph reads heavier than the next. Brand marks and project tiles
+   keep their colour. */
+.rowHero :global([data-run-segment]) svg:not(:global([data-brand])) {
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* One line before wrapping (visual refresh T5.4, carried from T3): once the bar is compact (`data-model-compact`: the
@@ -879,17 +996,24 @@
     --dsh-composer-send-seat: 92px;
   }
 
+  /* Send's centre is the row's line (council round 34 A2): the row's bottom pad plus half its line, so a 28px Send sits
+     10px up and a touch screen's 32px Send 8px up (below). Council round 35 P1: a subagent's bar has no model chip, so its
+     line was the 28px + control and Stop sat 2px above it; the row now holds its line at the model chip's 32px whatever
+     it shows, and the offset is derived from that line and the pad, not a constant. */
+  .row {
+    min-height: calc(var(--dsh-composer-row-pad-top) + var(--dsh-composer-row-line) + var(--dsh-composer-row-pad));
+  }
+
   .send {
     position: absolute;
     right: 8px;
-    bottom: 8px;
+    bottom: calc(var(--dsh-composer-row-pad) + (var(--dsh-composer-row-line) - 28px) / 2);
     z-index: 1;
   }
 
-  /* The chips scroll inside the bar; nothing they hold may widen the card (menus open above it, never sideways). */
-  .card {
-    overflow-x: clip;
-  }
+  /* The card itself never clips: the @, / and + menus hang above it from `.overlayAnchor`, and WebKit clips both axes
+     of a box that clips one, which left an iPhone with tappable but unpainted menus. The chips stay inside the bar
+     because the row scrolls (above). */
 
   /* The new-thread bar wraps instead (composer redesign b:v9yh): project, host, workspace, mode and model are all
      choices to read before the first message, so none may hide off the edge of a scrolling line. Send keeps its seat
@@ -911,10 +1035,12 @@
   white-space: nowrap;
 }
 
+/* A touch screen's 32px Send sits on the row's 8px bottom pad (council round 34 A2): a touch-only 6px put it 2px under
+   the + control's line, and a fine pointer's 28px Send at 8px sat 2px under it too. */
 @media (pointer: coarse) {
   @container (max-width: 560px) {
     .send {
-      bottom: 6px;
+      bottom: calc(var(--dsh-composer-row-pad) + (var(--dsh-composer-row-line) - 32px) / 2);
     }
   }
 }
@@ -931,4 +1057,79 @@
     position: absolute;
     inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
   }
+}
+
+/* Touch (unslop r3 item 23): the 44pt areas above must fit where they are hit-tested. A narrow bar is a scroll
+   container, which clips its children's areas to its padding box: give it room above the chips (taken back by the
+   margin, so nothing moves), and let + win the strip it shares with the chip beside it. The meter line's ⋯ gets the
+   same area; its line stops clipping, since every item in it shrinks or hides on its own. */
+@media (pointer: coarse) {
+  @container (max-width: 560px) {
+    .row {
+      --dsh-composer-row-pad-top: 8px;
+      margin-top: -8px;
+    }
+
+    .dock:not([data-meter-expanded]) {
+      overflow: visible;
+    }
+  }
+
+  .add {
+    z-index: 1;
+  }
+
+  .meterMore {
+    position: relative;
+  }
+
+  /* Send's own area ends 4px under the card, so ⋯'s reaches 7px up and 17px down; the line keeps 10px under it so that
+     reach stays on screen. */
+  .meterMore::after {
+    content: '';
+    position: absolute;
+    inset: -7px min(0px, calc((100% - 44px) / 2)) -17px;
+  }
+
+  .root:not(.hero) {
+    padding-bottom: 10px;
+  }
+}
+
+/* dshfiles (round four R12): with the keyboard up a phone has little room above the composer. The `@`/`/` list stays
+   under the top bar (`--dsh-trigger-menu-max`, measured by useTriggerMenuRoom), and opens under the caret, above the
+   keyboard, when fewer than three rows fit above. The input-trigger menu sets its own inline max-height. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .card :global([data-trigger-menu]) {
+    max-height: min(400px, var(--dsh-trigger-menu-max, 400px)) !important;
+  }
+
+  :global(html[data-shell-phone-nav]) .card[data-trigger-menu-below] :global([data-trigger-menu]) {
+    top: var(--dsh-trigger-menu-top, auto) !important;
+    bottom: auto !important;
+    z-index: 5;
+  }
+
+  /* Council round 10 C1: the empty docked composer is a 76px block, not 88px: no top pad and a 36px text line (6px
+     pads), then the 40px bar. The line is a floor, so the card still grows with the draft. */
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .card {
+    padding-top: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .input {
+    min-height: 36px;
+    padding-block: 6px;
+  }
+
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .placeholder {
+    top: 6px;
+  }
+}
+
+/* Council round 10 C3: one rule for the bar's chips. A value reads in ink at 500 and the run pickers' 13px (the mode
+   chip and the model chip were 12px, the mode chip in the secondary ink, so "Can edit" read as disabled); glyphs take
+   the secondary ink (the mode chip's own classes, the model picker's), brand marks keep their colour. */
+.row :is(:global([data-composer-mode-chip]), :global([data-model-trigger])) {
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 500;
 }

@@ -45,6 +45,10 @@
       "types": "./src/thread-mention.ts",
       "default": "./dist/thread-mention.js"
     },
+    "./thread-status-client": {
+      "types": "./src/thread-status-client.ts",
+      "default": "./dist/thread-status-client.js"
+    },
     "./destinations": {
       "types": "./src/destinations.ts",
       "default": "./dist/destinations.js"
@@ -72,6 +76,10 @@
     "./project-colors": {
       "types": "./src/project-colors.ts",
       "default": "./dist/project-colors.js"
+    },
+    "./failed-turns-client": {
+      "types": "./src/failed-turns-client.ts",
+      "default": "./dist/failed-turns-client.js"
     }
   },
   "scripts": {
@@ -87,6 +95,7 @@
     "@dshfiles/activity-timeline": "workspace:*",
     "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/background-jobs": "workspace:*",
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",

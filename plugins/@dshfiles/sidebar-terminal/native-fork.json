@@ -25,6 +25,8 @@
     "src/native/client/TerminalExcerptAction.tsx",
     "src/native/client/excerpt-targets.ts",
     "src/native/client/excerpt.ts",
-    "src/native/client/use-terminal-excerpt-target.ts"
+    "src/native/client/use-terminal-excerpt-target.ts",
+    "src/native/client/terminal-key-row.test.ts",
+    "src/native/client/terminal-key-row.tsx"
   ]
 }

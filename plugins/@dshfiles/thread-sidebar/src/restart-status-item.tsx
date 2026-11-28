@@ -3,7 +3,7 @@ import { useApi, useRegistry, useResource } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { threadSidebarRestartApi, type AutoRestartStatusWire } from './restart-api.js'
 import { RestartBridge, type RestartRequest } from './restart-bridge.js'
 import { AUTO_RESTART_READ } from './restart-status-read.js'
@@ -80,6 +80,22 @@ export const useAutoRestart = (): AutoRestartView => {
 
 const NO_PACKAGES: readonly string[] = []
 
+const UPPERCASE_WORDS: ReadonlySet<string> = new Set(['ai', 'mcp', 'jj', 'ui', 'pwa', 'hmr', 'cli', 'dsh', 'ram'])
+
+/**
+ * A package id as a person names the plugin: `@dshfiles/ai-accounts` reads "AI accounts". The notice is read by the
+ * person who decides to restart, not by someone looking for a package.
+ */
+const pluginDisplayName = (packageId: string): string => {
+  const words = (packageId.split('/').at(-1) ?? packageId).split('-').filter(word => word !== '')
+  const named = words.map(word => (UPPERCASE_WORDS.has(word) ? word.toUpperCase() : word)).join(' ')
+  return named === '' ? packageId : `${named.charAt(0).toUpperCase()}${named.slice(1)}`
+}
+
+export class RestartNoticeModel {
+  static readonly pluginDisplayName = pluginDisplayName
+}
+
 /** One store over every source's packages, so the item re-renders when any of them changes. */
 const useSourcePackages = (sources: readonly PendingRestartSource[]): readonly string[] => {
   const store = useMemo(() => {
@@ -106,8 +122,11 @@ const useSourcePackages = (sources: readonly PendingRestartSource[]): readonly s
  * The status strip's one restart item (docs/ade-ux §4.1 R5): every update only a Host restart applies, from the Host
  * files thread-sidebar watches and from other plugins' sources, with the restart verbs. It hides while nothing waits.
  * The verbs run in the sidebar shell, which keeps the confirmation dialog and its guards.
+ *
+ * `fallback` is what the same strip seat shows while no restart waits: the Update DSH notice. An update and the restart
+ * that loads it are two steps of one flow, so they share one item instead of sitting side by side.
  */
-export const RestartStatusItem = (props: StatusItemProps & { readonly text: RestartStatusText }): JSX.Element | null => {
+export const RestartStatusItem = (props: StatusItemProps & { readonly text: RestartStatusText; readonly fallback?: ReactNode }): JSX.Element | null => {
   const notice = useSyncExternalStore(RestartBridge.subscribe, RestartBridge.read, RestartBridge.read)
   const sources = useRegistry(PendingRestartSources)
   const sourcePackages = useSourcePackages(sources)
@@ -118,8 +137,9 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
   const restartApi = useApi(threadSidebarRestartApi)
   const commandCopy = useCopyFeedback()
   // The rail's Restart carries the same countdown, Postpone and verbs: one restart control (b:kgcc).
-  if (notice.onRail) return null
-  if (plugins.length === 0 && notice.waitingLabel === null && auto.secondsLeft === null) return null
+  const quiet = <>{props.fallback ?? null}</>
+  if (notice.onRail) return quiet
+  if (plugins.length === 0 && notice.waitingLabel === null && auto.secondsLeft === null) return quiet
   const label = auto.secondsLeft === null ? (notice.waitingLabel ?? props.text.pending(plugins.length)) : props.text.autoCountdown(auto.secondsLeft)
   const postpone = (): void => {
     setOpen(false)
@@ -136,6 +156,8 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
           type="button"
           className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:text-warning dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
           data-testid="status-item-restart"
+          // A pending restart is the user's to act on: the phone keeps the strip for it (council round 3 B6, frame-layout).
+          data-status-actionable=""
           aria-label={label}
         >
           <span className="dshx:truncate">{label}</span>
@@ -145,9 +167,9 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
         {plugins.length === 0 ? null : (
           <div className="dshx:flex dshx:flex-col dshx:gap-1">
             <p className="dshx:text-sm dshx:font-medium">{props.text.applied}</p>
-            <ul className="dshx:max-h-40 dshx:overflow-y-auto dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+            <ul className="dshx:max-h-40 dshx:overflow-y-auto dshx:text-xs dshx:text-muted-foreground">
               {plugins.map(plugin => (
-                <li key={plugin}>{plugin}</li>
+                <li key={plugin}>{pluginDisplayName(plugin)}</li>
               ))}
             </ul>
           </div>

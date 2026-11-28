@@ -9,7 +9,8 @@ const agent = (fields: Partial<Agent> = {}): Agent => ({
   ...fields,
 })
 
-const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
+// Without a tone: a draft's `null` (clear) is not a stored agent's value, and these drafts double as agents.
+const draft = (fields: Partial<Omit<AgentDraft, 'tone'>> = {}): Omit<AgentDraft, 'tone'> => ({
   handle: 'reviewer',
   name: 'Reviewer',
   glyph: '🔍',
@@ -109,6 +110,15 @@ test('a row stored before memory scopes and routines existed still loads', () =>
   })
   assert.equal(parsed.memoryScope, null)
   assert.equal(parsed.routine, '')
+  // A row from before colours has no tone: it keeps the colour hashed from its handle.
+  assert.equal(parsed.tone, undefined)
+})
+
+test('a tone is one of the six identity slots', () => {
+  const decode = Schema.decodeUnknownResult(agentSchema)
+  const stored = { ...Agents.builtIn(5) }
+  assert.equal(Schema.decodeUnknownSync(agentSchema)({ ...stored, tone: 3 }).tone, 3)
+  for (const tone of [-1, 6, 1.5, '2']) assert.equal(decode({ ...stored, tone })._tag, 'Failure', `tone ${String(tone)} is refused`)
 })
 
 test('a memory scope is the agent’s own note scope, absent by default', () => {

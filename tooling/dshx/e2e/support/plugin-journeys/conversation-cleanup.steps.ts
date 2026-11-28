@@ -139,7 +139,7 @@ When('conversation cleanup deletion is confirmed', async ({ page }: { page: Page
   await cleanupSection(page).getByRole('button', { name: 'Delete previewed threads', exact: true }).click()
   const confirmation = page.getByRole('alertdialog', { name: confirmationTitle, exact: true })
   await expect(confirmation).toBeVisible()
-  await confirmation.getByRole('button', { name: 'Permanently delete', exact: true }).click()
+  await confirmation.getByRole('button', { name: 'Delete threads', exact: true }).click()
   await expect(confirmation).toBeHidden()
 })
 

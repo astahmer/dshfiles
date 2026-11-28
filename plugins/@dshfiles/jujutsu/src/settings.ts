@@ -40,27 +40,27 @@ export const jujutsuSettings = defineSettings({
     composerBar: Schema.boolean()
       .default(true)
       .description(
-        'Show the Changes pill (net file diff, opens the Changes view) in the thread header and the phone top bar when the Session folder is a JJ workspace.',
+        'Show the Changes pill in the thread header when the thread runs in a JJ workspace.',
       ),
     composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
     headerToggle: Schema.boolean()
       .default(false)
       .description(
-        'Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository. Off keeps the header for thread state; the side panel opens from its own rail.',
+        'Show a button in the thread header that opens the Jujutsu side panel for the thread’s project.',
       ),
     chatReferenceLinks: Schema.boolean()
       .default(true)
-      .description('Link explicit Jujutsu references in chat (`jj:main`, a revision id, or a repository bookmark) to the Jujutsu panel.'),
+      .description('Link explicit Jujutsu references in thread messages (`jj:main`, a revision id, or a repository bookmark) to the Jujutsu panel.'),
     chatReferenceClickBehavior: Schema.union([
       Schema.const('focus').description('Focus revision'),
       Schema.const('path').description('Compare with main/default and show revision ancestry'),
     ])
       .default('focus')
-      .description('What happens when a Jujutsu reference in chat is clicked.'),
+      .description('What happens when a Jujutsu reference in a thread is clicked.'),
     composerBarBase: Schema.string()
       .default('project')
       .description(
-        'Default base of the composer bar: `project` (since the fork point with the project’s main branch, Settings › Projects; `main` without one), `parent` (working copy vs @-), `trunk` (since trunk()), a local bookmark such as `main`, or a selected remote bookmark.',
+        'What the composer bar diffs against: project, parent, trunk, or a bookmark.',
       ),
   }),
   applies: 'live',

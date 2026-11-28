@@ -24,6 +24,7 @@ test('every override applies to the derived row', () => {
   for (const override of OVERRIDES) {
     assert.match(block, new RegExp(`- id: ${override.id}\\n`), override.id)
     if (override.name !== undefined) assert.match(block, new RegExp(`- id: ${override.id}\\n\\s+name: '${override.name}'`), override.id)
+    for (const key of Object.keys(override.addConfig ?? {})) assert.match(block, new RegExp(`- id: ${override.id}\\n(?:\\s+.+\\n)*?\\s+${key}:\\n`), `${override.id} ${key}`)
   }
   const body = block.slice(block.indexOf('- id: preset-standard'))
   assert.doesNotMatch(body, /customSkillDirs/)

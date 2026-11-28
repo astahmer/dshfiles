@@ -7,6 +7,7 @@ import { useState } from 'react'
 
 import { agentLimits, type Agent } from './agent.js'
 import { AgentName } from './agent-list.js'
+import { AgentTone } from './agent-tone.js'
 
 export interface AgentStartProject {
   readonly id: string
@@ -50,7 +51,7 @@ export const AgentStartDialog = (props: {
             <DialogHeader>
               <DialogTitle>Start a thread with @{agent.handle}</DialogTitle>
               <DialogDescription>
-                <AgentName glyph={agent.glyph} name={agent.name} /> · {props.routeLabel(agent)} · {props.presetLabel(agent)}
+                <AgentName glyph={agent.glyph} name={agent.name} slot={AgentTone.slotOf(agent)} /> · {props.routeLabel(agent)} · {props.presetLabel(agent)}
                 {agent.instructions.trim() === '' ? '' : ' · its instructions open the thread'}
               </DialogDescription>
             </DialogHeader>

@@ -1,0 +1,514 @@
+/*
+ * Colour roles (DESIGN.md › Colour roles). Colour has four jobs: attention, result, identity, data. Each role below
+ * names its job, so a plugin writes `dshx:text-status-ready` or `dshx:bg-identity-3` instead of borrowing a status hue.
+ *
+ * - Status and health roles are new names for the existing semantic values: they follow the Host theme (and a custom
+ *   accent hue) exactly as `info`, `success`, `warning` and `destructive` do.
+ * - `control-on` is the ink (council round 7 A1): the on state of a switch, checkbox or radio, its tick or knob in
+ *   `control-on-foreground` (the inverse ink). Indigo means attention, the focus ring and links only; every on state,
+ *   chosen card and active tab bar is ink. In dark it steps down to L 0.82 of the ink's own hue (council round 9 A2), so
+ *   a column of on switches reads as ink rather than a near-white glare; light keeps the ink itself.
+ * - Identity tells projects, providers and agents apart and never says state: a text-safe ramp at oklch L 0.50
+ *   (light) and 0.78 with chroma capped at 0.13 (dark), every tone at AA on bg, panel and raised in both schemes
+ *   (tests/palette.test.ts).
+ * - Data is the categorical chart order (round five K5): six identity hues at a chart step, teal, violet, copper,
+ *   magenta, olive, cyan, so no series starts with the interaction accent or reads as a status. Each is a real CSS
+ *   variable (`--dshx-data-<n>`) a plot spec can name; marks hold 3:1 where charts sit.
+ *
+ * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
+ */
+@theme inline {
+  --color-status-needs-you: var(--dsw-alias-state-business-primary);
+  --color-status-failed: var(--dsw-alias-state-error-primary);
+  --color-status-ready: var(--dsw-alias-state-success-primary);
+  /* The Ready dot (council round 6 A6): lighter than the ready text green in light; the success tone in dark. */
+  --color-status-ready-mark: var(--dshx-ready-mark, var(--dsw-alias-state-success-primary));
+  --color-status-working: var(--dsw-alias-label-primary);
+  --color-status-idle: var(--dsw-alias-label-tertiary);
+  --color-status-done: var(--dsw-alias-label-secondary);
+  --color-control-on: var(--dshx-control-on, var(--dsw-alias-label-primary));
+  --color-control-on-foreground: var(--dshx-control-on-foreground, var(--dsw-alias-label-primary-foreground));
+  /* The dense checkbox's on state (council round 12 A3): a step off the ink in light, the dark on state in dark. */
+  --color-control-on-dense: var(--dshx-control-on-dense, var(--dshx-control-on, var(--dsw-alias-label-primary)));
+  /*
+   * The tint rung on things you act on (round five K3): a row-level attention verb (Review, Answer, Rate…) is Needs-you
+   * text on a 12% tint of it, a failed row's verb the danger pair. The text is pulled 30% toward the ink so it holds
+   * AA on its own tint at rest, hover and press over every surface (tests/button-tint.test.tsx). `attention-tint` and
+   * `danger-tint` are the rest tint for a chip or a band that is not a button.
+   */
+  /*
+   * A selection (round five K2): a neutral warm wash since council round 3 (generated in theme.generated.css), so
+   * indigo fills mean attention only. The selected row, the settings category, a pressed toggle, the palette's
+   * highlighted row. Text on it stays ink (`text-foreground`). A selected list row adds
+   * `selected-marker` (a straight 3 x 16px ink pill 3px from the leading edge, council round 10 A2; ink since council
+   * round 6 A1, so indigo means attention only) and its title at `font-selected` (550); a chosen card or tile takes
+   * `selected-card` instead, with no wash (council round 8 A2).
+   */
+  --color-selected-wash: var(--dshx-selected-wash);
+  --font-weight-selected: 550;
+  /*
+   * Attention washes (round five A2): the persistent fill of a Needs-you row (accent hue) and a Failed row (danger hue),
+   * stronger than the selection wash, generated in theme.generated.css. Ink, secondary text and the status glyphs
+   * hold AA on them (tests/attention-wash.test.ts). `wash-needs-you-band` is the calmer dark variant for a full-width
+   * head band (an Inbox card); rows keep `wash-needs-you` (council round 3 A2).
+   */
+  --color-wash-needs-you: var(--dshx-wash-needs-you);
+  --color-wash-needs-you-band: var(--dshx-wash-needs-you-band);
+  --color-wash-failed: var(--dshx-wash-failed);
+  /*
+   * A field's boundary (council round 6 A2): `border-field-border` on an input, select trigger, textarea, input group,
+   * combobox trigger, checkbox and radio, 3:1 against every surface a field sits on (WCAG 1.4.11; tests/field-look).
+   * Dividers and card hairlines stay `border-border`. Falls back to the Host control border without ui-styles.
+   */
+  --color-field-border: var(--dshx-field-border, var(--dsw-alias-border-l3));
+  /*
+   * A quiet trigger's fill (council round 10 A1): `bg-trigger-fill` under `triggerLook` (Select, Combobox, `Button
+   * variant="field"`) and `select-look`. Light oklch(0.955 0.004 65), dark oklch(0.235 0.006 65); ink, secondary and
+   * faint text hold AA on it (tests/field-look). Falls back to the raised step without ui-styles.
+   */
+  --color-trigger-fill: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));
+  /*
+   * A segmented control's track: `bg-segment-track`, the raised step in both schemes (#23201D in dark: council round 34
+   * B3); inside a popover it is `--dshx-segment-track-floating`, #1A1715 in dark, below the popover fill (round 28). Falls back to the muted step without ui-styles.
+   */
+  --color-segment-track: var(--dshx-segment-track, var(--dsw-alias-bg-module-platform));
+  /*
+   * The user prompt bubble (council round 6 A5): `bg-prompt-fill`, or `var(--dshx-prompt-fill)` in a CSS module (chat's
+   * MessageItem bubble). A faint cool tint at hue 230; ink, secondary and faint text and links hold AA on it
+   * (tests/prompt-fill). Falls back to the Host bubble fill without ui-styles.
+   */
+  --color-prompt-fill: var(--dshx-prompt-fill, var(--dsw-specific-bubble));
+  /* Behind a kit dialog, alert dialog or sheet (round five K8): warm ink at 32% in light, black at 50% in dark. */
+  --color-scrim: var(--dshx-scrim);
+  --color-attention-foreground: var(--dshx-attention-foreground);
+  --color-danger-tint-foreground: var(--dshx-danger-tint-foreground);
+  /*
+   * A verb on a head band (council round 12 A2: `Button band`): its 20/26/32% fill sits over the band's own wash, so its
+   * text is pulled further toward the ink, 40% in light and 50% in dark, to hold AA on every state (tests/button-tint).
+   */
+  --color-attention-band-foreground: var(--dshx-attention-band-foreground);
+  --color-danger-band-foreground: var(--dshx-danger-band-foreground);
+  --color-attention-tint: color-mix(in oklab, var(--dsw-alias-state-business-primary) 12%, transparent);
+  --color-danger-tint: color-mix(in oklab, var(--dsw-alias-state-error-primary) 12%, transparent);
+  /* A destructive button's fill: white text holds 4.5:1 on it in both schemes (the dark danger text tone does not). */
+  --color-destructive-solid: var(--dshx-destructive-solid);
+  --color-health-ok: var(--dsw-alias-state-success-primary);
+  --color-health-limited: var(--dsw-alias-state-warn-primary);
+  --color-health-down: var(--dsw-alias-state-error-primary);
+  --color-health-off: var(--dsw-alias-label-tertiary);
+  --color-identity-1: var(--dshx-identity-1);
+  --color-identity-2: var(--dshx-identity-2);
+  --color-identity-3: var(--dshx-identity-3);
+  --color-identity-4: var(--dshx-identity-4);
+  --color-identity-5: var(--dshx-identity-5);
+  --color-identity-6: var(--dshx-identity-6);
+  --color-identity-7: var(--dshx-identity-7);
+  --color-identity-8: var(--dshx-identity-8);
+  --color-data-1: var(--dshx-data-1);
+  --color-data-2: var(--dshx-data-2);
+  --color-data-3: var(--dshx-data-3);
+  --color-data-4: var(--dshx-data-4);
+  --color-data-5: var(--dshx-data-5);
+  --color-data-6: var(--dshx-data-6);
+  /*
+   * Navigation identity (council round 3 A7): each rail destination's glyph draws in its own identity tone, so colour
+   * enters the chrome through what a place is, never as a tinted panel. `dshx:text-nav-<id>`, `dshx:bg-nav-<id>/14`;
+   * or the `nav-tone-<id>` + `text-nav-tone` / `bg-nav-tile` utilities below.
+   */
+  --color-nav-threads: var(--dshx-nav-tone-threads);
+  --color-nav-inbox: var(--dshx-nav-tone-inbox);
+  --color-nav-land: var(--dshx-nav-tone-land);
+  --color-nav-work: var(--dshx-nav-tone-work);
+  --color-nav-agents: var(--dshx-nav-tone-agents);
+  --color-nav-observe: var(--dshx-nav-tone-observe);
+  --color-nav-knowledge: var(--dshx-nav-tone-knowledge);
+  --color-nav-settings: var(--dshx-nav-tone-settings);
+}
+
+/*
+ * The selection marker (round five A1; ink in council round 6 A1): `dshx:selected-marker`, applied wherever a list row,
+ * nav item or palette row takes `bg-selected-wash`. Ink holds 3:1 on the wash in both schemes (tests/selected-wash).
+ * Since council round 10 A2 it is a straight 3 x 16px pill (radius full), 3px from the row's start edge and centred
+ * on its height, never an inset shadow that bends with the row's corner. It is drawn as three background layers (the
+ * body and two round caps), so it needs no positioned row, no pseudo-element and moves nothing. A row whose place glyph
+ * already shows the selection (a `place-seat` tile that has not opted out with `data-selected="false"`) draws no
+ * marker. An active underline tab draws its own 2px ink bar (council round 7 A1), under the tab.
+ *
+ * Council round 11 A1: a row whose first visual is a glyph, tile or mark draws no marker either; the wash and the 550
+ * title carry it (Linear, Things), so the pill never crowds a status glyph, project tile or provider mark. Leading means
+ * the row's first element, or the first element of its first element, up to four deep: `StatusGlyph`, `ProjectMark`,
+ * `PlaceGlyph`/`place-seat` (selected or not), `ModelMark` and `NativeProviderMark`. A plugin glyph opts in with
+ * `data-leading-glyph` (found anywhere in the row), and a row opts out with `data-marker="none"`
+ * (`components/selection`). The pill stays on plain-text rows. A row whose wash is not the selection wash (a selected
+ * Needs-you or Failed row keeps its attention wash) keeps the pill with `data-marker="pill"`: there it is the only
+ * selection cue besides the 550 title.
+ */
+@utility selected-marker {
+  &[data-marker='pill'],
+  &:not(:has([class*='place-seat']:not([data-selected='false']))):not([data-marker='none']):not(
+      :has(
+        [data-leading-glyph],
+        > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :first-child > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child
+      )
+    ) {
+    background-image:
+      linear-gradient(var(--dsw-alias-label-primary), var(--dsw-alias-label-primary)),
+      radial-gradient(circle closest-side, var(--dsw-alias-label-primary) 80%, transparent 100%),
+      radial-gradient(circle closest-side, var(--dsw-alias-label-primary) 80%, transparent 100%);
+    background-size:
+      3px 13px,
+      3px 3px,
+      3px 3px;
+    background-position:
+      3px 50%,
+      3px calc(50% - 6.5px),
+      3px calc(50% + 6.5px);
+    background-repeat: no-repeat;
+  }
+}
+
+/*
+ * The selected edge (council round 12 A1): `dshx:selected-edge` beside `bg-selected-wash` on a selected row that leads
+ * with a glyph, tile or mark, where `selected-marker` draws no pill (the current thread row, an account row). The wash
+ * alone measured 1.10:1 off the dark page, so a neutral 1px inset edge (`--dshx-selected-edge`, generated: light
+ * #67625D, dark #9D9792; its own value, darker than the field edge since council round 14 A2) outlines it, 3:1 against the wash on the page, the nav column and a dialog (tests/selected-edge).
+ * An inset shadow, so it moves nothing and follows the row's radius; focus keeps the kit outline. Plain-text rows keep
+ * the pill and take no edge; a Needs-you or Failed row keeps its attention wash and its pill (`MARKER_KEEP`).
+ */
+@utility selected-edge {
+  box-shadow: inset 0 0 0 1px var(--dshx-selected-edge, var(--dshx-field-border, var(--dsw-alias-border-l3)));
+}
+
+/*
+ * The selected segment (council round 10 A3): one rule for the kit's segmented `TabsList`, the page's sliding tab
+ * indicator and `SlidingSegments`. Paper (#FEFCFA) on the #EBE9E7 track in light, a raised #302C28 on the #23201D
+ * track in dark, a 6px radius inside the track's 3px inset and a quiet 1px edge (the ink at 10% light, white at 7%
+ * dark), no shadow. The element carries its own 1px `border` (width), so the edge never changes its box; the label on
+ * it is the ink at 550 (`font-selected`). Ink holds AA on the thumb and secondary text on the track (tests/segments).
+ */
+@utility segment-thumb {
+  border-color: var(--dshx-segment-edge, var(--dsw-alias-border-l2));
+  border-radius: var(--dsw-radius-sm, 6px);
+  background-color: var(--dshx-segment-thumb, var(--dsw-alias-bg-base));
+  box-shadow: none;
+}
+
+/*
+ * A segment label that turns 550 when selected keeps the width of its 550 form at rest (council round 10 A3), so
+ * selecting a segment never moves its neighbours: `segment-label` on a span with `data-label` (the label text) reserves
+ * that width with a zero-height, invisible pseudo-element. No text is duplicated in the DOM.
+ */
+@utility segment-label {
+  display: inline-flex;
+  flex-direction: column;
+  &::before {
+    /* Empty alternative text: the reserve is never part of the accessible name. */
+    content: attr(data-label) / '';
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    font-weight: 550;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+/*
+ * The chosen card or tile (council round 3 A1): `dshx:selected-card` on a bordered card (a theme card, a starter tile,
+ * a plan option). A 1.5px edge in the ink at 80% (council round 9 A3: its own 1px border plus a 0.5px inset ring, so
+ * the box never changes size; ink since council round 7 A1, lighter than the 2px pure ink it was) and a 16px check badge
+ * in the full ink in the trailing top corner, so the choice reads without colour. Nothing heavier (council round 8 A2): the card keeps its normal surface, no wash. No inset leading marker:
+ * that is the list row's cue. The badge is the ink with the check cut out to the card's surface, 3:1 both ways on
+ * every surface step. Focus keeps the indigo kit outline, which this never touches.
+ */
+@utility selected-card {
+  position: relative;
+  border-color: color-mix(in oklab, var(--dsw-alias-label-primary) 80%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--dsw-alias-label-primary) 80%, transparent);
+  &::after {
+    content: '';
+    position: absolute;
+    /* All four insets: a coarse pointer's 44px hit area also draws with a raw button's ::after (styles.css). */
+    inset-block: 6px auto;
+    inset-inline: auto 6px;
+    width: 16px;
+    height: 16px;
+    background-color: var(--dsw-alias-label-primary);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cmask id='m'%3E%3Crect width='16' height='16' fill='white'/%3E%3Cpath d='M4.5 8.2 7 10.6l4.5-5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='8' cy='8' r='8' fill='white' mask='url(%23m)'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+    pointer-events: none;
+  }
+}
+
+/*
+ * Navigation identity utilities (council round 3 A7). `nav-tone-<id>` names a destination on the rail item (or tab-bar
+ * tab); inside it, `text-nav-tone` draws the icon in that tone (glyph only, the label stays ink) and `bg-nav-tile` gives the
+ * active item's icon seat a 14% tile of the same tone. The `text-`/`bg-` names keep them clear of the kit's
+ * `[&_svg:not([class*=text-])]` icon colour inside buttons and menu rows. Glyph and ink label hold 3:1 and AA on the tile over bg, panel
+ * and raised in both schemes (tests/nav-tone.test.ts). No tinted rows, panels or headers.
+ */
+@utility nav-tone-threads {
+  --dshx-nav-tone: var(--dshx-nav-tone-threads);
+}
+@utility nav-tone-inbox {
+  --dshx-nav-tone: var(--dshx-nav-tone-inbox);
+}
+@utility nav-tone-land {
+  --dshx-nav-tone: var(--dshx-nav-tone-land);
+}
+@utility nav-tone-work {
+  --dshx-nav-tone: var(--dshx-nav-tone-work);
+}
+@utility nav-tone-agents {
+  --dshx-nav-tone: var(--dshx-nav-tone-agents);
+}
+@utility nav-tone-observe {
+  --dshx-nav-tone: var(--dshx-nav-tone-observe);
+}
+@utility nav-tone-knowledge {
+  --dshx-nav-tone: var(--dshx-nav-tone-knowledge);
+}
+@utility nav-tone-settings {
+  --dshx-nav-tone: var(--dshx-nav-tone-settings);
+}
+@utility text-nav-tone {
+  color: var(--dshx-nav-tone, currentColor);
+}
+@utility bg-nav-tile {
+  background-color: color-mix(in oklab, var(--dshx-nav-tone, currentColor) 14%, transparent);
+}
+
+/*
+ * The selected-place tile (council round 9 A1): "a selected place carries its tone". `dshx:place-seat` is the seat of a
+ * 16–18px glyph in a nav row, a side-column row, a tab or a phone tab-bar tab: the glyph draws in the place's tone
+ * (`--dshx-nav-tone`: a `nav-tone-<id>` class, a Settings group's identity tone as an inline variable, see `PlaceGlyph`)
+ * and, once the place is selected, sits on the same 14% tile as the rail. Selected means the seat says so
+ * (`data-selected="true"`) or the row or tab around it does: `aria-current` (a nav or list row), `aria-selected="true"`
+ * (a tab) or Dockview's `.dv-active-tab`; `data-selected="false"` opts a seat out. Geometry stays with the caller
+ * (`size-6 rounded-md` is the 24px default), so the tile never moves a row. The selection bar, wash and label stay
+ * neutral ink. Glyph 3:1 and ink label AA on the tile over bg, panel, raised and the selected wash, for every nav and
+ * identity tone (tests/place-glyph.test.tsx).
+ */
+@utility place-seat {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--dshx-nav-tone, currentColor);
+  &[data-selected='true'],
+  :where([aria-current]:not([aria-current='false']), [aria-selected='true'], .dv-active-tab) &:not([data-selected='false']) {
+    background-color: color-mix(in oklab, var(--dshx-nav-tone, currentColor) 14%, transparent);
+  }
+}
+
+/*
+ * The attention badge (council round 4 A3): a Needs-you count on a nav glyph or a tab (`AttentionBadge`, or
+ * `dshx:badge-attention` on a span). A 16px pill in the attention fill: the Needs-you colour with white text in light;
+ * in dark a lifted fill of the accent hue (L 0.72) with dark text (L 0.2), so it is never a white blob. A 2px ring in
+ * the surface it sits on cuts it off the glyph; the rail's panel step by default, `--dshx-badge-ring` elsewhere (the
+ * phone tab bar sets its own). Text AA on the fill and fill 3:1 on bg, panel and raised (tests/attention-badge.test.tsx).
+ * Seat it beside the glyph, never over it.
+ */
+@utility badge-attention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 16px;
+  min-width: 16px;
+  padding-inline: 4px;
+  border-radius: 9999px;
+  background-color: var(--dshx-badge-attention-fill);
+  color: var(--dshx-badge-attention-foreground);
+  box-shadow: 0 0 0 2px var(--dshx-badge-ring, var(--dsw-specific-sidebar-fill));
+  font-size: var(--dshx-density-text-min);
+  font-weight: 600;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * The evidence well (council round 16 A1): the one recipe for what an Inbox card body quotes, desktop and phone: the
+ * command an approval runs ("Runs: …", neutral) or a failed turn's provider line ("Error: …", `data-tone="danger"`,
+ * only when there is a line to show). `dshx:evidence-well` on a block, or `EvidenceWell` (`components/ui/evidence-well`).
+ * Full measure, padding 8/12, radius 6, mono 12/18 that wraps; neutral oklch(0.95 0.004 70) / dark oklch(0.24 0.006 70),
+ * red-soft oklch(0.96 0.02 25) / dark oklch(0.26 0.03 25). Plainly not a button: no height, no border, no shadow, text
+ * flush to the start. A `[data-evidence-label]` part ("Runs:", "Error:") is secondary ink, or the danger text tone in a
+ * danger well. Ink, secondary and the danger tone hold AA on both fills in both schemes (tests/evidence-well).
+ */
+@utility evidence-well {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 6px);
+  box-shadow: none;
+  background-color: var(--dshx-evidence-well);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  text-align: start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  & :where([data-evidence-label]) {
+    color: var(--dsw-alias-label-secondary);
+  }
+  &[data-tone='danger'] {
+    background-color: var(--dshx-evidence-well-danger);
+  }
+  &[data-tone='danger'] :where([data-evidence-label]) {
+    color: var(--dsw-alias-state-error-primary);
+  }
+}
+
+@layer base {
+  :root {
+    /* teal, violet, orange, pink, green, olive, sky, brown */
+    --dshx-identity-1: oklch(0.5 0.09 195);
+    --dshx-identity-2: oklch(0.5 0.17 300);
+    --dshx-identity-3: oklch(0.5 0.13 50);
+    --dshx-identity-4: oklch(0.5 0.17 350);
+    --dshx-identity-5: oklch(0.5 0.13 145);
+    --dshx-identity-6: oklch(0.5 0.1 100);
+    --dshx-identity-7: oklch(0.5 0.12 235);
+    --dshx-identity-8: oklch(0.5 0.08 70);
+    /* teal, violet, copper, magenta, olive, cyan */
+    --dshx-data-1: oklch(0.6 0.12 195);
+    --dshx-data-2: oklch(0.6 0.12 305);
+    --dshx-data-3: oklch(0.6 0.12 55);
+    --dshx-data-4: oklch(0.6 0.12 340);
+    --dshx-data-5: oklch(0.6 0.12 110);
+    --dshx-data-6: oklch(0.6 0.12 225);
+    --dshx-scrim: rgb(27 26 25 / 0.32);
+    /* How long a row that just became Needs you, Failed or Ready holds its tint (DESIGN.md › Motion). */
+    --dshx-duration-hold: 1200ms;
+  }
+  /* On body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing). */
+  body {
+    /*
+     * The rail destinations' own tones (council round 4 A1; hues re-spread in council round 8 A4), declared on body so
+     * dark follows. Every hue keeps 25° from the status hues (red 25, amber 80, green 150, indigo 270) and 40° from every
+     * other: Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350.
+     * Inbox is the attention destination: its glyph is the secondary ink like Settings, and its indigo AttentionBadge
+     * carries the colour. Chroma 0.14 in light (L 0.52–0.56), 0.13 in dark (L 0.78); teal and blue stop at the sRGB
+     * edge in light (about 0.10 and 0.12 at L 0.56), as vivid as those hues get. Glyph 3:1 and ink AA on the 14% tile
+     * over bg, panel and raised (tests/nav-tone.test.ts).
+     */
+    --dshx-nav-tone-threads: oklch(0.56 0.124 235);
+    --dshx-nav-tone-inbox: var(--dsw-alias-label-secondary);
+    --dshx-nav-tone-land: oklch(0.56 0.102 180);
+    --dshx-nav-tone-work: oklch(0.54 0.14 52);
+    --dshx-nav-tone-agents: oklch(0.52 0.14 350);
+    --dshx-nav-tone-observe: oklch(0.55 0.125 118);
+    --dshx-nav-tone-knowledge: oklch(0.52 0.14 305);
+    --dshx-nav-tone-settings: var(--dsw-alias-label-secondary);
+    --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
+    /* The on state (council round 9 A2): the ink and its inverse in light. */
+    --dshx-control-on: var(--dsw-alias-label-primary);
+    --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
+    /*
+     * `Checkbox size="sm"` (council round 13 A1): oklch(0.50 0.01 65) on warm stone, the ink's hue at L 0.5, with the
+     * white (inverse ink) tick at 5.9:1; the fill holds 4.96:1 on raised and the selected wash, so a column of checked
+     * boxes reads as light marks instead of dark squares.
+     */
+    --dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.5 calc(c * 4) h);
+    --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
+    --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
+    --dshx-attention-band-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 60%, var(--dsw-alias-label-primary));
+    --dshx-danger-band-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 60%, var(--dsw-alias-label-primary));
+    --dshx-badge-attention-fill: var(--dsw-alias-state-business-primary);
+    --dshx-badge-attention-foreground: oklch(1 0 0);
+    /* The evidence well's fills (council round 16 A1): a warm neutral and a red-soft for an error line. */
+    --dshx-evidence-well: oklch(0.95 0.004 70);
+    --dshx-evidence-well-danger: oklch(0.96 0.02 25);
+  }
+  body[data-ds-dark-theme] {
+    --dshx-identity-1: oklch(0.78 0.09 195);
+    --dshx-identity-2: oklch(0.78 0.13 300);
+    --dshx-identity-3: oklch(0.78 0.13 50);
+    --dshx-identity-4: oklch(0.78 0.13 350);
+    --dshx-identity-5: oklch(0.78 0.13 145);
+    --dshx-identity-6: oklch(0.78 0.1 100);
+    --dshx-identity-7: oklch(0.78 0.12 235);
+    --dshx-identity-8: oklch(0.78 0.08 70);
+    --dshx-data-1: oklch(0.7 0.11 195);
+    --dshx-data-2: oklch(0.7 0.11 305);
+    --dshx-data-3: oklch(0.7 0.11 55);
+    --dshx-data-4: oklch(0.7 0.11 340);
+    --dshx-data-5: oklch(0.7 0.11 110);
+    --dshx-data-6: oklch(0.7 0.11 225);
+    --dshx-nav-tone-threads: oklch(0.78 0.13 235);
+    --dshx-nav-tone-land: oklch(0.78 0.13 180);
+    --dshx-nav-tone-work: oklch(0.78 0.13 52);
+    --dshx-nav-tone-agents: oklch(0.78 0.13 350);
+    --dshx-nav-tone-observe: oklch(0.78 0.13 118);
+    --dshx-nav-tone-knowledge: oklch(0.78 0.13 305);
+    --dshx-scrim: rgb(0 0 0 / 0.5);
+    /*
+     * The dark on state (council round 9 A2): the ink's hue and chroma at L 0.82, not the near-white ink (L 0.93), so on
+     * switches stop glaring; the tick and knob stay the dark inverse ink. Fill 3:1 on bg, panel, raised and the selected
+     * wash; tick 3:1 on the fill (tests/control-on.test.tsx).
+     */
+    --dshx-control-on: oklch(from var(--dsw-alias-label-primary) 0.82 c h);
+    --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
+    /*
+     * `Checkbox size="sm"` in dark (council round 14 A3): oklch(0.68 0.008 65) on warm stone, below the 0.82 on state so
+     * a column of checked boxes stops glaring, under the dark inverse-ink tick (6.5:1); the fill holds 4.7:1 on a dialog
+     * and more on every other surface (tests/checkbox-size).
+     */
+    --dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.68 calc(c * 1.6) h);
+    /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
+    --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
+    /* A band verb's text (council round 12 A2): half ink in dark, where a 32% fill lifts the band toward the text. */
+    --dshx-attention-band-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-label-primary));
+    --dshx-danger-band-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 50%, var(--dsw-alias-label-primary));
+    /* The attention badge follows the accent hue (indigo 270 by default) at a fixed lightness and chroma. */
+    --dshx-badge-attention-fill: oklch(from var(--dsw-alias-state-business-primary) 0.72 0.14 h);
+    --dshx-badge-attention-foreground: oklch(from var(--dsw-alias-state-business-primary) 0.2 0.02 h);
+    --dshx-evidence-well: oklch(0.24 0.006 70);
+    --dshx-evidence-well-danger: oklch(0.26 0.03 25);
+  }
+}
+
+@layer components {
+  /*
+   * `ProjectMark` letters: the project tone (inherited from the tile) pulled 25% toward the ink, so two 11px letters hold
+   * AA on their own 18% tile over bg, panel, raised and selected in both schemes (tests/project-mark.test.tsx).
+   */
+  .dshx-project-mark-letters {
+    color: color-mix(in oklab, currentColor 75%, var(--dsw-alias-label-primary));
+  }
+
+  /*
+   * Chart labels (round five A5): TanStack charts draw axis ticks and legend labels in currentColor at 68–78% opacity
+   * and 11px, which measured 2.95:1. Inside a `ChartFrame` they read at full secondary ink (the frame's
+   * `text-muted-foreground`, AA on bg, panel and raised), at the 12px meta size and with tabular figures. A CSS rule
+   * beats the library's presentation attributes; gridlines and value labels keep their own style. Council round 10 A8
+   * extends it to every axis and legend text, 12px minimum: axis titles (`x-label`, `y-label`), every static legend
+   * text (labels, steps, the gradient's min and max at 10px), facet labels; the interactive legend takes the size
+   * only, so a hidden series keeps its dimmed label.
+   */
+  .dshx-chart-frame text[data-ts-key*='tick-label'],
+  .dshx-chart-frame text[data-ts-key*='legend']:not([data-ts-key^='interactive-legend']),
+  .dshx-chart-frame text[data-ts-key$='-label'],
+  .dshx-chart-frame text[data-ts-key$=':label'] {
+    fill: currentColor;
+    fill-opacity: 1;
+    font-size: var(--dshx-density-text-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dshx-chart-frame text[data-ts-key^='interactive-legend-label'] {
+    font-size: var(--dshx-density-text-meta);
+    font-variant-numeric: tabular-nums;
+  }
+}

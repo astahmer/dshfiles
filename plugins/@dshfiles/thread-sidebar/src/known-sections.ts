@@ -18,6 +18,22 @@ export interface DestinationSection {
    * and the palette still find it by either.
    */
   readonly formerLabels?: readonly string[]
+  /**
+   * `developer`: a page for people who write plugins (a component reference, the extension catalog), not for someone
+   * supervising agents. It is listed in the Developer group at the end of Settings, which a sidebar setting hides.
+   */
+  readonly group?: 'developer'
+  /**
+   * Not listed under its destination: the page repeats what another page of the destination already shows, so the list
+   * would offer the same thing twice. The command palette and the New tab page still open it, and a person can file it
+   * in any folder.
+   */
+  readonly unlisted?: boolean
+  /**
+   * `destination`: the row draws its destination's glyph, the one the page's tab shows (council round 10 B2), instead of
+   * the glyph the page registers. For the page that is the destination's own act (Review under Land).
+   */
+  readonly glyph?: 'destination'
 }
 
 /**
@@ -31,14 +47,16 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     destination: 'threads',
     label: 'Board',
     description: 'The same threads as columns.',
-    formerLabels: ['Thread Sidebar: Board'],
+    // "Thread board" was its own palette row beside this page's; the page row answers to both names.
+    formerLabels: ['Thread Sidebar: Board', 'Thread board', 'Kanban'],
   },
   {
     panelId: 'attention-inbox',
     destination: 'inbox',
-    label: 'Needs you',
+    // The destination and its page share one name; "Needs you" is the view inside the page.
+    label: 'Inbox',
     description: 'Questions, approvals and failures waiting on you.',
-    formerLabels: ['Inbox'],
+    formerLabels: ['Inbox', 'Needs you'],
   },
   {
     panelId: 'jj-integration',
@@ -54,6 +72,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     label: 'Review',
     description: 'Review a workspace before landing it.',
     order: 2,
+    glyph: 'destination',
     formerLabels: ['pulls.review: Reviews', 'Review'],
   },
   {
@@ -80,7 +99,15 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     order: 1,
     formerLabels: ['Backlog: Items', 'Backlog'],
   },
-  { panelId: 'schedules', destination: 'work', label: 'Schedules', description: 'Reminders and recurring prompts.', order: 2, formerLabels: ['Schedules'] },
+  {
+    panelId: 'schedules',
+    destination: 'work',
+    label: 'Schedules',
+    // Item 30's wording: Schedules prompts a thread that exists; Automations starts a new one.
+    description: 'Prompts sent to a thread at a set time.',
+    order: 2,
+    formerLabels: ['Schedules', 'Automation tasks'],
+  },
   {
     panelId: 'dshfiles-agents',
     destination: 'agents',
@@ -104,21 +131,6 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     description: 'Tools, skills and MCP servers an agent can use.',
     order: 3,
     formerLabels: ['Agent Toolkit: Capabilities'],
-  },
-  // capabilities-hub's two pages (merge 2026-11-11): filed with the agent's capabilities instead of Other pages.
-  {
-    panelId: 'dshfiles-capabilities-hub',
-    destination: 'agents',
-    label: 'Capabilities hub',
-    description: 'Where skills, MCP servers and plugins are managed.',
-    order: 4,
-  },
-  {
-    panelId: 'dshfiles-plugin-market',
-    destination: 'agents',
-    label: 'Plugin market',
-    description: 'Community plugins from dshmarket.com.',
-    order: 5,
   },
   // Upstream (2026-11): retained thread events, including notifications missed while away.
   {
@@ -185,14 +197,6 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Resource Packs: Resources'],
   },
   {
-    panelId: 'component-gallery',
-    destination: 'knowledge',
-    label: 'Component gallery',
-    description: 'Every shared plugin component, live.',
-    order: 3,
-    formerLabels: ['Component Gallery: Components', 'Component gallery'],
-  },
-  {
     panelId: 'dshfiles-whiteboard',
     destination: 'knowledge',
     label: 'Whiteboard',
@@ -233,11 +237,45 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Secret Catalog: Secrets', 'Secrets'],
   },
   { panelId: 'plugins', destination: 'settings', label: 'Plugins', description: 'Installed plugins and the marketplace.', order: 4, formerLabels: ['Plugins'] },
+  // settings-shell's Plugins by category: right after Plugins, the list it regroups (ties keep this order).
   {
     panelId: 'dshfiles-plugin-list',
     destination: 'settings',
     label: 'Plugins by category',
-    description: 'A second view of your plugins: by area, with filters and Settings shortcuts.',
+    description: 'Turn plugins on or off, grouped by area.',
     order: 5,
+  },
+  // capabilities-hub's two pages: beside the managers they open, after them (the plugin declares the same seats).
+  {
+    panelId: 'dshfiles-plugin-market',
+    destination: 'settings',
+    label: 'Plugin market',
+    description: 'Community plugins from dshmarket.com.',
+    order: 5,
+  },
+  {
+    panelId: 'dshfiles-capabilities-hub',
+    destination: 'settings',
+    label: 'Capabilities hub',
+    description: 'Where skills, MCP servers and plugins are managed.',
+    order: 6,
+  },
+  // Developer pages: for plugin authors, so they sit apart at the end of Settings instead of among the user's pages.
+  {
+    panelId: 'component-gallery',
+    destination: 'settings',
+    label: 'Component gallery',
+    description: 'Every shared plugin component, live.',
+    order: 1,
+    group: 'developer',
+    formerLabels: ['Component Gallery: Components', 'Component gallery'],
+  },
+  {
+    panelId: 'dshfiles-plugin-guide',
+    destination: 'settings',
+    label: 'Plugin guide',
+    description: 'Where a plugin can extend DSH.',
+    order: 2,
+    group: 'developer',
   },
 ]

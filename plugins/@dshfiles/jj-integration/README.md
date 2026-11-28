@@ -2,13 +2,13 @@
 
 ![Pick a New-thread project](docs/screenshots/new-thread-project-picker.png)
 
-![Thread integration control center](docs/screenshots/thread-workspaces-panel.png)
+![Workspaces page](docs/screenshots/thread-workspaces-panel.png)
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
 
 ![Start a thread workspace from a remote bookmark](docs/screenshots/thread-destination-remote.png)
 
-![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
+![Land from the end of a turn](docs/screenshots/turn-end-integrate.png)
 
 ![Choose a project's main branch](docs/screenshots/project-main-branch.png)
 
@@ -127,6 +127,11 @@ One control in the conversation header carries the workspace state:
   waiting to rebase, or the shared project checkout when the thread runs beside
   the other threads. It never disappears while the state loads, so the header
   cannot lose the only way to the thread's workspace actions.
+- While the workspace holds described, conflict-free work and no thread in it
+  is busy, the header shows one primary **Land** button beside the control. It
+  opens a confirmation that lists the revisions before anything moves; the
+  menu's **Land on main** opens the same confirmation. With nothing to land, or
+  while landing cannot start, there is no button and the menu says why.
 - Its menu shows the workspace path, what the workspace state is (ready to
   integrate, up to date, behind `main`, conflicted, shared checkout, or blocked),
   **Integrate into the configured bookmark** (main by default), **Open thread workspaces in side panel**, and
@@ -340,9 +345,15 @@ instead of restarting it, so a fold that was nearly done still answers and the
 rebase proceeds; only a read that stays unreadable for 45 s refuses with "refresh
 and retry", and by then its work has warmed the next attempt.
 
-Each successful rebase adds a row to the conversation, after the turn it
-followed, with the target bookmark and 12-character tip change ID; a thread that
-keeps working and lands again gets one row per land. The latest row's actions are
+Each successful rebase adds a one-line row to the conversation, after the turn it
+followed: "Landed on main" and how long ago, with the 8-character tip change ID and
+the exact time in its tooltip; a thread that keeps working and lands again gets
+one row per land. A clean land shows no toast: the header's "✓ Landed" (which
+fades in over the count) and this row confirm it, and the confirmation dialog
+hands focus back to the Land that opened it, or to the composer once it landed.
+Only a land that stopped or left a warning reports in a toast, which counts the
+revisions instead of naming their ids. While the header shows Land, the turn-end
+offer keeps its sentence and revision list but not a second Land button. The latest row's actions are
 what `integratedThreadActions` selects: **Settle** alone by default, **Archive**,
 both, or none. Archive acts on that Session only; Settle asks
 `@dshfiles/thread-sidebar`, which owns the settled status, through the cancelable
@@ -350,6 +361,20 @@ both, or none. Archive acts on that Session only; Settle asks
 one writer. Both are disabled while the Session is running. Automatic settling
 and archiving are not a second policy here: "Settle integrated threads" and
 "Archive settled threads" in Settings › Thread sidebar already do it on a delay.
+
+### Fresh Land state
+
+A land answers only once the landed thread's entry in the cached inventory has been
+read again (`RepositoryViews.replaceThread`) and its Ready item retracted, so the
+thread list's refetch on `dshfiles:jj-changed` stops showing "1 to land" and its
+Land at once instead of after the rescan (5.5 s measured before). New work shows
+Land without the one-minute idle poll: the Host watches the operation heads
+(`.jj/repo/op_heads/heads`) of every repository the last scan named
+(`src/repository-watch.ts`, no jj process) and publishes `repositoryChanged` with
+that repository's thread workspaces, at most once a second; each open header,
+turn-end offer and marker of one of those threads reads its status again. A
+git-only repository, or a Host from before the event, keeps the polls. The watch
+is Host code: it takes effect after a DSH restart.
 
 ### In the Inbox
 

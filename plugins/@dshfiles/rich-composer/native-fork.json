@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. Under Workbench's reserved host corner the header draws no rule of its own: the reserving wrapper draws it across the whole pane ([data-conversation-header-reserved], round five B8).",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-conversation",
@@ -76,6 +76,7 @@
     "src/native/input/draft-annotations.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
+    "src/native/input/editor/reference-chip-agent-tone.test.tsx",
     "src/native/input/editor/reference-chip-excerpt.test.tsx",
     "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/editor/touch-keyboard.test.ts",
@@ -83,7 +84,15 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
+    "src/native/input/sent-annotations.test.ts",
+    "src/native/input/sent-annotations.ts",
     "src/native/skeleton/AnnotationsPill.tsx",
-    "src/native/skeleton/annotations-pill-done.test.tsx"
+    "src/native/skeleton/annotations-pill-done.test.tsx",
+    "src/native/skeleton/composer-edge.test.ts",
+    "src/native/skeleton/dock-geometry.test.ts",
+    "src/native/skeleton/hero-project-mark.test.tsx",
+    "src/native/skeleton/input-bar-overlay.test.ts",
+    "src/native/skeleton/picker-sheet-scrim.test.ts",
+    "src/native/skeleton/touch-targets.test.ts"
   ]
 }

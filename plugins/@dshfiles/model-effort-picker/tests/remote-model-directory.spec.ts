@@ -30,6 +30,16 @@ const fixture = (fetchCatalog: () => Promise<typeof catalog>) => {
 }
 
 describe('RemoteModelDirectory status', () => {
+  it('keeps the last known model while the session reloads after a reconnect, so the chip never reads Choose model', async () => {
+    const { base, remote } = fixture(async () => catalog)
+    await remote.load()
+    base.store.set(baseState({ current: null, status: 'idle' }))
+    expect(remote.store.getSnapshot().current).toEqual(current)
+    const next: ModelSelection = { provider: 'remote', model: 'second' }
+    base.store.set(baseState({ current: next }))
+    expect(remote.store.getSnapshot().current).toEqual(next)
+  })
+
   it('stays selecting when the remote catalog loads under an in-flight selection', async () => {
     const { base, remote } = fixture(async () => catalog)
     base.store.set(baseState({ status: 'selecting', pending: current }))

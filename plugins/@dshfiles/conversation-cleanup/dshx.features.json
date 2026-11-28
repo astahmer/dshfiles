@@ -5,7 +5,8 @@
     {
       "id": "conversation-cleanup",
       "title": "Permanently clean up done or archived threads",
-      "summary": "Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, restart or remote deletion.",
+      "summary": "Preview done or archived threads and permanently delete their logs after you confirm.",
+      "details": "Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, restart or remote deletion.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",

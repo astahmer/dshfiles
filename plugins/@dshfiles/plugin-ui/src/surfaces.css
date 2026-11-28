@@ -1,0 +1,72 @@
+/*
+ * Floating surfaces (council round 3 A8; DESIGN.md › Elevation & Depth). A dialog, an alert dialog and the command
+ * palette sit on `dshx:surface-dialog`: in light the page fill, the hairline and s3; in dark a raised warm fill
+ * (oklch 0.27 since council round 4 A5, above the raised step, so it reads clearly over the 50% black scrim), a faint
+ * light edge and one deep shadow, so the layer reads above near-black without a glowing border. That fill sits on the
+ * page's selection wash (0.275), so inside a dark dialog the selection lifts to 0.30 and the faint text step to 0.68:
+ * the highlighted row still stands off the fill, and faint text holds AA on it. A popover-level fill inside the dialog
+ * (the palette's `Command` root, `bg-popover`) takes the dialog fill, so the card is one tone. Light keeps all three:
+ * there the popover step already is the page fill. A keycap reads its look here too (council round 10 A5): one
+ * shortcut chip in both schemes and every surface, the raised step (`tone-2`) with a 1px hairline (`border-l2`), in
+ * the UI sans with the platform symbol faces before any generic fallback, so ⌘ ⌥ ⇧ never fall to a serif face.
+ *
+ * Declared on body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing).
+ * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
+ */
+@layer base {
+  body {
+    /*
+     * Surface roles (council round 5 A4; DESIGN.md › Elevation & Depth). Every navigation column (the thread list,
+     * the Settings categories, a master list beside a detail) sits on `nav` (`--dshx-tone-nav`, also the Host sidebar
+     * fill): the panel step #F4F2F0 in light, lifted to oklch(0.225 0.006 60) #1E1B19 in dark (council round 6 A4) so
+     * column and page separate without a hairline; every page sits on `stage`, the canvas (#FEFCFA / #15120F). They follow the active theme's steps; the
+     * Host fallbacks hold without ui-styles. `surface-nav` / `surface-stage` also set `--dshx-surface`, the fill a
+     * fade, a badge ring or a sticky header blends into.
+     */
+    --dshx-surface-nav: var(--dshx-tone-nav, var(--dshx-tone-panel, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1))));
+    --dshx-surface-stage: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
+    --dshx-dialog-fill: var(--dsw-alias-bg-base);
+    --dshx-dialog-border: var(--dsw-alias-border-l2);
+    --dshx-elevation-dialog: var(--dshx-elevation-3);
+    --dshx-kbd-fill: var(--dshx-tone-2, var(--dsw-alias-bg-module-platform));
+    --dshx-kbd-border: var(--dsw-alias-border-l2);
+    --dshx-kbd-font: var(--dsw-font-family, ui-sans-serif, system-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
+    --dshx-dialog-selected-wash: var(--dshx-selected-wash);
+    --dshx-dialog-faint: var(--dsw-alias-label-tertiary);
+    /*
+     * Faint ink in a nav column (council round 13 A3): a row's hover fill is ink at 6% over the panel step, which left
+     * light faint (step 8) at 4.39:1. In light the column's faint text takes the secondary step (4.78:1 on the hover,
+     * 4.96:1 on the selected wash); dark faint already holds 4.64:1 on its 7% hover.
+     */
+    --dshx-nav-faint: var(--dsw-alias-label-secondary);
+  }
+  body[data-ds-dark-theme] {
+    --dshx-nav-faint: var(--dsw-alias-label-tertiary);
+    --dshx-dialog-fill: oklch(0.27 0.006 60);
+    --dshx-dialog-selected-wash: oklch(from var(--dshx-selected-wash) max(l, 0.3) c h);
+    --dshx-dialog-faint: oklch(from var(--dsw-alias-label-tertiary) max(l, 0.68) c h);
+    --dshx-dialog-border: oklch(1 0 0 / 0.08);
+    --dshx-elevation-dialog: 0 24px 64px rgb(0 0 0 / 0.55);
+  }
+}
+
+@utility surface-nav {
+  --dshx-surface: var(--dshx-surface-nav);
+  --dsw-alias-label-tertiary: var(--dshx-nav-faint);
+  --dsw-alias-label-caption: var(--dshx-nav-faint);
+  background-color: var(--dshx-surface);
+}
+
+@utility surface-stage {
+  --dshx-surface: var(--dshx-surface-stage);
+  background-color: var(--dshx-surface);
+}
+
+@utility surface-dialog {
+  --dshx-selected-wash: var(--dshx-dialog-selected-wash);
+  --dsw-alias-label-tertiary: var(--dshx-dialog-faint);
+  --dsw-alias-bg-layer-2: var(--dshx-dialog-fill);
+  background-color: var(--dshx-dialog-fill);
+  border-color: var(--dshx-dialog-border);
+  box-shadow: var(--dshx-elevation-dialog);
+}

@@ -1,12 +1,17 @@
 import { CommandKeys } from '@dshfiles/dshx/client'
 import { cn } from '../../lib/utils.js'
 
+/**
+ * The one shortcut chip (council round 10 A5): 20px, a 1px hairline (`border-l2`) on the raised step (`tone-2`) in both
+ * schemes, secondary ink at 12/500 in the UI sans with tabular numerals. Its family (`--dshx-kbd-font`, surfaces.css)
+ * puts the platform symbol faces before any generic fallback, so ⌘ ⌥ ⇧ never fall to a serif face.
+ */
 function Kbd({ className, ...props }: React.ComponentProps<'kbd'>) {
   return (
     <kbd
       data-slot="kbd"
       className={cn(
-        'dshx:pointer-events-none dshx:inline-flex dshx:h-5 dshx:w-fit dshx:min-w-5 dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:font-sans dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:select-none',
+        'dshx:pointer-events-none dshx:inline-flex dshx:h-5 dshx:w-fit dshx:min-w-5 dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-sm dshx:border dshx:border-(--dshx-kbd-border) dshx:bg-(--dshx-kbd-fill) dshx:px-1 dshx:font-(family-name:--dshx-kbd-font) dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums dshx:select-none',
         'dshx:[&_svg:not([class*=size-])]:size-3',
         'dshx:[[data-slot=tooltip-content]_&]:bg-background/20 dshx:[[data-slot=tooltip-content]_&]:text-background dshx:dark:[[data-slot=tooltip-content]_&]:bg-background/10',
         className,

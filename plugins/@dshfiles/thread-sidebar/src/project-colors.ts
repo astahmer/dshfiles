@@ -8,10 +8,12 @@ import { useMemo } from 'react'
 export interface ProjectChip {
   readonly className?: string
   readonly color?: string
+  /** The palette tone behind `className`, for a kit `ProjectMark` (`tone`). */
+  readonly tone?: number
 }
 
 const chipOf = (choice: ProjectColorChoice): ProjectChip =>
-  choice.kind === 'tone' ? { className: ProjectTone.toneClass(choice.tone) } : { color: choice.color }
+  choice.kind === 'tone' ? { className: ProjectTone.toneClass(choice.tone), tone: choice.tone } : { color: choice.color }
 
 /**
  * The colour chosen for a project when it was imported, resolved to a palette class or a custom colour. A project without

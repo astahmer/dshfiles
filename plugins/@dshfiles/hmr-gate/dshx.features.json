@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "plugins-row",
-      "title": "Plugin updates waiting for a Host restart",
-      "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
+      "title": "Plugin updates waiting for a restart",
+      "summary": "The Plugins page lists plugin updates that wait for a DSH restart, and the page keeps working meanwhile.",
+      "details": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
       "reach": ["click tab \"Settings\"", "click button \"Plugins\"", "click button \"View HMR updates\"", "expect text \"Nothing is waiting*\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "statusItem",
@@ -93,7 +94,8 @@
     {
       "id": "deferred-update-inbox-item",
       "title": "Plugin updates waiting for a restart in the Inbox",
-      "summary": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A changed set of packages shows again after Done; the item resolves once nothing waits.",
+      "summary": "The Inbox shows one item naming plugin updates that wait for a restart, and when to restart.",
+      "details": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A changed set of packages shows again after Done; the item resolves once nothing waits.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
@@ -140,8 +142,9 @@
     },
     {
       "id": "restart-status-item",
-      "title": "Held-back bundles join the one restart notice",
-      "summary": "While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle verbs; restarting stays the user's confirmed decision, and the Plugins page row explains what would apply.",
+      "title": "Waiting updates join the restart notice",
+      "summary": "Plugin updates that need a restart are named in the one Restart pending item in the status bar.",
+      "details": "While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle verbs; restarting stays the user's confirmed decision, and the Plugins page row explains what would apply.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client"],
       "surface": "statusItem",
@@ -171,8 +174,9 @@
     },
     {
       "id": "host-reload",
-      "title": "Experimental in-process Host reload for opted-in plugins",
-      "summary": "With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload \"safe\" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is checked, the old Cordis fiber is disposed and the new one starts in the same Loader row. On success the held-back client rebuild applies in step; a refused or failed reload keeps the plugin listed as waiting for a restart.",
+      "title": "Reload a plugin without restarting DSH",
+      "summary": "Off by default: a plugin marked safe can reload inside the running DSH without a restart.",
+      "details": "With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload \"safe\" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is checked, the old Cordis fiber is disposed and the new one starts in the same Loader row. On success the held-back client rebuild applies in step; a refused or failed reload keeps the plugin listed as waiting for a restart.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["host"],
       "surface": "infrastructure",
@@ -238,7 +242,8 @@
     {
       "id": "update-timing",
       "title": "Plugin updates wait for a hidden or idle moment",
-      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbench, rich-composer, session-controller) never apply in front of a focused window: they wait for the page to hide, or for the window to lose focus with the reader idle. On a phone every update waits; on a desktop only thread-drawing ones do. A held update that needs a reload takes it at that moment too.",
+      "summary": "Plugin updates apply only when the page is hidden or you have been idle for a while.",
+      "details": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbench, rich-composer, session-controller) never apply in front of a focused window: they wait for the page to hide, or for the window to lose focus with the reader idle. On a phone every update waits; on a desktop only thread-drawing ones do. A held update that needs a reload takes it at that moment too.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client"],
       "surface": "infrastructure",

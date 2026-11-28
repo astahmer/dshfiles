@@ -70,6 +70,32 @@ describe('MarkdownProse', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
   })
 
+  // Round five C2 (council round 5): DSH 0.2.2-rc.2 draws a fence through its `FenceCodeBlock` preset, so the tree held a
+  // FenceCodeBlock element, never the CodeBlock card, and every card kept the native wrapped default: phone code broke
+  // mid-statement. The preset is unwrapped, and its card gets the no-wrap default and the toolbar toggle.
+  it('reaches the card inside the native fence preset, so a fence still defaults to no-wrap', () => {
+    const Fence = (props: {
+      readonly code: string
+      readonly streaming: boolean
+      readonly labels: { readonly copyLabel: string; readonly copiedLabel: string; readonly toolbarLabels: typeof labels }
+    }): ReactNode => <CodeBlock code={`${props.code}\n`} streaming={props.streaming} toolbarLabels={props.labels.toolbarLabels} />
+    const FenceProse = (props: { readonly tree: ReactNode }): ReactNode => {
+      const state = useRef(MarkdownProse.state(CodeBlock, Fence))
+      return MarkdownProse.transform(props.tree, state.current, 'answer')
+    }
+    const { container, getByRole } = render(
+      <FenceProse
+        tree={
+          <div>
+            <Fence key="a" code="for (const item of items) total += item" streaming={false} labels={{ copyLabel: 'Copy', copiedLabel: 'Copied', toolbarLabels: labels }} />
+          </div>
+        }
+      />,
+    )
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('false')
+    expect(getByRole('button', { name: 'Wrap' }).closest('[data-actions]')).not.toBeNull()
+  })
+
   it('folds a settled card after 24 lines and shows it all on request', () => {
     const { container, getByRole } = render(
       <Prose

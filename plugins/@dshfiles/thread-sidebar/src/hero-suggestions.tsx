@@ -7,6 +7,7 @@
  */
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { FileDiffIcon, InboxIcon, PlayIcon } from '@dshfiles/plugin-ui/icons'
+import { StatusCount } from '@dshfiles/plugin-ui/components/work-status'
 import { useMemo } from 'react'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { formatAge } from './relative-age.js'
@@ -28,18 +29,31 @@ export interface HeroThreadRow {
 export interface HeroSuggestions {
   readonly resume: { readonly id: string; readonly title: string; readonly at: number } | undefined
   readonly review: { readonly id: string; readonly title: string; readonly cwd: string | undefined } | undefined
-  /** Threads that need you (questions, approvals, resumes). */
-  readonly inbox: number
+  /**
+   * The Inbox's two populations, as its badge counts them (council round 6 B7): threads waiting on you (questions,
+   * approvals, resumes) and threads whose turn failed.
+   */
+  readonly inbox: InboxSplit
 }
 
-const needsYou = (signal: InboxThreadSignal | undefined): boolean => signal?.severity === 'blocking'
+export interface InboxSplit {
+  readonly waiting: number
+  readonly failed: number
+}
+
+/** "2 waiting on you · 1 failed"; nothing when both are zero. */
+const inboxLabel = (split: InboxSplit): string | undefined => {
+  const parts = [split.waiting > 0 ? `${String(split.waiting)} waiting on you` : undefined, split.failed > 0 ? `${String(split.failed)} failed` : undefined]
+  const shown = parts.filter(part => part !== undefined)
+  return shown.length === 0 ? undefined : shown.join(' · ')
+}
 
 /**
  * Pick the cards.
  * - Review: the most recently active thread whose Inbox item offers Land.
  * - Resume: a thread whose Inbox item offers Resume first, then the most recently active quiet thread; never a
  *   running or blank thread, the hero's own thread, or the Review thread.
- * - Inbox: how many threads need you.
+ * - Inbox: how many threads wait on you, and how many failed: the two the Inbox badge adds up.
  */
 const pick = (rows: readonly HeroThreadRow[], heroSessionId: string | undefined): HeroSuggestions => {
   const candidates = rows.filter(row => !row.blank && row.id !== heroSessionId)
@@ -51,7 +65,10 @@ const pick = (rows: readonly HeroThreadRow[], heroSessionId: string | undefined)
   return {
     resume: resume === undefined ? undefined : { id: resume.id, title: resume.title, at: resume.activityAt },
     review: review === undefined ? undefined : { id: review.id, title: review.title, cwd: review.cwd },
-    inbox: candidates.filter(row => needsYou(row.signal)).length,
+    inbox: {
+      waiting: candidates.filter(row => row.signal?.severity === 'blocking').length,
+      failed: candidates.filter(row => row.signal?.severity === 'failed').length,
+    },
   }
 }
 
@@ -84,9 +101,11 @@ export interface HeroSuggestionActions {
   readonly openInbox: () => void
 }
 
-// Flat cards on a hairline (the composer stays the only elevated object); 48pt rows on touch.
+// The one New-thread chip style, the starters' own (council round 13 B7, C6): 32px, radius 8, the raised fill, no
+// border, 12px padding, 44px on touch. The 16px rule reaches the chip's own icon only, so a StatusCount badge keeps its
+// small glyph.
 const CARD =
-  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&_svg]:size-4 dshx:[&_svg]:flex-none'
+  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-0 dshx:bg-secondary dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base dshx:[&>svg]:size-4 dshx:[&>svg]:flex-none'
 
 /** The cards for one hero; nothing when no card has real data. */
 export const HeroSuggestionCards = (props: {
@@ -96,8 +115,8 @@ export const HeroSuggestionCards = (props: {
   readonly now: () => number
 }): JSX.Element | null => {
   const sessions = props.useSessions(state => state)
-  const inbox = useInboxThreadSignals({ enabled: true })
-  const suggestions = useMemo(() => pick(rowsOf(sessions, inbox.signals), props.heroSessionId), [sessions, inbox.signals, props.heroSessionId])
+  const signals = useInboxThreadSignals({ enabled: true })
+  const suggestions = useMemo(() => pick(rowsOf(sessions, signals.signals), props.heroSessionId), [sessions, signals.signals, props.heroSessionId])
   const cards: JSX.Element[] = []
   if (suggestions.resume !== undefined) {
     const resume = suggestions.resume
@@ -134,14 +153,16 @@ export const HeroSuggestionCards = (props: {
       </button>,
     )
   }
-  if (suggestions.inbox > 0) {
-    const count = suggestions.inbox
+  // The Inbox chip counts with the list's StatusCount badges (◆ 2 ✕ 1, council round 12 C4); the sentence is its name.
+  const inbox = suggestions.inbox
+  const inboxText = inboxLabel(inbox)
+  if (inboxText !== undefined) {
     cards.push(
-      <button key="inbox" type="button" className={CARD} data-hero-card="inbox" onClick={props.actions.openInbox}>
+      <button key="inbox" type="button" className={CARD} data-hero-card="inbox" aria-label={`Inbox, ${inboxText}`} onClick={props.actions.openInbox}>
         <InboxIcon aria-hidden="true" />
         <span className="dshx:font-medium dshx:text-foreground">Inbox</span>
-        <span aria-hidden="true">·</span>
-        <span className="dshx:flex-none dshx:tabular-nums">{count === 1 ? '1 thread needs you' : `${count} threads need you`}</span>
+        <StatusCount status="needs-you" count={inbox.waiting} label={`${String(inbox.waiting)} waiting on you`} />
+        <StatusCount status="failed" count={inbox.failed} label={`${String(inbox.failed)} failed`} />
       </button>,
     )
   }
@@ -151,4 +172,5 @@ export const HeroSuggestionCards = (props: {
 export class HeroSuggestionsModel {
   static readonly pick = pick
   static readonly rowsOf = rowsOf
+  static readonly inboxLabel = inboxLabel
 }

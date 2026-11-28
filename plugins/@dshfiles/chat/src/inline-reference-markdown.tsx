@@ -3,7 +3,7 @@
  * registry (see `./code-fences.tsx`) applied. A separate module so a provider that only defines references or fences
  * never loads the native renderer.
  */
-import { CodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CodeBlock, FenceCodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useRegistry } from '@dshfiles/dshx/client'
 import { memo, type ComponentProps, type ReactNode } from 'react'
 import { CodeFenceSeat } from './code-fence-seat.js'
@@ -24,7 +24,7 @@ const renderMarkdownText = MarkdownText.type
 export const InlineReferenceMarkdown = memo(function InlineReferenceMarkdown(props: MarkdownTextProps): ReactNode {
   const references = InlineReferenceModel.useState()
   const renderers = useRegistry(CodeFences)
-  const prose = MarkdownProse.useState(CodeBlock)
+  const prose = MarkdownProse.useState(CodeBlock, FenceCodeBlock)
   const output = renderMarkdownText(props)
   return (
     <CodeFenceSeat renderers={renderers} labels={props.labels.code}>

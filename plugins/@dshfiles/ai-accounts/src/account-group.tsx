@@ -1,5 +1,4 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,43 +6,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  BarChart3Icon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  LayersIcon,
-  MoreHorizontalIcon,
-  PencilIcon,
-  RefreshCwIcon,
-  Settings2Icon,
-} from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ArrowDownIcon, ArrowUpIcon, PencilIcon, RefreshCwIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
+import { SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
-import { KIND_LABEL, routedKind } from './account-labels.js'
+import { AccountLabels, KIND_LABEL } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
 import { ActionHint, ProviderGlyph } from './panel-primitives.js'
-import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { AccountConnection, type AccountSection } from './account-connection-status.js'
+import { HealthDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
-/** Selection is cosmetic; ordering always uses the full canonical provider group. */
+/**
+ * Selection is cosmetic; ordering always uses the full canonical provider group. A row only selects (brand tile, name,
+ * one health dot, its `⋯`): the picker switch, rename and the Models / Settings / Usage sections live once, in the
+ * detail (round five P5).
+ */
 export const AccountGroup = (props: {
   readonly kind: AccountProfile['kind']
   readonly accounts: readonly AccountProfile[]
   readonly visibleIds: readonly string[]
   readonly selectedId: string | null
   readonly onSelect: (instanceId: string) => void
-  readonly onToggle: (profile: AccountProfile) => void
   readonly onMove: (instanceId: string, direction: AccountOrderDirection) => void
   readonly reorderingDisabled: boolean
   readonly usage?: AccountsUsage | null
-  readonly activeSection?: AccountSection
   readonly onSection?: (instanceId: string, section: AccountSection) => void
   readonly onRename?: (instanceId: string) => void
   readonly onConnect?: (instanceId: string) => void
 }): JSX.Element | null => {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   if (!props.accounts.some(account => props.visibleIds.includes(account.instanceId))) return null
   return (
     <section aria-label={`${KIND_LABEL[props.kind]} accounts`}>
@@ -51,21 +41,24 @@ export const AccountGroup = (props: {
         {props.accounts.map((profile, index) => {
           if (!props.visibleIds.includes(profile.instanceId)) return null
           const selected = profile.instanceId === props.selectedId
-          const open = expanded[profile.instanceId] ?? (selected && props.activeSection === 'models')
-          const status = accountConnectionStatus(profile, props.usage ?? null)
+          const status = AccountConnection.status(profile, props.usage ?? null)
+          const identity = [profile.plan === null ? null : AccountLabels.planLabel(profile.plan), profile.identity].filter(Boolean).join(' · ')
+          const signIn = profile.signedIn ? 'Credentials available' : 'Not signed in'
           return (
             <li
               data-account-priority={index + 1}
               key={profile.instanceId}
               className={cn(
-                'dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:bg-card dshx:transition-colors',
-                selected ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/10' : 'dshx:border-border/60 dshx:hover:border-muted-foreground/40',
+                'dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:transition-colors',
+                // The selected edge replaces the hairline rather than doubling it (council round 12, A1).
+                selected ? 'dshx:border-transparent dshx:bg-clip-padding' : 'dshx:hover:border-muted-foreground/40',
               )}
             >
               <div
                 className={cn(
-                  'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-l-[3px] dshx:px-3 dshx:py-3',
-                  selected ? 'dshx:border-l-info dshx:bg-info/5' : 'dshx:border-l-transparent',
+                  'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3',
+                  // A glyph-leading row: no pill, so the wash takes the kit's neutral inset edge, on the card's inner corner.
+                  selected && cn('dshx:rounded-md dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker', SELECTED_EDGE),
                 )}
               >
                 <button
@@ -75,52 +68,32 @@ export const AccountGroup = (props: {
                   onClick={() => props.onSelect(profile.instanceId)}
                   type="button"
                 >
-                  <ProviderGlyph kind={profile.kind} />
+                  <ProviderGlyph kind={profile.kind} list />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-                    <strong className="dshx:truncate dshx:text-sm dshx:font-semibold">{profile.displayName}</strong>
-                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">
-                      {[profile.plan, profile.identity].filter(Boolean).join(' · ') || (profile.signedIn ? 'Credentials available' : 'Not signed in')}
-                    </span>
+                    <strong className={cn('dshx:truncate dshx:text-sm', selected ? 'dshx:font-selected' : 'dshx:font-medium')}>{profile.displayName}</strong>
+                    <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{identity || signIn}</span>
                   </span>
                 </button>
-                {selected ? (
-                  <Button
-                    aria-label={`Rename ${profile.displayName}`}
-                    className="dshx:@max-pane-narrow:hidden"
-                    onClick={() => props.onRename?.(profile.instanceId)}
-                    size="icon-xs"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <PencilIcon className="dshx:size-3" />
-                  </Button>
-                ) : null}
-                <ActionHint label={status.detail ?? status.label}>
-                  <span
-                    className={cn(
-                      'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs',
-                      status.tone === 'success' ? 'dshx:text-success' : status.tone === 'warning' ? 'dshx:text-warning' : 'dshx:text-muted-foreground',
-                    )}
-                  >
-                    <StatusDot tone="current" />
-                    <span className={status.tone === 'warning' ? undefined : 'dshx:@max-pane-narrow:hidden'}>{status.label}</span>
+                {/* One health dot. Healthy is only the dot; a limited or down account also names its state in the dot's colour. */}
+                {status.health === 'limited' || status.health === 'down' ? (
+                  <ActionHint label={status.detail ?? status.label}>
+                    <span className={cn('dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs', healthTextClass[status.health])}>
+                      <HealthDot health={status.health} />
+                      {status.label}
+                    </span>
+                  </ActionHint>
+                ) : identity !== '' && status.label === 'Not signed in' ? (
+                  <span className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
+                    <HealthDot health={status.health} />
+                    {status.label}
                   </span>
-                </ActionHint>
-                <Switch
-                  aria-label={
-                    routedKind(profile.kind)
-                      ? `${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`
-                      : `${profile.enabled ? 'Disable' : 'Enable'} quota tracking for ${profile.displayName}`
-                  }
-                  checked={profile.enabled}
-                  className="dshx:shrink-0 dshx:data-[state=checked]:bg-info"
-                  onCheckedChange={() => props.onToggle(profile)}
-                  size="sm"
-                />
+                ) : (
+                  <HealthDot aria-label={status.label} health={status.health} />
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button aria-label={`Actions for ${profile.displayName}`} size="icon-xs" type="button" variant="ghost">
-                      <MoreHorizontalIcon />
+                      <OverflowGlyph />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -155,47 +128,7 @@ export const AccountGroup = (props: {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button
-                  aria-label={`${open ? 'Collapse' : 'Expand'} ${profile.displayName} sections`}
-                  aria-expanded={open}
-                  className="dshx:shrink-0"
-                  onClick={() => setExpanded(current => ({ ...current, [profile.instanceId]: !open }))}
-                  size="icon-xs"
-                  type="button"
-                  variant="ghost"
-                >
-                  {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
-                </Button>
               </div>
-              {open ? (
-                <nav aria-label={`${profile.displayName} sections`} className="dshx:border-t dshx:bg-background/60">
-                  {(
-                    [
-                      {
-                        id: 'models',
-                        label: 'Models',
-                        Icon: LayersIcon,
-                        detail: `${profile.favoriteModelIds.length} favorites · ${profile.hiddenModelIds.length} hidden`,
-                      },
-                      { id: 'settings', label: 'Settings', Icon: Settings2Icon, detail: `Priority ${index + 1} · ${KIND_LABEL[profile.kind]}` },
-                      { id: 'usage', label: 'Usage', Icon: BarChart3Icon, detail: 'Activity and subscription quota' },
-                    ] as const
-                  ).map(item => (
-                    <button
-                      aria-current={selected && props.activeSection === item.id ? 'page' : undefined}
-                      className="dshx:flex dshx:w-full dshx:items-center dshx:gap-3 dshx:border-b dshx:px-5 dshx:py-2.5 dshx:text-left dshx:text-xs dshx:last:border-b-0 dshx:hover:bg-accent"
-                      key={item.id}
-                      onClick={() => props.onSection?.(profile.instanceId, item.id)}
-                      type="button"
-                    >
-                      <item.Icon className="dshx:size-4 dshx:text-muted-foreground" />
-                      <span>{item.label}</span>
-                      <span className="dshx:ml-auto dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{item.detail}</span>
-                      <ChevronRightIcon className="dshx:size-3 dshx:text-muted-foreground" />
-                    </button>
-                  ))}
-                </nav>
-              ) : null}
             </li>
           )
         })}

@@ -5,7 +5,8 @@
     {
       "id": "github-pull-request-links",
       "title": "Link and watch GitHub pull requests from DSH threads",
-      "summary": "Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads. A backlog item can own a watch too (watchFor / unwatchFor / ownedWatches, owner kind backlog-item): polled by the same sweep, it never prompts or settles a thread. issueStates reads the open or closed state of up to 100 GitHub issues, fifty per gh api graphql call, for the backlog's linked issues.",
+      "summary": "Pull requests linked to a thread are watched, and their state changes are reported in the thread.",
+      "details": "Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads. A backlog item can own a watch too (watchFor / unwatchFor / ownedWatches, owner kind backlog-item): polled by the same sweep, it never prompts or settles a thread. issueStates reads the open or closed state of up to 100 GitHub issues, fifty per gh api graphql call, for the backlog's linked issues.",
       "surfaces": ["host", "tool", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -137,7 +138,8 @@
     {
       "id": "github-pull-request-create",
       "title": "Create a GitHub pull request from a thread",
-      "summary": "Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create and links and watches the pull request on the thread.",
+      "summary": "Create a GitHub pull request from a thread after a preview with a drafted title and body.",
+      "details": "Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create and links and watches the pull request on the thread.",
       "surfaces": ["client", "host", "tool", "command", "integration"],
       "surface": "command",
       "destination": "none",

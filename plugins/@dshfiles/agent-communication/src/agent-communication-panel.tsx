@@ -137,7 +137,7 @@ const MessageRow = (props: {
           {props.message.intent === 'request' ? props.t('request') : props.t('notice')}
         </Badge>
         <Badge variant="outline">{props.message.priority === 'urgent' ? props.t('urgent') : props.t('normal')}</Badge>
-        <Badge variant="secondary">{props.t('recipientCount', { count: props.message.recipients.length })}</Badge>
+        <Badge variant="secondary">{props.message.recipients.length === 1 ? props.t('recipientCountOne') : props.t('recipientCount', { count: props.message.recipients.length })}</Badge>
       </div>
     </div>
     <div className="dshx:mt-3 dshx:rounded-md dshx:bg-muted/60 dshx:p-3">
@@ -304,6 +304,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     .reverse()
     .flatMap(page => page.items)
   const historyPageCount = messagesQuery.data?.pages.length ?? 0
+  // The count beside the conversation title is the rows its list shows (DESIGN.md › Layout, counts).
+  const shownMessageCount = messages.length
   const messageQueryIdentity = JSON.stringify(browseQueryKey)
   const messagesScroll = useRef<HTMLDivElement>(null)
   const captureOlderAnchor = usePrependScrollAnchor({ root: messagesScroll, pageCount: historyPageCount, scope: messageQueryIdentity })
@@ -348,7 +350,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   })
   const t = props.t
   const [tab, setTab] = useState<'messages' | 'diagnostics'>('messages')
-  const connected = diagnostics !== undefined && diagnosticsQuery.error === null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
   const currentTitle = currentDirectAgent === null ? t('allConversations') : t('directThread', { agent: sessionLabel(currentDirectAgent) })
   const legacyHost = diagnostics?.unnotifiedRecipientCount !== undefined
@@ -383,7 +384,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       <Page
         heading={t('messages')}
         description={t('noTurnGuarantee')}
-        meta={<Badge variant={connected ? 'secondary' : 'destructive'}>{connected ? t('connected') : t('unavailable')}</Badge>}
+        // A healthy page draws no connection chip (the failure has its own alert below); Diagnostics is a tool, so it
+        // sits under the overflow menu, and its view offers the way back to the messages.
         actions={[
           {
             id: 'refresh',
@@ -392,20 +394,12 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
             onSelect: () => void diagnosticsQuery.refetch(),
             pending: diagnosticsQuery.isFetching,
           },
+          ...(diagnostics === undefined
+            ? []
+            : tab === 'messages'
+              ? [{ id: 'diagnostics', label: t('diagnostics'), placement: 'overflow', onSelect: () => setTab('diagnostics') } as const]
+              : [{ id: 'messages', label: t('messages'), onSelect: () => setTab('messages') } as const]),
         ]}
-        {...(diagnostics === undefined
-          ? {}
-          : {
-              tabs: {
-                label: t('messages'),
-                value: tab,
-                onValueChange: (value: string) => setTab(value === 'diagnostics' ? 'diagnostics' : 'messages'),
-                items: [
-                  { value: 'messages', label: t('messages') },
-                  { value: 'diagnostics', label: t('diagnostics') },
-                ],
-              },
-            })}
       >
         {diagnosticsQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-6" /> : null}
         {diagnosticsQuery.error !== null ? (
@@ -492,7 +486,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                   <CardHeader className="dshx:flex-row dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
                     <div className="dshx:min-w-0">
                       <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
-                      <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
+                      <CardDescription>{shownMessageCount === 0 ? null : shownMessageCount === 1 ? t('messageCountOne') : t('messageCount', { count: shownMessageCount })}</CardDescription>
                     </div>
                     <SearchInput
                       className="dshx:w-full dshx:max-w-xs dshx:@max-pane-narrow:max-w-none"
@@ -586,7 +580,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       ) : null}
                       {receiptCount === null ? null : (
                         <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
-                          {t('sendReceipt', { count: receiptCount })}
+                          {receiptCount === 1 ? t('sendReceiptOne') : t('sendReceipt', { count: receiptCount })}
                         </p>
                       )}
                     </form>

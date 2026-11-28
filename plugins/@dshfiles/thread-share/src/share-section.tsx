@@ -29,7 +29,7 @@ const keys = {
   publish: ['thread-share', 'publish'] as const,
 }
 
-const RESTART_HINT = 'The Thread sharing Host plugin did not answer. Restart DSH after installing it, then retry.'
+const RESTART_HINT = 'Thread sharing did not answer. Restart DSH, then retry.'
 
 const decodeRows = Schema.decodeUnknownSync(Schema.Struct({ shares: Schema.Array(shareRowSchema), routePath: Schema.String }))
 const decodeThreads = Schema.decodeUnknownSync(Schema.Struct({ threads: Schema.Array(threadOptionSchema) }))
@@ -343,7 +343,7 @@ const ShareList = (): JSX.Element => {
                       trigger="Revoke"
                       triggerLabel={`Revoke share of ${row.title}`}
                       heading="Revoke this share?"
-                      description="The link stops working at once and a snapshot is deleted. This cannot be undone; create a new share to share again."
+                      description="The link stops working at once and a snapshot is deleted. This cannot be undone. Create a new share to share again."
                       action="Revoke share"
                       disabled={revoke.isPending}
                       onConfirm={() => revoke.mutate(row.id)}

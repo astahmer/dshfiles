@@ -6,7 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import { ChevronRightIcon, PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
@@ -16,6 +18,7 @@ import {
   jsonValueSchema,
   SettingsSchemaModel,
   type ChoiceOption,
+  type JsonShape,
   type JsonValue,
   type NumberControl,
   type ScalarControl,
@@ -31,6 +34,21 @@ const MAX_PREVIEW = 40
 const valuePreview = (value: JsonValue): string => {
   const text = JSON.stringify(value) ?? ''
   return text.length > MAX_PREVIEW ? `${text.slice(0, MAX_PREVIEW - 1)}…` : text
+}
+
+/** How long the pointer rests on a setting's name before its config key shows. */
+const KEY_TOOLTIP_DELAY_MS = 600
+
+/**
+ * A value that is the schema default needs no caption: the source line is for the rows that differ. A schema without
+ * a default gives the Host nothing to compare with, and "Source unknown" read as a fault, so that row says nothing.
+ */
+const showsSource = (provenance: SettingProvenance): boolean => provenance.source !== 'default' && provenance.source !== 'unknown'
+
+/** A search that matched the config key shows it, so the highlighted match is on screen. */
+const keyMatches = (key: string, query: string | undefined): boolean => {
+  const needle = query?.trim().toLowerCase() ?? ''
+  return needle !== '' && key.toLowerCase().includes(needle)
 }
 
 /** Where the row's value comes from, in words: no colour carries the meaning. */
@@ -102,13 +120,33 @@ const useDraft = (stored: string, commit: (draft: string) => void) => {
       editing.current = false
       if (draft !== stored) commit(draft)
     },
+    /** Drops what was typed: the field shows the stored value again. */
+    onReset: () => {
+      editing.current = false
+      setDraft(stored)
+    },
   }
+}
+
+/** Float noise from a division (0.1 + 0.2) never reaches the field. */
+const SHOWN_PRECISION = 12
+
+/** A stored number in the unit the control shows: a fraction as a percentage, 300000 ms as 300 s. */
+const shownNumber = (control: NumberControl, stored: number): number => {
+  if (control.percent) return Math.round(stored * 10_000) / 100
+  return control.factor === undefined ? stored : Number((stored / control.factor).toPrecision(SHOWN_PRECISION))
+}
+
+/** What a typed number stores. A scaled unit stores whole base units: 1.5 s is 1500 ms. */
+const storedNumber = (control: NumberControl, shown: number): number => {
+  if (control.percent) return shown / 100
+  return control.factor === undefined ? shown : Math.round(shown * control.factor)
 }
 
 const formatNumber = (control: NumberControl, value: JsonValue | undefined): string => {
   const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(value))
   if (parsed === undefined || value === undefined || value === null) return ''
-  return String(control.percent ? Math.round(parsed * 10_000) / 100 : parsed)
+  return String(shownNumber(control, parsed))
 }
 
 const ChoiceInput = (props: {
@@ -126,17 +164,30 @@ const ChoiceInput = (props: {
   if (SettingsSchemaModel.choiceDisplay(props.options) === 'segmented') {
     return (
       <ToggleGroup aria-label={props.label} disabled={props.disabled} onValueChange={pick} size="sm" type="single" value={selected} variant="outline">
-        {props.options.map(option => (
-          <ToggleGroupItem className="dshx:px-3" key={choiceKey(option.value)} title={option.detail || undefined} value={choiceKey(option.value)}>
-            {option.label}
-          </ToggleGroupItem>
-        ))}
+        {props.options.map(option =>
+          option.detail === '' ? (
+            <ToggleGroupItem className="dshx:px-3" key={choiceKey(option.value)} value={choiceKey(option.value)}>
+              {option.label}
+            </ToggleGroupItem>
+          ) : (
+            <Tooltip key={choiceKey(option.value)}>
+              <TooltipTrigger asChild>
+                <ToggleGroupItem className="dshx:px-3" value={choiceKey(option.value)}>
+                  {option.label}
+                </ToggleGroupItem>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:max-w-72" side="top">
+                {option.detail}
+              </TooltipContent>
+            </Tooltip>
+          ),
+        )}
       </ToggleGroup>
     )
   }
   return (
     <Select disabled={props.disabled} onValueChange={pick} value={selected}>
-      <SelectTrigger aria-label={props.label} className="dshx:min-w-40" size="sm">
+      <SelectTrigger aria-label={props.label} className="dshx:min-w-44" size="sm">
         <SelectValue>{props.options.find(option => choiceKey(option.value) === selected)?.label}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -163,10 +214,10 @@ const NumberInput = (props: {
 }): JSX.Element => {
   const [invalid, setInvalid] = useState(false)
   const { control } = props
-  const scale = control.percent ? 100 : 1
+  const shownBound = (bound: number | undefined): number | undefined => (bound === undefined ? undefined : shownNumber(control, bound))
   const draft = useDraft(formatNumber(control, props.value), text => {
     const parsed = Option.getOrUndefined(Schema.decodeUnknownOption(numberSchema)(text))
-    const value = parsed !== undefined ? parsed / scale : Number.NaN
+    const value = parsed !== undefined ? storedNumber(control, parsed) : Number.NaN
     const outOfRange = (control.min !== undefined && value < control.min) || (control.max !== undefined && value > control.max)
     setInvalid(parsed === undefined || text.trim() === '' || outOfRange)
     if (parsed !== undefined && text.trim() !== '' && !outOfRange) props.onChange(value)
@@ -180,14 +231,18 @@ const NumberInput = (props: {
           className="dshx:text-right dshx:font-mono! dshx:tabular-nums"
           disabled={props.disabled}
           inputMode="decimal"
-          max={control.max === undefined ? undefined : control.max * scale}
-          min={control.min === undefined ? undefined : control.min * scale}
+          // Chromium draws a number field's decimals in the field's language: without one it follows the browser (0,8 in
+          // an English interface on a French system).
+          lang={props.t('form.numberLocale')}
+          max={shownBound(control.max)}
+          min={shownBound(control.min)}
           onBlur={draft.onCommit}
           onChange={event => draft.onChange(event.currentTarget.value)}
           onKeyDown={event => {
             if (event.key === 'Enter') draft.onCommit()
           }}
-          step={control.step === undefined ? undefined : control.step * scale}
+          // A scaled unit takes fractions (1.5 s); its step in stored units would be a sliver of the shown one.
+          step={control.factor === undefined ? shownBound(control.step) : 'any'}
           type="number"
           value={draft.value}
         />
@@ -200,8 +255,8 @@ const NumberInput = (props: {
       {invalid && (
         <span className="dshx:text-xs dshx:text-destructive" role="alert">
           {props.t('form.invalidNumber', {
-            min: control.min === undefined ? '−∞' : control.min * scale,
-            max: control.max === undefined ? '∞' : control.max * scale,
+            min: shownBound(control.min) ?? '−∞',
+            max: shownBound(control.max) ?? '∞',
           })}
         </span>
       )}
@@ -256,11 +311,21 @@ const ScalarInput = (props: {
   readonly disabled: boolean
   readonly t: ShellTranslate
   readonly className?: string
+  /** The row's write is in flight: the control already shows the value asked for and stays usable (round three item 29). */
+  readonly busy?: boolean | undefined
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
   const { control } = props
   if (control.kind === 'boolean') {
-    return <Switch aria-label={props.label} checked={props.value === true} disabled={props.disabled} onCheckedChange={checked => props.onChange(checked)} />
+    return (
+      <Switch
+        aria-busy={props.busy === true ? true : undefined}
+        aria-label={props.label}
+        checked={props.value === true}
+        disabled={props.disabled}
+        onCheckedChange={checked => props.onChange(checked)}
+      />
+    )
   }
   if (control.kind === 'choice')
     return <ChoiceInput disabled={props.disabled} label={props.label} onChange={props.onChange} options={control.options} value={props.value} />
@@ -348,9 +413,14 @@ const RecordInput = (props: {
     <div aria-label={props.label} className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5" role="list">
       {entries.map(([key, value]) => (
         <div className="dshx:flex dshx:items-center dshx:gap-1.5" key={key} role="listitem">
-          <span className="dshx:w-40 dshx:shrink-0 dshx:truncate dshx:font-mono dshx:text-xs" title={key}>
-            {key}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="dshx:w-40 dshx:shrink-0 dshx:truncate dshx:font-mono dshx:text-xs">{key}</span>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:font-mono" side="top">
+              {key}
+            </TooltipContent>
+          </Tooltip>
           <ScalarInput
             className="dshx:w-full"
             control={props.valueControl}
@@ -399,24 +469,33 @@ const RecordInput = (props: {
   )
 }
 
-/** The fallback for shapes no control fits: the value as JSON, saved when it parses. */
+const JSON_HINT = { list: 'form.jsonList', object: 'form.jsonObject' } as const
+const JSON_PROBLEM = { syntax: 'form.invalidJson', list: 'form.invalidJsonList', object: 'form.invalidJsonObject' } as const
+
+/**
+ * The fallback for shapes no control fits (a list of objects, a nested map): the value as JSON. The draft is checked
+ * as it is typed, against the shape the schema declares, and only a valid one is ever saved, so a typo cannot break
+ * the setting: the stored value stays, the field says what is wrong and how to fix it, and one button restores it.
+ */
 const JsonInput = (props: {
   readonly label: string
+  readonly shape: JsonShape | undefined
   readonly value: JsonValue | undefined
   readonly disabled: boolean
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
-  const [invalid, setInvalid] = useState(false)
-  const draft = useDraft(props.value === undefined ? '' : (JSON.stringify(props.value, null, 2) ?? ''), text => {
-    const value = SettingsSchemaModel.parseJsonDraft(text)
-    setInvalid(value === undefined)
-    if (value !== undefined) props.onChange(value)
+  const stored = props.value === undefined ? '' : (JSON.stringify(props.value, null, 2) ?? '')
+  const draft = useDraft(stored, text => {
+    const checked = SettingsSchemaModel.checkJsonDraft(text, props.shape)
+    if (checked.ok) props.onChange(checked.value)
   })
+  const checked = draft.value === stored ? undefined : SettingsSchemaModel.checkJsonDraft(draft.value, props.shape)
+  const problem = checked === undefined || checked.ok ? undefined : checked.reason
   return (
     <div className="dshx:flex dshx:w-full dshx:flex-col dshx:gap-1">
       <Textarea
-        aria-invalid={invalid}
+        aria-invalid={problem !== undefined}
         aria-label={props.label}
         className="dshx:min-h-24 dshx:w-full dshx:font-mono! dshx:text-xs"
         disabled={props.disabled}
@@ -425,9 +504,16 @@ const JsonInput = (props: {
         spellCheck={false}
         value={draft.value}
       />
-      <span className={cn('dshx:text-xs', invalid ? 'dshx:text-destructive' : 'dshx:text-muted-foreground')} role={invalid ? 'alert' : undefined}>
-        {invalid ? props.t('form.invalidJson') : props.t('form.json')}
-      </span>
+      {problem === undefined ? (
+        <span className="dshx:text-xs dshx:text-muted-foreground">{props.t(props.shape === undefined ? 'form.json' : JSON_HINT[props.shape])}</span>
+      ) : (
+        <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-xs dshx:text-destructive">
+          <span role="alert">{props.t(JSON_PROBLEM[problem])}</span>
+          <Button className="dshx:h-6 dshx:text-foreground" onClick={draft.onReset} size="xs" type="button" variant="outline">
+            {props.t('form.restoreJson')}
+          </Button>
+        </span>
+      )}
     </div>
   )
 }
@@ -455,6 +541,7 @@ const SettingControlInput = (props: {
   readonly control: SettingControl
   readonly value: JsonValue | undefined
   readonly disabled: boolean
+  readonly busy?: boolean | undefined
   readonly t: ShellTranslate
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
@@ -464,8 +551,10 @@ const SettingControlInput = (props: {
   if (control.kind === 'record') {
     return <RecordInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} valueControl={control.value} />
   }
-  if (control.kind === 'json') return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
-  return <ScalarInput control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
+  if (control.kind === 'json') {
+    return <JsonInput disabled={props.disabled} label={props.label} onChange={props.onChange} shape={control.shape} t={props.t} value={props.value} />
+  }
+  return <ScalarInput busy={props.busy} control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
 }
 
 /** How long a deep-linked row stays highlighted after it scrolls into view. */
@@ -484,6 +573,8 @@ const SettingRow = (props: {
   readonly focused: boolean
   /** The Host refused this row's last write. */
   readonly refused: boolean
+  /** This row's write is in flight. */
+  readonly saving: boolean
   readonly t: ShellTranslate
   readonly write: (field: SettingField, value: JsonValue) => Promise<boolean>
 }): JSX.Element => {
@@ -504,30 +595,46 @@ const SettingRow = (props: {
     void props.reset(field)
   }
   const block = isBlockControl(field.control)
-  const control = <SettingControlInput control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
+  const key = field.path.join('.')
+  const keyShown = keyMatches(key, props.highlight)
+  const sourceShown = showsSource(props.provenance)
+  const control = (
+    <SettingControlInput busy={props.saving} control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
+  )
   return (
     <div
       className={cn(
-        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border-b-[0.5px] dshx:border-border/70 dshx:px-2.5 dshx:py-3.5 dshx:transition-colors dshx:duration-100 dshx:last:border-b-0 dshx:hover:bg-accent/30',
-        flashing && 'dshx:bg-accent/70',
+        // The kit Settings row grammar (council round 8 B4, kit A5): an inset hairline, none under the last row, and a
+        // full-row hover wash; the row bleeds 8px either side, so its text stays on the lane edge.
+        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:py-3.5 dshx:settings-row dshx:last:bg-none',
+        flashing && 'dshx:bg-accent/70 dshx:transition-colors',
       )}
       data-modified={props.modified ? '' : undefined}
       data-setting-path={field.path.join('.')}
       ref={row}
     >
-      {props.modified && (
-        <span
-          aria-hidden="true"
-          className="dshx:absolute dshx:inset-y-3 dshx:left-0 dshx:w-0.5 dshx:rounded-full dshx:bg-info"
-          title={props.t('form.modified')}
-        />
-      )}
-      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
+      {/* 12px left of the text, as before the row's 8px bleed. */}
+      {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-1 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
+      {/* The label takes the rest of the lane and the control a 280px seat, right-aligned, so every control ends on the
+          header's action edge (council round 7 B1). Below 28rem (a phone) every row stacks: its text, then its control
+          (round five B7). */}
+      <div
+        className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(280px,max-content)] dshx:items-start dshx:gap-6 dshx:@max-pane-narrow:grid-cols-1 dshx:@max-pane-narrow:gap-2"
+        data-setting-row-layout=""
+      >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-base dshx:leading-5 dshx:text-foreground">
-            <span data-setting-label={field.path.join('.')}>
-              <Highlight query={props.highlight} text={field.title} />
-            </span>
+          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:settings-label">
+            {/* The config key stays one hover away (and in the JSON view); it is not a line of every row. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span data-setting-label={key}>
+                  <Highlight query={props.highlight} text={field.title} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="dshx:font-mono" side="top">
+                {key}
+              </TooltipContent>
+            </Tooltip>
             {props.modified && <span className="dshx:sr-only">{props.t('form.modified')}</span>}
             {props.modified && (
               <Button
@@ -544,18 +651,22 @@ const SettingRow = (props: {
             )}
           </span>
           {field.description !== '' && (
-            <span className="dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
+            <span className="dshx:max-w-[60ch] dshx:settings-description">
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
-          <span className="dshx:mt-0.5 dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground/80">
-            <code className="dshx:rounded dshx:bg-muted/80 dshx:px-1.5 dshx:py-px dshx:font-mono">
-              <Highlight query={props.highlight} text={field.path.join('.')} />
-            </code>
-            <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>
-          </span>
+          {(keyShown || sourceShown) && (
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-2xs dshx:text-muted-foreground/80">
+              {keyShown && (
+                <code className="dshx:font-mono">
+                  <Highlight query={props.highlight} text={key} />
+                </code>
+              )}
+              {sourceShown && <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>}
+            </span>
+          )}
         </div>
-        {!block && <div className="dshx:shrink-0">{control}</div>}
+        {!block && <div className="dshx:min-w-0 dshx:justify-self-end dshx:@max-pane-narrow:justify-self-start">{control}</div>}
       </div>
       {block && control}
       {props.refused && (
@@ -578,6 +689,10 @@ export const SettingsForm = (props: {
   readonly t: ShellTranslate
   readonly highlight?: string
   readonly focusPath?: readonly string[]
+  /** Drawn at the end of the Advanced fold, after the advanced settings: the page's JSON switch and Plugin details. */
+  readonly advancedExtra?: ReactNode
+  /** The page the fold belongs to, for its accessible name ("Advanced: Main tabs") on an entry of several pages. */
+  readonly advancedOf?: string
 }): JSX.Element => {
   const snapshot = useConfigFormSnapshot(props.form)
   const values = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.value))
@@ -611,37 +726,86 @@ export const SettingsForm = (props: {
   const user = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.user))
   const base = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.base))
   const focusKey = props.focusPath?.join('.')
-  if (values === undefined) return <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace} />
+  const isModified = (field: SettingField): boolean => {
+    const outcome = outcomes.get(field.path.join('.'))
+    const edit = outcome?.status === 'saving' ? outcome.edit : undefined
+    return edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'
+  }
+  // Search results list exactly what matched: they never fold. Elsewhere the settings a schema folds sit under
+  // "Advanced", which opens by itself when one of them is modified (a changed setting is never out of sight) or
+  // focused from a link, and otherwise stays as the user left it.
+  const folds = props.highlight === undefined
+  const everyday = folds ? props.fields.filter(field => !field.advanced) : props.fields
+  const advanced = folds ? props.fields.filter(field => field.advanced) : []
+  const focusedAdvanced = advanced.some(field => field.path.join('.') === focusKey)
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>()
+  useEffect(() => {
+    if (focusedAdvanced) setAdvancedOpen(true)
+  }, [focusedAdvanced, focusKey])
+  const advancedShown = advancedOpen ?? (focusedAdvanced || advanced.some(isModified))
+  const rows = (fields: readonly SettingField[]): ReactNode =>
+    fields.map((field, index) => {
+      const outcome = outcomes.get(field.path.join('.'))
+      const edit = outcome?.status === 'saving' ? outcome.edit : undefined
+      const group = field.groups.join(' › ')
+      const previous = fields[index - 1]?.groups.join(' › ')
+      return (
+        <Fragment key={field.path.join('.')}>
+          {group !== '' && group !== previous && <h4 className="dshx:settings-heading dshx:first:mt-0">{group}</h4>}
+          <SettingRow
+            disabled={disabled}
+            field={field}
+            focused={focusKey === field.path.join('.')}
+            highlight={props.highlight}
+            modified={isModified(field)}
+            provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
+            refused={outcome?.status === 'refused'}
+            reset={reset}
+            saving={outcome?.status === 'saving'}
+            t={props.t}
+            value={displayedValue({ edit, field, values, base })}
+            write={write}
+          />
+        </Fragment>
+      )
+    })
+  const advancedLabel = advanced.length > 0 ? props.t('form.advanced', { count: advanced.length }) : props.t('form.advancedPlain')
+  const advancedFold =
+    advanced.length > 0 || props.advancedExtra !== undefined ? (
+      <Collapsible className="dshx:flex dshx:flex-col" onOpenChange={setAdvancedOpen} open={advancedShown}>
+        <CollapsibleTrigger asChild>
+          <Button
+            aria-label={props.advancedOf === undefined ? undefined : props.t('form.advancedOf', { page: props.advancedOf })}
+            className="dshx:-ml-2 dshx:mt-1 dshx:self-start dshx:text-muted-foreground"
+            data-settings-advanced=""
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronRightIcon className={cn('dshx:transition-transform', advancedShown && 'dshx:rotate-90')} />
+            {advancedLabel}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="dshx:flex dshx:flex-col">
+          {rows(advanced)}
+          {props.advancedExtra}
+        </CollapsibleContent>
+      </Collapsible>
+    ) : null
+  if (values === undefined)
+    return (
+      <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
+        {advancedFold}
+      </div>
+    )
   return (
-    <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
-      {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
-      {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
-      {props.fields.map((field, index) => {
-        const outcome = outcomes.get(field.path.join('.'))
-        const edit = outcome?.status === 'saving' ? outcome.edit : undefined
-        const group = field.groups.join(' › ')
-        const previous = props.fields[index - 1]?.groups.join(' › ')
-        return (
-          <Fragment key={field.path.join('.')}>
-            {group !== '' && group !== previous && (
-              <h4 className="dshx:mt-4 dshx:text-xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">{group}</h4>
-            )}
-            <SettingRow
-              disabled={disabled}
-              field={field}
-              focused={focusKey === field.path.join('.')}
-              highlight={props.highlight}
-              modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
-              provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
-              refused={outcome?.status === 'refused'}
-              reset={reset}
-              t={props.t}
-              value={displayedValue({ edit, field, values, base })}
-              write={write}
-            />
-          </Fragment>
-        )
-      })}
-    </div>
+    <TooltipProvider delayDuration={KEY_TOOLTIP_DELAY_MS}>
+      <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
+        {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
+        {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
+        {rows(everyday)}
+        {advancedFold}
+      </div>
+    </TooltipProvider>
   )
 }

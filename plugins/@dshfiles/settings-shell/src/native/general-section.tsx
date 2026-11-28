@@ -2,11 +2,13 @@
  * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `GeneralSection.js`,
  * `CurrentVersionRow.js`, `DeveloperToolsRow.js` and `chrome.js`.
  */
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PaletteMath } from '@dshfiles/plugin-ui/theme/palette'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import { IconSettingsOutlineMedium, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconSettingsOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ShellTranslate } from './locales.js'
 import { useObservable } from './use-observable.js'
 import { DshReleaseIndicator } from '../release-notice.js'
@@ -21,15 +23,62 @@ const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly 
   return true
 }
 
+type SchemeColours = ReturnType<typeof PaletteMath.standaloneColours>
+
+/** One scheme's miniature window: the page, its sidebar strip, two text lines and one indigo (Needs-you) diamond. */
+const previewParts = (colours: SchemeColours): string =>
+  [
+    `<rect width="96" height="56" fill="${colours.bg}"/>`,
+    `<rect data-part="sidebar" width="24" height="56" fill="${colours.panel}"/>`,
+    `<rect x="24" width="1" height="56" fill="${colours.line}"/>`,
+    `<rect data-part="line" x="34" y="15" width="46" height="4" rx="2" fill="${colours.text}"/>`,
+    `<rect data-part="line" x="34" y="25" width="32" height="4" rx="2" fill="${colours.muted}"/>`,
+    `<polygon data-part="diamond" points="38,35 42,39 38,43 34,39" fill="${colours.accent}"/>`,
+    `<rect data-part="line" x="46" y="37" width="22" height="4" rx="2" fill="${colours.muted}"/>`,
+  ].join('')
+
+/**
+ * Each Appearance card's preview (round five B7): a miniature drawn in that theme's own palette, so the card shows the
+ * theme it picks rather than an icon. System shows the light window with its trailing half in dark. Drawn on a 96×56
+ * grid and shown at 72×42 (council round 11 B4), so the 80px card keeps air above the preview and under its label.
+ */
+const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
+  const light = PaletteMath.standaloneColours('light')
+  const dark = PaletteMath.standaloneColours('dark')
+  const body =
+    scheme === 'system'
+      ? `${previewParts(light)}<g clip-path="url(#half)">${previewParts(dark)}</g>`
+      : previewParts(scheme === 'light' ? light : dark)
+  // One mid-grey edge on every preview, so a near-white or near-black window shows on a light and on a dark card alike.
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="42" viewBox="0 0 96 56" preserveAspectRatio="none">',
+    '<defs><clipPath id="frame"><rect width="96" height="56" rx="6"/></clipPath><clipPath id="half"><rect x="48" width="48" height="56"/></clipPath></defs>',
+    `<g clip-path="url(#frame)">${body}</g>`,
+    `<rect x="0.5" y="0.5" width="95" height="55" rx="5.5" fill="none" stroke="${light.faint}"/>`,
+    '</svg>',
+  ].join('')
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+
+const themeSwatches = (): CSSProperties & Record<`--settings-swatch-${string}`, string> => ({
+  '--settings-swatch-light': themePreview('light'),
+  '--settings-swatch-dark': themePreview('dark'),
+  '--settings-swatch-system': themePreview('system'),
+})
+
 /** The General section column; rows come from `settings.general.item` registrants. */
 export const GeneralSection = (
   props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'> & {
     readonly target?: string | undefined
-    /** A notice above the rows (a newer DSH release); it never sits among the preferences. */
+    /**
+     * A notice after the rows (a newer DSH release); it never sits among the preferences. Round three item 30: it arrives
+     * after the first paint, so above the rows it pushed them down 71px; below them it moves nothing.
+     */
     readonly banner?: React.ReactNode
   },
 ): JSX.Element => {
   const column = useRef<HTMLDivElement>(null)
+  const swatches = useMemo(() => themeSwatches(), [])
   useEffect(() => {
     if (props.target === undefined || column.current === null) return
     revealSettingsEntry({ container: column.current, entryId: props.target })
@@ -40,17 +89,96 @@ export const GeneralSection = (
     // native rows are unlayered module CSS, so the basis must be important to beat their own `flex`.
     <div
       className={cn(
-        "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
-        'dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
-        'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!',
+        "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0 dshx:[&>[data-slot='settings.general.item']>:last-child]:bg-none!",
+        // The kit Settings row grammar (council round 8 B4, kit A5) on core's module rows: an inset hairline (the utility
+        // drops the native border), a full-row hover wash, the 14/500 label and the 13/400 description.
+        'dshx:[&_[class$=row]]:settings-row! dshx:[&_[class$=row]_[class*=_title_]]:settings-label! dshx:[&_[class$=row]_[class*=_description_]]:settings-description!',
+        // Core's Appearance row is a `_group` whose `_title` (no trailing `_`) sits over its cubes: the same 14/500 label
+        // (round nine B1), not core's 14/400.
+        'dshx:[&_[class$=_title]:has(+[class$=_cubeRow])]:settings-label!',
+        // Below 28rem every native row stacks, its control under its text (round five B7), like the plugin rows.
+        'dshx:@max-pane-narrow:[&_[class$=row]]:flex-col! dshx:@max-pane-narrow:[&_[class$=row]]:items-start! dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
+        'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:w-full!',
+        // Round three item 30: the Language note reads as the Language row's own caption, under one divider.
+        'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:bg-none! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
+        // The chosen Appearance cube (core theme row, unlayered module CSS) is the kit's selected card (council round 8 A2,
+        // B4): a 2px edge and a check badge in its top-end corner on the card's own surface, no fill change and no inset
+        // row marker.
+        'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card! dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-transparent!',
+        // Three ~152×80 cards from the row's start edge, 8px apart (council round 11 B4), instead of three cards splitting
+        // the column: a choice of three reads at a glance. A narrow pane shrinks them on one line, never wrapping the third.
+        'dshx:[&_[class$=_cubeRow]]:flex-nowrap! dshx:[&_[class$=_cubeRow]]:gap-2! dshx:[&_[class$=_cubeRow]]:justify-start!',
+        'dshx:[&_[class*=_themeCube]]:flex-[0_1_152px]! dshx:[&_[class*=_themeCube]]:h-20! dshx:[&_[class*=_themeCube]]:min-w-0! dshx:[&_[class*=_themeCube]]:px-2!',
+        // The rows' selectors (core module CSS, filled and borderless) in the kit's one select look (council round 3 B3,
+        // kit A4): 32px, a 1px border, the page fill, 8px corners.
+        'dshx:[&_[class*=_selector_]]:select-look! dshx:[&_[class*=_selector_]:hover]:bg-(--dsw-alias-interactive-bg-hover)!',
+        // One 176px minimum for every select, the plugin rows' too (round nine B1): the control column's left edge is
+        // straight instead of following each value's length, and the chevron keeps to the trailing edge.
+        'dshx:[&_[class*=_selector_]]:min-w-44! dshx:[&_[class*=_selector_]]:justify-between!',
+        // A touch screen keeps 44px controls: the selectors, and the stepper whose up and down buttons are 44px there.
+        'dshx:pointer-coarse:[&_[class*=_selector_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]+[class*=_unit_]]:h-11!',
+        // Font size: the core stepper and its "px" read as one field with the unit as an inner suffix, the kit's UnitInput
+        // look (council round 3 B3, kit A4), instead of a filled number pill beside a loose unit.
+        'dshx:[&_[class*=_stepper_]]:h-8! dshx:[&_[class*=_stepper_]]:min-w-14! dshx:[&_[class*=_stepper_]]:w-full! dshx:[&_[class*=_stepper_]]:justify-start! dshx:[&_[class*=_stepper_]]:rounded-r-none! dshx:[&_[class*=_stepper_]]:border! dshx:[&_[class*=_stepper_]]:border-r-0! dshx:[&_[class*=_stepper_]]:border-field-border! dshx:[&_[class*=_stepper_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]]:pl-2.5!',
+        // The value and its unit at the kit UnitInput's text size (council round 4 B5), not core's 14px.
+        'dshx:[&_[class*=_stepper_]_[class*=_value_]]:text-sm! dshx:[&_[class*=_stepper_]_[class*=_value_]]:leading-5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-sm!',
+        // The Font size row is a grid (council round 14 B3): the label column, then the field and its unit filling the
+        // selects' 176px column (140 + 36, council round 10 B3), so the column's left edge stays straight. Core's control
+        // box steps aside (`contents`) so its disclosure can leave the field's column for the label's.
+        'dshx:[&_[class$=row]:has([class*=_expander_])]:grid! dshx:[&_[class$=row]:has([class*=_expander_])]:grid-cols-[minmax(0,1fr)_8.75rem_2.25rem]! dshx:[&_[class$=row]:has([class*=_expander_])]:gap-x-0! dshx:[&_[class$=row]:has([class*=_expander_])]:gap-y-1!',
+        'dshx:[&_[class$=row]:has([class*=_expander_])>[class$=rowText]]:col-start-1! dshx:[&_[class$=row]:has([class*=_expander_])>[class$=rowText]]:row-start-1!',
+        'dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:contents!',
+        'dshx:[&_[class*=_stepper_]]:col-start-2! dshx:[&_[class*=_stepper_]]:row-start-1! dshx:[&_[class*=_stepper_]]:row-span-2! dshx:[&_[class*=_stepper_]]:self-center!',
+        'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:col-start-3! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:row-start-1! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:row-span-2! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:self-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:justify-end!',
+        // Below 28rem the row stacks like the others: the text, the disclosure under it, then the field.
+        'dshx:@max-pane-narrow:[&_[class$=row]:has([class*=_expander_])]:grid-cols-[8.75rem_2.25rem_minmax(0,1fr)]! dshx:@max-pane-narrow:[&_[class$=row]:has([class*=_expander_])>[class$=rowText]]:col-span-full! dshx:@max-pane-narrow:[&_[class*=_expander_]]:col-span-full! dshx:@max-pane-narrow:[&_[class*=_stepper_]]:col-start-1! dshx:@max-pane-narrow:[&_[class*=_stepper_]]:row-start-3! dshx:@max-pane-narrow:[&_[class*=_stepper_]]:row-span-1! dshx:@max-pane-narrow:[&_[class*=_stepper_]+[class*=_unit_]]:col-start-2! dshx:@max-pane-narrow:[&_[class*=_stepper_]+[class*=_unit_]]:row-start-3! dshx:@max-pane-narrow:[&_[class*=_stepper_]+[class*=_unit_]]:row-span-1! dshx:@max-pane-narrow:[&_[class$=row]:has([class*=_expander_])]:gap-y-2!',
+        // No chevron trailing the field (council round 4 B5): core's More font settings disclosure read as the field's
+        // menu. It is a link under the row's description, in the label column (council round 14 B3), named by its own
+        // label, drawn by the kit's disclosure link (council round 15 B4): the link colour, 13/500, a 12px chevron 4px
+        // after the label from `::after`, an underline only under the pointer, 44px on touch. Core's own chevron stays
+        // hidden.
+        'dshx:[&_[class*=_expander_]]:disclosure-link! dshx:[&_[class*=_expander_]]:ml-0! dshx:[&_[class*=_expander_]]:col-start-1! dshx:[&_[class*=_expander_]]:row-start-2! dshx:[&_[class*=_expander_]]:justify-self-start! dshx:[&_[class*=_expander_]]:justify-start! dshx:[&_[class*=_expander_]]:h-auto! dshx:[&_[class*=_expander_]]:w-auto! dshx:[&_[class*=_expander_]>svg]:hidden! dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]',
+        'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:ml-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-field-border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
+        // Each card leads with its theme's 72×42 preview (`themeSwatches`, round five B7; council round 11 B4) in place of
+        // core's icon, label under it; cards in core order, Light, Dark, System. Centred in the 80px card: 42 + 4 + 22.
+        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-0! dshx:[&_[class*=_themeCube]]:gap-1! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-[42px] dshx:[&_[class*=_themeCube]]:before:w-18 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        // Helper copy reads in lines of 60 characters at most (council round 6 B5), whichever plugin drew the row.
+        'dshx:[&_[class*=_desc]]:max-w-[60ch]! dshx:[&_[class*=Description]]:max-w-[60ch]!',
+        'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
       )}
+      data-settings-theme-swatches=""
       ref={column}
+      style={swatches}
     >
-      {props.banner}
       {props.renderSlot('settings.general.item', {})}
+      {props.banner}
     </div>
   )
 }
+
+/**
+ * General's group headings (council round 6 B5): the transcript rows chat registers (View mode, When to collapse work
+ * details, Replies after collapse, order 12) sit under one "Transcript" heading, after core's Font size (11); the rows
+ * after them (Show coding view at 15 onwards) start a "Behavior" group, so the transcript group ends where its rows do.
+ * "Basics" (council round 7 B2) heads core's Permission (-20), Language (0), Appearance (10) and Font size (11), so every
+ * General row sits in a named group.
+ */
+export const GENERAL_HEADINGS = [
+  { id: 'dshfiles-general-basics-heading', key: 'general.basicsHeading', order: -30, first: true },
+  { id: 'dshfiles-general-transcript-heading', key: 'general.transcriptHeading', order: 11.5, first: false },
+  { id: 'dshfiles-general-behavior-heading', key: 'general.behaviorHeading', order: 13, first: false },
+] as const
+
+/**
+ * One General group heading: the kit's Settings heading step (18/24 at 600, 40px above and 12px below, council round 10
+ * A6), with no spacing of its own, no divider (the row above keeps its own). The `first` heading opens the page and
+ * starts at its top.
+ */
+export const GeneralGroupHeading = (props: { readonly label: string; readonly first?: boolean }): JSX.Element => (
+  <h3 className={cn('dshx:min-w-0 dshx:settings-heading', props.first === true && 'dshx:mt-0!')} data-settings-general-heading="">
+    {props.label}
+  </h3>
+)
 
 /** The release the native client build embeds; the port keeps the version it was taken from. */
 export const CurrentVersionRow = (props: { readonly t: ShellTranslate; readonly version: string }): JSX.Element => (
@@ -59,36 +187,51 @@ export const CurrentVersionRow = (props: { readonly t: ShellTranslate; readonly 
   </div>
 )
 
-/** The shared developer-tool visibility switch. */
+/**
+ * The shared developer-tool visibility switch. Round three item 29: it moves at once and stays usable while the Host
+ * saves (`aria-busy`, never `disabled`, which dropped focus to the page and held the thumb for 660 ms); a refused write
+ * moves it back over the same 120ms transition and says so. The kit switch replaces the native one, which takes no
+ * `aria-busy`.
+ */
 export const DeveloperToolsRow = (props: {
   readonly t: ShellTranslate
   readonly enabled: ObservableSnapshot<boolean>
   readonly setEnabled: (enabled: boolean) => Promise<void>
 }): JSX.Element => {
   const enabled = useObservable(props.enabled)
-  const [busy, setBusy] = useState(false)
+  /** The value the last click asked for, until its write settles; a newer click supersedes an older write. */
+  const [asked, setAsked] = useState<{ readonly value: boolean; readonly sequence: number } | undefined>(undefined)
+  const sequence = useRef(0)
   const [failed, setFailed] = useState(false)
+  const settle = (written: number, refused: boolean): void => {
+    if (written !== sequence.current) return
+    setAsked(undefined)
+    setFailed(refused)
+  }
   return (
     <div
-      className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:py-4"
+      className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6 dshx:py-4 dshx:settings-row"
       data-settings-entry="developer-tools"
     >
       <div>
-        <div className="dshx:text-base dshx:leading-5">{props.t('developerTools.title')}</div>
-        <div className="dshx:mt-1 dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">{props.t('developerTools.description')}</div>
+        <div className="dshx:settings-label">{props.t('developerTools.title')}</div>
+        <div className="dshx:mt-1 dshx:max-w-[60ch] dshx:settings-description">{props.t('developerTools.description')}</div>
         {failed && <div role="alert">{props.t('developerTools.error')}</div>}
       </div>
       <Switch
-        checked={enabled}
-        disabled={busy}
-        label={props.t('developerTools.title')}
-        onChange={next => {
+        aria-busy={asked === undefined ? undefined : true}
+        aria-label={props.t('developerTools.title')}
+        checked={asked?.value ?? enabled}
+        className="dshx-root dshx:shrink-0"
+        onCheckedChange={next => {
+          sequence.current += 1
+          const written = sequence.current
           setFailed(false)
-          setBusy(true)
-          props
-            .setEnabled(next)
-            .catch(() => setFailed(true))
-            .finally(() => setBusy(false))
+          setAsked({ value: next, sequence: written })
+          props.setEnabled(next).then(
+            () => settle(written, false),
+            () => settle(written, true),
+          )
         }}
       />
     </div>

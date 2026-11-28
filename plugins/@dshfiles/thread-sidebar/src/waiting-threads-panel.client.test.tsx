@@ -1,0 +1,67 @@
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { InboxThreadSignal } from './thread-status.js'
+
+const inbox = vi.hoisted(() => ({ act: vi.fn(), done: vi.fn() }))
+const SESSION = 'session-ready'
+const signal: InboxThreadSignal = { itemId: 'item-land', source: 'jj-integration.land', severity: 'ready', reason: 'Ready to land', verb: 'Land', openedAt: 1 }
+
+vi.mock('./inbox-signals.js', () => ({
+  useInboxThreadSignals: () => ({ signals: new Map([[SESSION, signal]]), loaded: true, act: inbox.act, done: inbox.done }),
+}))
+
+// The age helper comes from the Host's primitives, which this environment does not load.
+vi.mock('./relative-age.js', () => ({ formatAge: () => '1m' }))
+
+const { WaitingThreadsPanel } = await import('./waiting-threads-panel.js')
+
+const snapshot = { byId: { [SESSION]: { id: SESSION, displayTitle: 'Ready thread' } } }
+// SAFETY: the panel reads only the session list's snapshot and subscription, and this snapshot carries every row it names.
+const sessions: ISessions = { list: { getSnapshot: () => snapshot, subscribe: () => () => undefined } } as never
+// SAFETY: the panel only prints keys, so the identity translator covers every key it asks for.
+const t = ((key: string) => key) as Parameters<typeof WaitingThreadsPanel>[0]['t']
+
+const renderPanel = (props: { readonly confirmLand?: (sessionId: string) => boolean; readonly openThread?: (sessionId: string) => void }) => {
+  render(<WaitingThreadsPanel t={t} sessions={sessions} openThread={props.openThread ?? (() => undefined)} confirmLand={props.confirmLand} />)
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /waitingThreadsReady/u }))
+}
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
+
+describe('page title marks (council round 7 B6)', () => {
+  it('marks Waiting threads with the Inbox rail glyph in the inbox tone', () => {
+    renderPanel({})
+    const mark = document.querySelector('[data-slot="page-title-mark"]')
+    expect(mark?.className).toContain('dshx:text-nav-inbox')
+    expect(mark?.querySelector('svg')?.getAttribute('class')).toContain('lucide-inbox')
+  })
+
+  it('marks Notifications with the Observe rail glyph in the observe tone', () => {
+    const source = readFileSync('src/notification-history-panel.tsx', 'utf8')
+    expect(source).toMatch(/mark=\{<ActivityIcon \/>\}\s+markTone="observe"/u)
+  })
+})
+
+describe('Inbox › Waiting threads Land', () => {
+  it('opens the header confirmation for the thread on the first click and lands nothing', () => {
+    const confirmLand = vi.fn(() => true)
+    renderPanel({ confirmLand })
+    fireEvent.click(screen.getByRole('button', { name: 'Land' }))
+    expect(confirmLand).toHaveBeenCalledWith(SESSION)
+    expect(inbox.act).not.toHaveBeenCalled()
+  })
+
+  it('opens the thread when nothing can confirm, still landing nothing', () => {
+    const openThread = vi.fn()
+    renderPanel({ confirmLand: () => false, openThread })
+    fireEvent.click(screen.getByRole('button', { name: 'Land' }))
+    expect(openThread).toHaveBeenCalledWith(SESSION)
+    expect(inbox.act).not.toHaveBeenCalled()
+  })
+})

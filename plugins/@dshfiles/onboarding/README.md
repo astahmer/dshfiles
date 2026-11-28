@@ -54,9 +54,9 @@ blocks the app, makes no model request, and changes the profile only when you co
       itself again on a later load while setup is missing); only Done and Don't show again are kept per browser.
       **Show the setup wizard** (⌘K) or **Start setup** on the page replays it on any profile.
 
-3. **First tasks** — until the first thread has a message, the new-thread screen says one sentence and offers three
-   first tasks for the project on screen (**Explain the project**, **Find a rough edge**, **Add a missing test**) in
-   rich-composer's suggestion row. A task puts its prompt in the composer and never sends it; nothing shows without a
+3. **First tasks** — the new-thread screen offers three tasks for the project on screen (**Explain the project**,
+   **Find a rough edge**, **Add a missing test**) as light text-and-icon actions (no fill, the label in secondary ink, the glyph in its own identity tone; council round 16 C1), on a
+   line of their own under rich-composer's quiet Resume and Inbox line (round five C4); until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it; nothing shows without a
    project on screen. The wizard's First task step offers the same prompts for "this project".
 
 ## Pack changes
@@ -102,11 +102,14 @@ blocks the app, makes no model request, and changes the profile only when you co
 
 ## What's new
 
-1. **List.** Getting started's **What's new** lists each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
-   names an owned plugin directory (a title scoping two plugins counts for each), newest first, at most 50 changes (12
-   until **Show all**), each with its date. A change reads as a sentence: the `type(scope):` prefix is dropped and the
-   first letter capitalized; a fix carries a **Fix** badge and a breaking change **Breaking change**, and no plugin name
-   shows. `chore`, `docs`, `test`, `refactor` and `perf` stay out: they rarely change what a user sees.
+1. **List.** Getting started's **What's new** reads each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
+   names an owned plugin directory (a title scoping two plugins counts for each), newest first, at most 50 changes. It
+   leads with what was added: the five newest features (and breaking changes); **Show all N changes** lists everything,
+   fixes included, and **Show features only** folds it back. A change reads as a sentence: the `type(scope):` prefix is
+   dropped and the first letter capitalized, and no plugin name shows. A line carries at most one chip (**Breaking**,
+   **New** or **Fix**) in a column every line reserves while any line has one, so the sentences start on one edge. Its
+   date reads Today, Yesterday, "3 days ago", then the date in the reader's locale. `chore`, `docs`, `test`,
+   `refactor` and `perf` stay out: they rarely change what a user sees.
 2. **Since your last visit.** A change reads **New** when it landed after the instant you last pressed **Mark as seen**
    (kept per browser, `dshfiles.onboarding.whats-new.v1`). Opening the page never moves it, and before the first press
    nothing reads New.
@@ -213,7 +216,7 @@ All apply live; none needs a restart.
 | Key            | Default | Effect                                                                                                 |
 | -------------- | ------- | ------------------------------------------------------------------------------------------------------ |
 | `wizard`       | `true`  | Show the setup wizard while no thread is open. The palette command still replays it when off.          |
-| `starterTasks` | `true`  | Offer three first tasks for the project on the new-thread screen until the first thread has a message. |
+| `starterTasks` | `true`  | Offer three tasks for the project on the new-thread screen (with an explaining line until the first thread has a message). |
 | `checklist`    | `true`  | Show the checklist; off skips every Host check, the GitHub one included.                               |
 | `githubCheck`  | `true`  | Run `gh auth status --hostname github.com` on the Host (5 s timeout, cached 60 s); off reports `off`.  |
 | `packs`        | `true`  | Show the packs section.                                                                                |

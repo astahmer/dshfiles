@@ -134,7 +134,17 @@ DSHX fixes `cssCodeSplit: false` and `publicDir: false`, and inlines imported im
 <style data-plugin="package-id" data-plugin-css="package-id/client.css"></style>
 ```
 
-Loading the registration script alone does not create the style; it is created when the lazy factory materializes. Official DSH plugin ownership removes the old element during HMR/disposal. The final Client output allows one JavaScript file, an optional sourcemap, declarations, and no independent CSS, asset, worker, WASM, or additional chunk.
+Loading the registration script alone does not create the style; it is created when the lazy factory materializes. Official DSH plugin ownership removes the old element during HMR/disposal. The final Client output allows one JavaScript entry file, the lazy chunks below, their sourcemaps, declarations, and no independent CSS, asset, worker or WASM.
+
+## Lazy chunks
+
+Each literal `import()` target becomes `client.<name>.<hash>.js`, which the DSH module loader fetches on first use through `require.async` (the page boot does not parse it). Use it for views a page load does not show, for example with the kit's `lazyView(() => import('./page.js').then(module => module.Page), { label: 'Page' })`.
+
+- A module the entry also bundles is not copied: the chunk reads it from the entry's `__dshxLazyShared` table through `require(<package id>)`, so both run one instance. The table binds only the names chunks read, so the entry stays tree-shaken; keep a heavy module out of the entry's static imports if the chunk should own it.
+- A chunk's own `import()` targets become sibling chunks, unless they bundle modules of that chunk (they then stay inside it, so nothing runs twice).
+- A target stays inlined in `client.js` when the entry imports it statically or when it imports CSS (the entry owns the sheet). Two chunks may not bundle the same plugin module: export several views from one target module instead.
+- Under `dshx dev`, a change that alters what the entry must share fails once with `DSHX1105` ("Save again"); the next save builds.
+- Pin the split with a test: `bootImports(entry)` from `@dshfiles/plugin-ui/testing/boot-imports` lists the source files a Client entry parses at boot.
 
 ## Shared runtime (opt-in)
 
@@ -155,6 +165,8 @@ export default defineConfig({ client: { shared: '@scope/shared-runtime' } })
 - When the consumer's CSS hash equals the supplier's, the consumer only emits its ownership marker and the supplier injects the sheet. A consumer whose CSS differs keeps injecting its own sheet.
 - Build the supplier first. A missing manifest, or a supplier not listed in `dsh.client.external`, fails the build (`DSHX1208`, `DSHX4233`).
 - A supplier module is shared by every consumer, so its module-level state is shared too: keep anything meant to be per-plugin (a per-bundle QueryClient, for example) in the consumer's own code.
+- A provided module Node cannot import (the TypeScript sources of a workspace kit) is named from the supplier's own build. A provided workspace file is also matched when a consumer reaches it through a relative import inside its package, and such a package is guarded file by file: only a bundled copy of a provided file fails `DSHX1209`.
+- Consumers keep the module copies they read from the supplier when it loads, so a change to a provided module reaches an open page after a refresh, not through HMR of the supplier alone.
 - The Host must install the supplier: a consumer built with `shared` does not activate in a profile without it. To go back, drop `shared` and rebuild.
 
 ## Modules the page already provides

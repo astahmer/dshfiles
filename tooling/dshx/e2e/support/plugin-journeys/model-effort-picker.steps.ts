@@ -44,7 +44,7 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   await trigger.click()
 
   await expect(page.getByText('Choose a model', { exact: true })).toHaveCount(0)
-  const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const modelList = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
   await expect(modelList).toBeVisible()
   await expect(search).toBeFocused()
@@ -56,7 +56,7 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
   await search.fill('zz-no-provider-model-83914')
-  await expect(modelList.getByText('No matching models.', { exact: true })).toBeVisible()
+  await expect(modelList.getByText('No models match “zz-no-provider-model-83914”', { exact: true })).toBeVisible()
   await expect(modelList.locator('[data-model-picker-row]')).toHaveCount(0)
 })
 
@@ -70,8 +70,8 @@ Then('the empty search keeps the composer selection', async ({ page }: { page: P
     await expect(model).toHaveText(selection.model)
     if (selection.effort === '') await expect(effortLabel).toHaveCount(0)
     else await expect(effortLabel).toHaveText(selection.effort)
-    await expect(page.getByRole('list', { name: 'Models and accounts', exact: true }).getByText('No matching models.', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Details for/u })).toHaveCount(0)
+    await expect(page.getByRole('listbox', { name: 'Models and accounts', exact: true }).getByText('No models match “zz-no-provider-model-83914”', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-model-details-trigger]')).toHaveCount(0)
     await expect(page.getByRole('dialog')).toBeVisible()
   })
 })
@@ -80,28 +80,21 @@ When('the reasoning-effort slider is adjusted one step', async ({ page }: { page
   const selection = pickerSelectionByPage.get(page)
   if (selection === undefined) throw new Error('The model picker selection was not captured before adjusting reasoning effort.')
 
-  const effort = reasoningEffort(page)
-  const slider = effort.getByRole('slider')
-  await expect(slider).toBeVisible()
-  const currentValueAttribute = await slider.getAttribute('aria-valuenow')
-  const minimumAttribute = await slider.getAttribute('aria-valuemin')
-  const maximumAttribute = await slider.getAttribute('aria-valuemax')
-  if (currentValueAttribute === null || minimumAttribute === null || maximumAttribute === null) {
-    throw new Error('The reasoning slider did not expose its accessible value range.')
-  }
-
-  const currentValue = Number(currentValueAttribute)
-  const minimum = Number(minimumAttribute)
-  const maximum = Number(maximumAttribute)
-  if (![currentValue, minimum, maximum].every(Number.isInteger)) throw new Error('The reasoning slider exposed a non-integer value range.')
-
-  const direction = currentValue > minimum ? 'ArrowLeft' : 'ArrowRight'
-  const targetValue = direction === 'ArrowLeft' ? currentValue - 1 : currentValue + 1
-  if (targetValue < minimum || targetValue > maximum) throw new Error('The reasoning slider has no adjacent value to select.')
-
-  const targetEffort = (await effort.locator('[data-model-effort-option]').nth(targetValue).innerText()).trim()
-  await slider.press(direction)
-  await expect(slider).toHaveAttribute('aria-valuenow', String(targetValue))
+  // Council picker C1: effort is a radio group (one stop, arrow keys move the level).
+  const levels = reasoningEffort(page).getByRole('radio')
+  await expect(levels.first()).toBeVisible()
+  const count = await levels.count()
+  const checked = await levels.evaluateAll(radios => radios.findIndex(radio => radio.getAttribute('aria-checked') === 'true'))
+  const start = checked < 0 ? 0 : checked
+  const direction = start > 0 ? 'ArrowLeft' : 'ArrowRight'
+  const targetValue = direction === 'ArrowLeft' ? start - 1 : start + 1
+  if (targetValue < 0 || targetValue >= count) throw new Error('The reasoning levels have no adjacent value to select.')
+  const targetEffort = (await levels.nth(targetValue).getAttribute('aria-label')) ?? ''
+  await levels.nth(start).focus()
+  await page.keyboard.press(direction)
+  await expect(levels.nth(targetValue)).toHaveAttribute('aria-checked', 'true')
+  // Arrowing previews; Enter applies the level at once (otherwise it applies once arrowing rests).
+  await page.keyboard.press('Enter')
   pickerSelectionByPage.set(page, { model: selection.model, effort: targetEffort })
 })
 
@@ -112,7 +105,7 @@ Then('the picker reflects the adjusted reasoning effort', async ({ page }: { pag
   await recordAssertion(page, 'reasoning-slider-updates-selected-effort', async () => {
     await expect(page.locator('[data-model-picker-text]')).toHaveText(selection.model)
     await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
-    await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(reasoningEffort(page).getByRole('radio', { name: selection.effort, exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })
@@ -158,8 +151,11 @@ When('a supported legacy Codex model is selected without validating a new connec
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
   // This pre-existing fixture tests catalog controls only, never provider authentication or new-account admission.
   const card = providerAccounts.getByRole('listitem').filter({ has: page.getByText('Codex 1', { exact: true }) })
-  await card.getByRole('switch').click()
-  await expect(card.getByRole('switch')).toBeChecked()
+  // The rail row only selects; the account's picker switch is in its detail header.
+  await card.getByRole('button', { name: 'Select Codex 1', exact: true }).click()
+  const enabled = page.getByRole('region', { name: 'Selected account', exact: true }).getByRole('switch', { name: /model picker$/u })
+  await enabled.click()
+  await expect(enabled).toBeChecked()
   const home = profileFor(page).homeRoot
   const readLegacy = async () =>
     Schema.decodeUnknownSync(Schema.Struct({ accounts: Schema.Array(accountDraftSchema) }))(
@@ -195,28 +191,30 @@ When('a supported legacy Codex model is selected without validating a new connec
     throw new Error('The private legacy account is persisted enabled with 0600 auth, but the owned model picker is absent; see attached catalog diagnostics.')
   }
   await trigger.click()
-  const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const modelList = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
   const modelOptions = modelList.locator('[data-model-picker-option]')
   await search.fill('gpt-')
   await expect.poll(() => modelOptions.count()).toBeGreaterThan(1)
+  // Council picker C5: the search is a combobox; arrows move its active option, focus stays in the field.
+  const activeIs = async (index: number): Promise<void> =>
+    expect(search).toHaveAttribute('aria-activedescendant', (await modelOptions.nth(index).getAttribute('id')) ?? '')
   await search.press('ArrowDown')
-  await expect(modelOptions.first()).toBeFocused()
-  await modelOptions.first().press('ArrowDown')
-  await expect(modelOptions.nth(1)).toBeFocused()
-  await modelOptions.nth(1).press('ArrowUp')
-  await expect(modelOptions.first()).toBeFocused()
-  await modelOptions.first().press('ArrowUp')
+  await activeIs(1)
+  await search.press('ArrowUp')
+  await activeIs(0)
+  await search.press('ArrowUp')
+  await activeIs(0)
   await expect(search).toBeFocused()
   await search.fill('gpt-6-luna')
   const model = modelList.locator('[data-model-picker-option]').filter({ hasText: /GPT-6 Luna/iu })
   await expect(model).toBeVisible()
   await model.click()
-  await modelList.getByRole('button', { name: /Details for.*GPT-6 Luna/iu }).click()
+  await modelList.locator('[data-model-picker-row]').filter({ hasText: /GPT-6 Luna/iu }).locator('[data-model-details-trigger]').click()
   await expect(trigger).toHaveText('GPT-6 Luna')
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Codex 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('dialog').getByRole('radio', { name: /^Codex 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
 
-  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode', exact: true })
   const dialog = page.getByRole('dialog')
   if (!(await dialog.isVisible())) await trigger.click()
   await expect(dialog).toBeVisible()
@@ -227,21 +225,10 @@ When('a supported legacy Codex model is selected without validating a new connec
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
   const effort = reasoningEffort(page)
-  const providerDefault = effort.getByRole('button', { name: 'Default', exact: true })
-  await expect(providerDefault).toBeVisible()
-  const defaultBounds = await providerDefault.boundingBox()
-  const slider = effort.getByRole('slider')
-  const sliderBounds = await slider.boundingBox()
-  if (defaultBounds === null || sliderBounds === null) throw new Error('The reasoning controls have no visible bounds.')
-  expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
-  const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
-  if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
-  expect(trackBounds.height).toBeGreaterThanOrEqual(4)
-  expect(sliderBounds.width).toBeGreaterThanOrEqual(16)
-  const rangeColor = await effort
-    .locator('[data-model-effort-slider] [data-slot="slider-range"]')
-    .evaluate(element => getComputedStyle(element).backgroundColor)
-  expect(rangeColor).not.toBe('rgba(0, 0, 0, 0)')
+  // Council picker C1: the provider default is its own option beside the heading, the levels a radio group below it.
+  // Council picker round 3 R6: the provider default is the group's first radio ("Auto").
+  await expect(effort.getByRole('radio', { name: 'Auto, provider default', exact: true })).toBeVisible()
+  await expect(effort.getByRole('radiogroup')).toBeVisible()
   pickerSelectionByPage.set(page, {
     model: (await trigger.innerText()).trim(),
     effort: (await page.locator('[data-model-picker-effort]').innerText()).trim(),
@@ -254,14 +241,14 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
 
   const trigger = page.locator('[data-model-picker-text]')
   const dialog = page.getByRole('dialog')
-  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode', exact: true })
   await recordAssertion(page, 'fast-mode-is-limited-to-supported-codex-models', async () => {
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
     await expect(trigger).toHaveText(selection.model)
     await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
-    await expect(reasoningEffort(page).getByRole('slider')).toBeVisible()
-    await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(reasoningEffort(page).getByRole('radiogroup')).toBeVisible()
+    await expect(reasoningEffort(page).getByRole('radio', { name: selection.effort, exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(fastMode).toBeEnabled()
     await fastMode.click()
     await expect(fastMode).toBeChecked()
@@ -272,15 +259,15 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
 
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
-    const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+    const modelList = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
     const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
     await search.fill('gpt-5.3-codex-spark')
     const spark = modelList.locator('[data-model-picker-option]').filter({ hasText: /GPT-5.3 Codex Spark/iu })
     await expect(spark).toBeVisible()
     await spark.click()
-    await modelList.getByRole('button', { name: /Details for.*Spark/u }).click()
+    await modelList.locator('[data-model-picker-row]').filter({ hasText: /Spark/u }).locator('[data-model-details-trigger]').click()
     if ((await dialog.count()) === 0) await trigger.click()
-    await expect(dialog.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })).toHaveCount(0)
+    await expect(dialog.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })).toHaveCount(0)
     await expect(page.locator('[data-model-fast-mode-enabled]')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -310,16 +297,16 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
     await expect(connection).toBeHidden()
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     const detail = page.getByRole('region', { name: 'Selected account', exact: true })
-    await expect(detail.getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+    await expect(detail.getByRole('switch', { name: 'Show this account', exact: true })).toBeChecked()
   }
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   const picker = page.getByRole('button', { name: /, reasoning / })
   await expect(picker).toBeVisible()
   await picker.click()
-  const list = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const list = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
   await search.fill('gpt-6-luna')
-  const firstAccount = list.getByRole('button', { name: /^Use gpt-6-luna via Command Code \(Command Code 1\)$/u })
+  const firstAccount = list.getByRole('option', { name: /^gpt-6-luna, Command Code 1$/u })
   await firstAccount.click()
   const selectedModel = page.locator('[data-model-picker-text]')
   await expect(selectedModel).toHaveText('gpt-6-luna')
@@ -338,7 +325,8 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
     await expect(page.getByRole('tooltip')).toContainText('Command Code 1')
     // b:4qjm/b:16yr: no swap button beside the chip; the detail panel's Account chips switch the thread's account.
     await expect(page.locator('[data-model-account-swap]')).toHaveCount(0)
-    const accounts = page.getByRole('group', { name: 'Available accounts' }).or(page.getByLabel('Available accounts')).first()
+    // Council picker C3: the accounts are a radio group headed "Account".
+    const accounts = page.getByRole('radiogroup', { name: 'Account', exact: true }).first()
     // The isolated composition can close the menu's first open at once (as it drops the trigger tooltip on main), so an
     // open that closed itself is opened again.
     const openMenu = async (): Promise<void> => {
@@ -347,15 +335,15 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
       await expect(accounts).toBeVisible()
     }
     await openMenu()
-    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(accounts.getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
     await expect(async () => {
       await openMenu()
-      await accounts.getByRole('button', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
-      await expect(accounts.getByRole('button', { name: 'Command Code 2', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 })
+      await accounts.getByRole('radio', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
+      await expect(accounts.getByRole('radio', { name: 'Command Code 2', exact: true })).toHaveAttribute('aria-checked', 'true', { timeout: 2_000 })
     }).toPass({ timeout: 20_000 })
     // One row per model however many accounts offer it.
     await expect(
-      page.getByRole('list', { name: 'Models and accounts', exact: true }).locator('[data-model-picker-option]').filter({ hasText: 'gpt-6-luna' }),
+      page.getByRole('listbox', { name: 'Models and accounts', exact: true }).locator('[data-model-picker-option]').filter({ hasText: 'gpt-6-luna' }),
     ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(model).toHaveText('gpt-6-luna')
@@ -366,7 +354,7 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
     if (initialEffort === '') await expect(effort).toHaveCount(0)
     else await expect(effort).toHaveText(initialEffort)
     await openMenu()
-    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    await expect(accounts.getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'false')
     await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)

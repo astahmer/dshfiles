@@ -1,4 +1,6 @@
+import { useState, type ReactElement } from 'react'
 import { CircleHelpIcon } from '@dshfiles/plugin-ui/icons'
+import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { BRAND_MARKS, type BrandKey } from './brand-marks.js'
@@ -10,14 +12,33 @@ const TONE_FILL = {
   warning: 'dshx:bg-warning',
 } as const
 
-/** The model family's mark: vendored brand artwork, or its initial when the family is unknown. */
+/**
+ * Council round 18 C3: a family the kit draws takes the kit's 16 px mark in its brand colour, deepened in light as
+ * RouteModel does on the dock and list rows (3:1 on every row fill, plugin-ui tests/route-model), so the composer's
+ * model reads the same there; the picker's label stays neutral. Follow-up (lane A): let `ModelMark` take that tone.
+ */
+const KIT_MARK_TONE = 'dshx:brightness-85 dshx:dark:brightness-100'
+
+/**
+ * The model family's mark: the kit's ModelMark for the families it draws, else vendored brand artwork, or its initial
+ * when the family is unknown. The kit mark is always 16 px; `className` sizes the picker's own artwork.
+ */
 export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey | undefined; readonly name: string; readonly className?: string }) => {
+  // Round 4 T2: the kit mark is always 16 px, so `className` places a box around it (it was dropped, and the details
+  // header's alignment offset never landed).
+  if (brand !== undefined && modelFamily(brand) !== undefined)
+    return (
+      <span className={cn('dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', className)} data-model-brand-box>
+        <ModelMark modelId={brand} className={KIT_MARK_TONE} />
+      </span>
+    )
   if (brand === undefined)
     return (
       <span
         aria-hidden="true"
         className={cn(
-          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground',
+          // Round 4 T16: in dark the disc lifts off the popover (bg-muted sat on it).
+          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground dshx:dark:bg-(--dshx-tone-5)',
           className,
         )}
       >
@@ -34,16 +55,87 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
   )
 }
 
+/**
+ * Round 6 V12: the width a cut head draws (its kept characters and the ellipsis), so the head can shrink to it and the
+ * tail follows the ellipsis with no leftover space; `measure` gives a string's width in the head's font.
+ */
+export class SnugHead {
+  static width(input: { readonly text: string; readonly room: number; readonly measure: (text: string) => number }): number | undefined {
+    if (input.measure(input.text) <= input.room) return undefined
+    for (let keep = input.text.length - 1; keep > 0; keep -= 1) {
+      const drawn = input.measure(`${input.text.slice(0, keep)}…`)
+      if (drawn <= input.room) return Math.ceil(drawn)
+    }
+    return undefined
+  }
+}
+
+/** Whether an element, or a part of it marked `data-truncates` (a name's head, round 5 U1), is cut short. */
+export const isTruncatedWithin = (element: Element): boolean =>
+  isTruncated(element) || [...element.querySelectorAll('[data-truncates]')].some(part => isTruncated(part))
+
+/** Whether a text element is cut short by its ellipsis. */
+export const isTruncated = (element: { readonly scrollWidth: number; readonly clientWidth: number } | null): boolean =>
+  element !== null && element.scrollWidth > element.clientWidth + 1
+
+/**
+ * Council picker round 1, N3: a tooltip only when it adds something. It opens (after the provider's 500 ms) only when
+ * the text it wraps is truncated, below the text, so it never covers the search above the list or the row itself.
+ */
+export const TruncatedTooltip = ({
+  children,
+  content,
+  shortened = false,
+}: {
+  readonly children: ReactElement
+  readonly content: string
+  /** The text was shortened before it was drawn (a middle cut, round 4 T5), so the tooltip has something to add. */
+  readonly shortened?: boolean
+}) => {
+  const [open, setOpen] = useState(false)
+  // Round 6 V12: the tooltip stays inside the pane that marks itself `data-tooltip-boundary` (the list), so a long
+  // name's tooltip wraps there instead of covering the details beside it.
+  const [boundary, setBoundary] = useState<Element | null>(null)
+  const show = (target: Element): void => {
+    setBoundary(target.closest('[data-tooltip-boundary]'))
+    setOpen(shortened || isTruncatedWithin(target))
+  }
+  return (
+    <Tooltip
+      onOpenChange={next => {
+        if (!next) setOpen(false)
+      }}
+      open={open}
+    >
+      <TooltipTrigger
+        asChild
+        onFocus={event => show(event.currentTarget)}
+        onPointerEnter={event => show(event.currentTarget)}
+        onPointerLeave={() => setOpen(false)}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent
+        align="start"
+        className={cn(boundary !== null && 'dshx:max-w-(--radix-tooltip-content-available-width) dshx:break-all')}
+        {...(boundary === null ? {} : { collisionBoundary: boundary })}
+        collisionPadding={4}
+        data-model-truncated-tooltip
+        side="bottom"
+      >
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** The service name a route is offered through, shown after the model name. */
 export const ProviderLabel = ({ label, className }: { readonly label: string; readonly className?: string }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-2xs dshx:leading-none dshx:text-muted-foreground/80', className)} data-model-provider-label>
-        {label}
-      </span>
-    </TooltipTrigger>
-    <TooltipContent side="top">{label}</TooltipContent>
-  </Tooltip>
+  <TruncatedTooltip content={label}>
+    <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-xs dshx:leading-none dshx:text-muted-foreground', className)} data-model-provider-label>
+      {label}
+    </span>
+  </TruncatedTooltip>
 )
 
 /** The model's effort glyph: six bars fill in as effort rises, with the hue shifting from neutral to amber. */
@@ -88,9 +180,12 @@ export const AccountBadge = ({
   </Tooltip>
 )
 
-/** The quota convention every surface shares (ai-accounts `quotaTone`): muted while healthy, amber at 15% left or less, red once spent. */
-const quotaTone = (percent: number): string =>
-  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground/60'
+/**
+ * The quota convention every surface shares (ai-accounts `quotaTone`): secondary ink while healthy, amber at 15% left or
+ * less, red once spent. Round 3 R5: no opacity on the healthy ink, which at 60 % fell under 4.5:1 on the rows.
+ */
+export const quotaTone = (percent: number): string =>
+  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground'
 
 /** Remaining quota as a bare number, for a control that already has its own tooltip (the detail panel's account chips). */
 export const QuotaPercent = ({ percent, onReserve, className }: { readonly percent: number; readonly onReserve: boolean; readonly className?: string }) => (
@@ -129,14 +224,14 @@ export const QuotaText = ({
   )
 }
 
-/** A "?" that explains a control in place, never as inline helper text. */
-export const InfoHint = ({ description, className }: { readonly description: string; readonly className?: string }) => (
+/** A "?" that explains a control in place, never as inline helper text; `label` names it ("About reasoning effort"). */
+export const InfoHint = ({ description, label, className }: { readonly description: string; readonly label?: string; readonly className?: string }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <button
-        aria-label={description}
+        aria-label={label ?? description}
         className={cn(
-          'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+          'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:pointer-coarse:hidden dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
           className,
         )}
         type="button"

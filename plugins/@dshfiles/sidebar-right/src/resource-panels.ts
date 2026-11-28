@@ -37,9 +37,23 @@ export interface SidebarResourcePanels {
   readonly publish: (sessionId: string, panels: readonly SidebarResourcePanel[], close: (tabId: string) => void) => () => void
 }
 
+const RESOURCE_ID_PREFIX = 'dshfiles-resource/'
+
 export class SidebarResourcePanelModel {
   static id(sessionId: string, tabId: string): string {
-    return `dshfiles-resource/${encodeURIComponent(sessionId)}/${encodeURIComponent(tabId)}`
+    return `${RESOURCE_ID_PREFIX}${encodeURIComponent(sessionId)}/${encodeURIComponent(tabId)}`
+  }
+
+  /** The thread a resource panel id belongs to; undefined for any other panel id. A saved layout keeps only the id. */
+  static sessionIdOf(id: string): string | undefined {
+    if (!id.startsWith(RESOURCE_ID_PREFIX)) return undefined
+    const [session, tab, ...rest] = id.slice(RESOURCE_ID_PREFIX.length).split('/')
+    if (session === undefined || session === '' || tab === undefined || tab === '' || rest.length > 0) return undefined
+    try {
+      return decodeURIComponent(session)
+    } catch {
+      return undefined
+    }
   }
 
   /**

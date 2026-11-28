@@ -5,7 +5,8 @@
     {
       "id": "turn-summary-line",
       "title": "A summary footer under each finished turn",
-      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s\". The file count opens the edited files (each opens in the editor), the command count opens every command with its outcome, and the red failure count opens the failed commands with how each ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
+      "summary": "One line under each finished turn says what the agent did: files edited, commands run, tests and time.",
+      "details": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, the test outcome from the last test-runner summary, files read and searches — \"Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42\" — and, for a stopped or failed turn, how long it took (Chat's \"Worked for\" says it for the others). The file count opens the edited files (each opens in the editor), the command count opens every command with its outcome (in the owned Chat each command opens its folded call and the call's output), and the red failure count opens the failed commands with how each ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
       "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
@@ -43,14 +44,14 @@
         {
           "key": "testResults",
           "defaultValue": "true",
-          "constraints": "Boolean; show passed / total tests from the last Vitest, Jest or pytest summary a command printed.",
+          "constraints": "Boolean; show the test outcome from the last Vitest, Jest or pytest summary a command printed.",
           "choices": ["true", "false"],
           "coveredBy": ["turn-summary.model-footer"]
         },
         {
           "key": "duration",
           "defaultValue": "true",
-          "constraints": "Boolean; show how long the turn took from its start to its end.",
+          "constraints": "Boolean; show how long a stopped or failed turn took from its start to its end; Worked for says it for the others.",
           "choices": ["true", "false"],
           "coveredBy": ["turn-summary.model-footer"]
         },
@@ -82,6 +83,11 @@
           "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "turn-summary.command-output",
+          "featureFile": "tooling/dshx/e2e/features/turn-summary.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "turn-summary.model-commands",
           "file": "plugins/@dshfiles/turn-summary/src/turn-activity.test.ts",
@@ -110,17 +116,16 @@
     {
       "id": "turn-walkthrough",
       "title": "A walkthrough under a turn that changed code",
-      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\"), and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when diffs-review is loaded, else the native review tab). It is a row in the turn footer, so a closed walkthrough never floats above the composer. While it is on, the footer leaves out its edited-files part, which the native changed-files card above the turn already shows.",
+      "summary": "A turn that changed code offers a walkthrough of its files by folder.",
+      "details": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with its file count and line total, and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when diffs-review is loaded, else the native review tab). It is a row in the turn footer, so a closed walkthrough never floats above the composer. While it is on, the footer leaves out its edited-files part, which the native changed-files card above the turn already shows. It is offered only where it says more than the file chips: files in several folders, or more files than there are chips.",
       "reach": [
         "seed tool-call-thread",
         "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]] [[call write {\\\"file_path\\\":\\\"src/second.ts\\\",\\\"content\\\":\\\"export const second = 2\\\"}]]\"",
         "press Enter",
-        "expect text \"Walkthrough\"",
+        "expect button \"Walkthrough\"",
         "click button \"Walkthrough\"",
-        "expect text \"walkthrough.md\"",
-        "click button \"Open walkthrough.md\"",
-        "expect tab \"walkthrough.md\""
+        "expect button \"Open walkthrough.md\""
       ],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
@@ -169,8 +174,9 @@
     },
     {
       "id": "turn-marks-projection",
-      "title": "Per-Turn facts for the turn map and Since you left",
-      "summary": "A whole-log session projection (dshfilesTurnMarks, contract @dshfiles/chat/turn-marks): for every Turn, whether it asked a question (and whether one is still open), whether it failed, and the files its accepted edits wrote with lines added and removed, counted like the turn footer. Changes publish at Turn boundaries and when a question opens or closes.",
+      "title": "Turn facts for the turn map and Since you left",
+      "summary": "Each turn records whether it asked, failed or edited files, for the turn map and Since you left.",
+      "details": "A whole-log session projection (dshfilesTurnMarks, contract @dshfiles/chat/turn-marks): for every Turn, whether it asked a question (and whether one is still open), whether it failed, and the files its accepted edits wrote with lines added and removed, counted like the turn footer. Changes publish at Turn boundaries and when a question opens or closes.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",

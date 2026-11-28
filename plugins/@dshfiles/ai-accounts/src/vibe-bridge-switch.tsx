@@ -23,7 +23,7 @@ export const VibeBridgeSwitch = (props: {
         <Button
           aria-pressed={bridge === props.bridge}
           className={
-            bridge === props.bridge ? 'dshx:min-w-0 dshx:flex-1 dshx:bg-background dshx:text-xs dshx:shadow-sm' : 'dshx:min-w-0 dshx:flex-1 dshx:text-xs'
+            bridge === props.bridge ? 'dshx:min-w-0 dshx:flex-1 dshx:bg-background dshx:text-xs dshx:shadow-s1' : 'dshx:min-w-0 dshx:flex-1 dshx:text-xs'
           }
           disabled={props.disabled}
           key={bridge}

@@ -6,10 +6,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
-import { createWorkspacePickerPorts, ProjectFolderPicker, type DirectoryPickerPort, type WorkspacePickerPorts } from './picker/index.js'
+import { createWorkspacePickerPorts, ProjectFolderPicker, type DirectoryPickerPort, type PickerAddAction, type WorkspacePickerPorts } from './picker/index.js'
 import { useEffect, useState } from 'react'
 import { ProjectAddFlow, type ProjectAddView } from './project-add-flow.js'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
@@ -113,24 +112,18 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
   }
   // Creating a project and cloning were hidden behind a "New ▾" button (productivity pass Q5, T5.5): both are direct
   // buttons, and each says whether it creates a project or adds a folder that already exists.
-  const addActions = tools.isSuccess ? (
-    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.jj} type="button" variant="outline" onClick={() => openSubView('create', 'browse')}>
-        <FolderPlusIcon aria-hidden />
-        Create project…
-      </Button>
-      <Button className="dshx:shrink-0" disabled={props.busy || !tools.data.git} type="button" variant="outline" onClick={() => openSubView('clone', 'browse')}>
-        <GitBranchIcon aria-hidden />
-        Clone repository…
-      </Button>
-    </div>
-  ) : null
+  const addActions: readonly PickerAddAction[] = tools.isSuccess
+    ? [
+        { id: 'create', label: 'Create project…', icon: <FolderPlusIcon aria-hidden />, disabled: props.busy || !tools.data.jj, onSelect: () => openSubView('create', 'browse') },
+        { id: 'clone', label: 'Clone repository…', icon: <GitBranchIcon aria-hidden />, disabled: props.busy || !tools.data.git, onSelect: () => openSubView('clone', 'browse') },
+      ]
+    : []
   return (
     <ProjectFolderPicker
       {...directoryFlowLabels}
       directoryPicker={directoryPicker}
       disabled={props.busy}
-      headerActions={addActions}
+      addActions={addActions}
       mode="directories"
       showNativePicker={pickerCapabilities.data?.nativePicker === true}
       pathStyle={pickerCapabilities.data?.pathStyle}

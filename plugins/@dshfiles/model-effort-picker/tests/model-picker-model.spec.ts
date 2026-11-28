@@ -121,24 +121,28 @@ describe('model picker selection rules', () => {
     expect(ModelPickerModel.effortName(plain, { provider: 'northstar', model: 'plain-1' })).toBeUndefined()
   })
 
-  it('names the account in the trigger only when the thread is off the default account for its model (b:4qjm)', () => {
+  it('names the account in the trigger when several offer the model, marking any but the default (b:4qjm, round 3 R8)', () => {
     const alex = { id: 'opencode-go-alex', name: 'OpenCode Go Alex', models: [{ id: 'deepseek-v4', name: 'opencode-go-alex/DeepSeek V4' }] }
     const work = { id: 'opencode-go-work', name: 'OpenCode Go Work', models: [{ id: 'deepseek-v4', name: 'opencode-go-work/DeepSeek V4' }] }
     const alexSelection: ModelSelection = { provider: 'opencode-go-alex', model: 'deepseek-v4' }
 
+    // One account offers the model: no tag.
     expect(ModelPickerModel.triggerLabel({ groups: [alex, redwood], current: alexSelection })).toEqual({
-      model: 'DeepSeek V4',
-      title: 'OpenCode Go Alex · DeepSeek V4',
+      model: 'deepseek-v4',
+      title: 'OpenCode Go Alex · deepseek-v4',
     })
-    // Alex is the first account offering the model: the default, so unnamed.
+    // Alex is the first account offering the model: the default, tagged quietly.
     expect(ModelPickerModel.triggerLabel({ groups: [alex, work], current: alexSelection })).toEqual({
-      model: 'DeepSeek V4',
-      title: 'OpenCode Go Alex · DeepSeek V4',
+      model: 'deepseek-v4',
+      providerTag: 'OGA',
+      offDefault: false,
+      title: 'OpenCode Go Alex · deepseek-v4',
     })
     expect(ModelPickerModel.triggerLabel({ groups: [work, alex], current: alexSelection })).toEqual({
-      model: 'DeepSeek V4',
+      model: 'deepseek-v4',
       providerTag: 'OGA',
-      title: 'OpenCode Go Alex · DeepSeek V4',
+      offDefault: true,
+      title: 'OpenCode Go Alex · deepseek-v4',
     })
     expect(ModelPickerModel.triggerLabel({ groups: [], current: alexSelection })).toBeUndefined()
   })
@@ -181,16 +185,15 @@ describe('model picker selection rules', () => {
       )
     })
 
-    it("lists one row per model and provider, standing for the thread's account or the first account (b:16yr)", () => {
-      const providerOf = (id: string): string | undefined => (id.startsWith('codex-') ? 'Codex' : 'OpenCode')
-      const rows = ModelPickerModel.modelRows({ groups: accounts, current: onAlex2, providerOf })
+    it("lists one row per model, standing for the thread's account or the first account (b:16yr, council picker N4)", () => {
+      const rows = ModelPickerModel.modelRows({ groups: accounts, current: onAlex2 })
       expect(rows.map(row => `${row.group.id}:${row.model.id}:${String(row.accounts.length)}`)).toEqual(['codex-alex2:gpt-6-luna:3', 'opencode:kimi:1'])
       expect(rows[0]?.active).toBe(true)
-      const fresh = ModelPickerModel.modelRows({ groups: accounts, current: { provider: 'opencode', model: 'kimi' }, providerOf })
+      const fresh = ModelPickerModel.modelRows({ groups: accounts, current: { provider: 'opencode', model: 'kimi' } })
       expect(fresh.map(row => row.group.id)).toEqual(['opencode', 'codex-alex1'])
-      // The same model id from another service stays its own row.
-      const twoServices = ModelPickerModel.modelRows({ groups: [alex1, { ...other, models: [luna] }], current: null, providerOf })
-      expect(twoServices).toHaveLength(2)
+      // N4: the same model id from another service is the same row, so the list does not regroup once services are known.
+      const twoServices = ModelPickerModel.modelRows({ groups: [alex1, { ...other, models: [luna] }], current: null })
+      expect(twoServices).toHaveLength(1)
     })
 
     it('rotates only through the configured routes, and offers nothing when no other route qualifies', () => {
@@ -224,7 +227,7 @@ describe('model picker fallback chain', () => {
   })
 
   it('names rungs from the catalog and keeps ids for routes it no longer lists', () => {
-    expect(ModelPickerModel.fallbackLabel(groups, deep)).toEqual({ provider: 'Northstar AI', model: 'Nova 3', effort: 'Deep' })
+    expect(ModelPickerModel.fallbackLabel(groups, deep)).toEqual({ provider: 'Northstar AI', model: 'nova-3', effort: 'Deep' })
     expect(ModelPickerModel.fallbackLabel(groups, { provider: 'gone', model: 'm1' })).toEqual({ provider: 'gone', model: 'm1', effort: undefined })
   })
 })

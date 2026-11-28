@@ -1,11 +1,13 @@
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
@@ -17,8 +19,8 @@ import { TabMenuItems } from './tab-menu-items.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
-import { DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { DEFAULT_CLOSE_BUTTON_POSITION, TabProjectMark, type CloseButtonPosition, type TabProjectChip, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
+import { TabComposeGlyph, TabDestinationGlyph, TabIdleGlyph, TabStatusGlyph } from '@dshfiles/workbench/tab-status'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
 type DraggedMove =
@@ -39,31 +41,36 @@ interface TabStripProps {
   /** Project name per thread workspace id, shown before thread titles; absent hides project names. */
   readonly projectNames?: ReadonlyMap<string, string>
   /** Resolved project colour per thread workspace id: a palette class, or a custom `#rrggbb`. */
-  readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+  readonly projectChips?: Readonly<Record<string, TabProjectChip>>
 }
 
-const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
-  if (chip === undefined) return undefined
-  const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
-  if (chip.color !== undefined) style.color = chip.color
-  return style
-}
-
-/** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
-export const threadTabStatus = (facts: { readonly needsYou: boolean; readonly running: boolean; readonly unread: boolean }): TabStatus | null => {
+/** One glyph per thread tab, most urgent first: a question or approval waits, then work in progress, then a failed last turn, then an unseen finish. */
+export const threadTabStatus = (facts: {
+  readonly needsYou: boolean
+  readonly running: boolean
+  readonly failed?: boolean
+  readonly unread: boolean
+  /**
+   * The thread list's status with subagents rolled up (thread-status-client), when a list publishes one: it decides
+   * Needs you, Working and Failed, so a parent waiting on its child is Working here as in the list. Unread stays this
+   * tab's own fact, shown only where the list calls the thread Ready.
+   */
+  readonly listed?: WorkStatus | undefined
+}): TabStatus | null => {
+  if (facts.listed !== undefined) {
+    if (facts.listed === 'needs-you') return 'needsYou'
+    if (facts.listed === 'working') return 'running'
+    if (facts.listed === 'failed') return 'failed'
+    return facts.listed === 'ready' && facts.unread ? 'unread' : null
+  }
   if (facts.needsYou) return 'needsYou'
   if (facts.running) return 'running'
+  if (facts.failed === true) return 'failed'
   if (facts.unread) return 'unread'
   return null
 }
 
-const statusDotClass = {
-  running: 'dshx:animate-pulse dshx:bg-info',
-  needsYou: 'dshx:bg-warning',
-  unread: 'dshx:bg-primary',
-} satisfies Record<TabStatus, string>
-
-const statusLabel = { running: 'running', needsYou: 'needsYou', unread: 'unread' } as const satisfies Record<TabStatus, string>
+const statusLabel = { running: 'running', needsYou: 'needsYou', failed: 'failed', unread: 'unread' } as const satisfies Record<TabStatus, string>
 
 /** DSH's dock-kit strip glyphs (`dsh-client-ui-dockkit`): a 1px cross and plus on a 16px grid, drawn at 14px. */
 const CloseGlyph = (): ReactElement => (
@@ -88,6 +95,22 @@ const DROP_CARET =
 const STRIP_BUTTON =
   'dshx:flex dshx:size-7 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring'
 
+/**
+ * `<html data-main-tabs>` while any strip is mounted. Counted: a slot that re-registers mounts its new strip before the
+ * old one unmounts, and the old strip's cleanup must not clear the mark the new one set.
+ */
+let mountedStrips = 0
+export class StripPresence {
+  static readonly mount = (): (() => void) => {
+    mountedStrips += 1
+    document.documentElement.setAttribute('data-main-tabs', '')
+    return () => {
+      mountedStrips = Math.max(0, mountedStrips - 1)
+      if (mountedStrips === 0) document.documentElement.removeAttribute('data-main-tabs')
+    }
+  }
+}
+
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
   const closeButtonPosition = props.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
@@ -102,6 +125,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
   const activeId = tabs.find(tab => tab.active)?.id
+  // One chrome (round five B1): a folded sidebar draws its open header row over the start of this strip
+  // (thread-sidebar's sidebar-fold.ts) only while a strip is mounted to make room for it.
+  useLayoutEffect(() => StripPresence.mount(), [])
   const renameTab = async (tab: TabView, title: string): Promise<void> => {
     if (tab.kind !== 'thread') return
     try {
@@ -222,9 +248,10 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
 
   return (
     <div
-      className="dshx-root dshx:flex dshx:h-[38px] dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:bg-background dshx:pt-2.5 dshx:pr-1.5 dshx:text-[length:var(--dsh-content-font-size-secondary,13px)]"
+      // The strip on the nav surface, only the selected tab on the canvas (council round 6 B6), as the workbench strip.
+      className="dshx-root dshx:flex dshx:h-[38px] dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:surface-nav dshx:pt-2.5 dshx:pr-1.5 dshx:text-[length:var(--dsh-content-font-size-secondary,13px)]"
       data-window-drag=""
-      style={{ paddingInlineStart: 'calc(var(--dsh-frame-leading-clearance, 0px) + 10px)' }}
+      style={{ paddingInlineStart: 'calc(var(--dsh-frame-leading-clearance, 0px) + var(--dshfiles-sidebar-overhang, 0px) + 10px)' }}
     >
       <div
         ref={scroller}
@@ -288,7 +315,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
                         draggable={renamingTabId !== tab.id}
                         className={cn(
-                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:pr-2.5 dshx:pl-3 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
+                          'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                           props.fixedWidth === true
                             ? 'dshx:w-[160px] dshx:flex-none'
                             : cn('dshx:max-w-[190px] dshx:flex-[0_1_auto]', tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]'),
@@ -340,20 +369,15 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         {closeButtonPosition === 'left' ? closeButton : null}
                         <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                          {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
+                          {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? (project === undefined ? <TabComposeGlyph active={tab.active} /> : <TabIdleGlyph />) : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
+                          {tab.kind === 'panel' && tab.destination !== undefined ? (
+                            // A page names its destination with the rail glyph, in its nav tone on its tile while active
+                            // (round five B4, round nine B2); a page with its own place glyph (AI accounts, Plugins) shows that one.
+                            <TabDestinationGlyph destination={tab.destination} panelId={tab.panelId} active={tab.active} />
+                          ) : null}
                           {project === undefined ? null : (
-                            <span
-                              data-tab-project=""
-                              className={cn(
-                                'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
-                                projectChip === undefined
-                                  ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
-                                  : cn('dshx:font-medium', projectChip.className),
-                              )}
-                              style={projectChipStyle(projectChip)}
-                            >
-                              {project}
-                            </span>
+                            // The project's tile (round five T5); the tab's spoken name and tooltip carry its name.
+                            <ProjectMark name={project} size="dense" data-tab-project="" {...TabProjectMark.paint(projectChip)} />
                           )}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (
                             <InlineTitleEditor
@@ -364,7 +388,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                               onCommit={title => void renameTab(tab, title)}
                             />
                           ) : (
-                            <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                            // The active tab's label is ink at 500 (round five B5); every other tab keeps the strip's one
+                            // secondary ink, preview or kept (council round 18 B2.1).
+                            <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', tab.active && 'dshx:font-medium')}>
+                              {tab.title}
+                            </span>
                           )}
                           {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                         </span>
@@ -435,7 +463,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
             {tabs.map(tab => (
               <DropdownMenuItem key={tab.id} onSelect={() => send({ type: 'tab.select', tabId: tab.id })} className={cn(tab.active && 'dshx:font-semibold')}>
                 <span className="dshx:truncate">{tab.title}</span>
-                {tab.status === null ? null : <StatusDot className={cn('dshx:ml-auto', statusDotClass[tab.status])} />}
+                {tab.status === null ? null : <TabStatusGlyph status={tab.status} label={t(statusLabel[tab.status])} className="dshx:ml-auto" />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

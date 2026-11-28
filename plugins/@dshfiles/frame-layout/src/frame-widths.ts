@@ -76,8 +76,9 @@ export class FrameWidthsModel {
       pending = null
     }
     const unsubscribe = input.instance.subscribe(() => {
-      const { sidebar, sidebarLastOpen, rightbar } = input.instance.getSnapshot().layoutInfo
-      const next: FrameWidths = { sidebar: sidebarLastOpen, rightbar, collapsed: sidebar === 0 }
+      const { sidebar, sidebarLastOpen, sidebarCustom, rightbar } = input.instance.getSnapshot().layoutInfo
+      // An untouched width is stored as 0 (restore skips it), so the frame's default keeps applying (round five B4).
+      const next: FrameWidths = { sidebar: sidebarCustom ? sidebarLastOpen : 0, rightbar, collapsed: sidebar === 0 }
       const serialized = JSON.stringify(next)
       if (serialized === last) return
       last = serialized

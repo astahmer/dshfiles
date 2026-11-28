@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { animate, motionSafe, springs } from '../../motion/index.js'
 import { cn } from '../../lib/utils.js'
+import { SegmentLabel } from '../ui/tabs.js'
 
 export interface SlidingSegmentOption<V extends string> {
   readonly value: V
@@ -21,6 +22,8 @@ export interface SlidingSegmentsProps<V extends string> extends Omit<React.HTMLA
 /**
  * A segmented control whose selection pill glides (snappy spring) to the chosen segment instead of jumping. Filters,
  * Cost/Tokens toggles, Staging/Production switches. Arrow keys move the selection; it is a radio group to assistive tech.
+ * The pill is the one selected segment (council round 10 A3: `segment-thumb` inset 3px in the raised track, its label
+ * the ink at 550, the label's 550 width reserved so nothing moves).
  */
 export function SlidingSegments<V extends string>({ options, value, onValueChange, size = 'default', className, ...props }: SlidingSegmentsProps<V>) {
   const rootRef = React.useRef<HTMLDivElement>(null)
@@ -71,7 +74,7 @@ export function SlidingSegments<V extends string>({ options, value, onValueChang
     <div
       ref={rootRef}
       role="radiogroup"
-      className={cn('dshx:relative dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:bg-muted dshx:p-0.5', className)}
+      className={cn('dshx:relative dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.75', className)}
       onKeyDown={event => {
         if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
           event.preventDefault()
@@ -86,7 +89,7 @@ export function SlidingSegments<V extends string>({ options, value, onValueChang
       <span
         ref={pillRef}
         aria-hidden
-        className="dshx:pointer-events-none dshx:absolute dshx:top-0.5 dshx:bottom-0.5 dshx:left-0 dshx:rounded-md dshx:bg-background dshx:shadow-xs dshx:ring-1 dshx:ring-border"
+        className="dshx:pointer-events-none dshx:absolute dshx:inset-y-0.75 dshx:left-0 dshx:border dshx:segment-thumb"
       />
       {options.map(option => {
         const checked = option.value === value
@@ -104,12 +107,13 @@ export function SlidingSegments<V extends string>({ options, value, onValueChang
             tabIndex={checked ? 0 : -1}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              'dshx:relative dshx:z-10 dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:justify-center dshx:gap-1.5 dshx:rounded-md dshx:font-medium dshx:whitespace-nowrap dshx:text-muted-foreground dshx:transition-colors dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:aria-checked:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:shrink-0',
-              size === 'sm' ? 'dshx:h-6 dshx:px-2 dshx:text-xs' : 'dshx:h-7 dshx:px-3 dshx:text-sm',
+              'dshx:relative dshx:z-10 dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:justify-center dshx:gap-1.5 dshx:rounded-md dshx:font-medium dshx:whitespace-nowrap dshx:text-muted-foreground dshx:transition-colors dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:aria-checked:font-selected dshx:aria-checked:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:shrink-0',
+              // Inset 3px in a 32px (28px `sm`) track: the same outer height as before.
+              size === 'sm' ? 'dshx:h-5.5 dshx:px-2 dshx:text-xs' : 'dshx:h-6.5 dshx:px-3 dshx:text-sm',
             )}
           >
             {option.icon}
-            {option.label}
+            {typeof option.label === 'string' ? <SegmentLabel label={option.label} /> : option.label}
           </button>
         )
       })}

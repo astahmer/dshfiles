@@ -24,3 +24,12 @@ export const filterPageAccounts = (accounts: readonly AccountProfile[], query: s
     return terms.every(term => text.includes(term))
   })
 }
+
+/**
+ * The page heading's count (DESIGN.md Counts): every row the unfiltered list shows, the saved accounts and the
+ * built-in providers listed under them. The built-ins count only once their list answered and is available.
+ */
+export const accountsPageCount = (input: {
+  readonly accounts: readonly unknown[]
+  readonly native: { readonly available: boolean; readonly providers: readonly unknown[] } | undefined
+}): number => input.accounts.length + (input.native?.available === true ? input.native.providers.length : 0)

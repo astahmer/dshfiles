@@ -1,7 +1,7 @@
-import { Chart, barX, barY, colorLegend, defineChart, scaleBand, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
+import { Chart, barX, barY, colorLegend, defineChart, scaleBand, tooltip } from '@dshfiles/plugin-ui/chart'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -9,6 +9,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ActivityReport } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { UsageFormattingModel } from './format.js'
+import { BAND_PADDING, BAR_GEOMETRY, VALUE_SCALE } from './chart-geometry.js'
+import { DATA_SERIES } from './data-series.js'
 
 const TOOL_CATEGORIES = ['tool', 'skill', 'api', 'plugin', 'mcp', 'other'] as const
 type ToolCategory = (typeof TOOL_CATEGORIES)[number]
@@ -124,7 +126,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   const axisLabels = useMemo(() => [...new Set(timelineRows.map(row => row.label))], [timelineRows])
   const xAxis = useMemo(
     () => ({
-      scale: () => scaleBand<string>().domain(axisLabels).padding(0.2),
+      scale: () => scaleBand<string>().domain(axisLabels).padding(BAND_PADDING),
       axis: {
         ticks: {
           format: (value: string) =>
@@ -139,12 +141,12 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
   const timelineChart = useMemo(
     () =>
       defineChart({
-        marks: [barY(timelineRows, { x: 'label', y: 'calls', color: 'category' })],
+        marks: [barY(timelineRows, { x: 'label', y: 'calls', color: 'category', ...BAR_GEOMETRY })],
         scales: {
           x: xAxis,
-          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } },
         },
-        color: { domain: categories.map(category => CATEGORY_LABELS[category]), legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: categories.map(category => CATEGORY_LABELS[category]), range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -159,8 +161,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         marks: [barX(rankedRows, { x: 'value', y: 'name', color: 'category' })],
         scales: {
           x: {
-            scale: scaleLinear,
-            grid: true,
+            ...VALUE_SCALE,
             axis: {
               ticks: {
                 count: 4,
@@ -170,7 +171,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
           },
           y: { scale: () => scaleBand<string>().paddingInner(0.15).paddingOuter(0.05) },
         },
-        color: { domain: categories.map(category => CATEGORY_LABELS[category]), legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: categories.map(category => CATEGORY_LABELS[category]), range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: { use: tooltip, format: point => `${point.datum.name} · ${point.datum.category}: ${metricLabel(metric, point.datum.value)}` },
       }),
     [rankedRows, metric, categories],
@@ -182,7 +183,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
       <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-destructive">
         {errorMessage(query.error, 'Could not load tool activity.')}
         <Button variant="outline" size="xs" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          Try again
+          Retry
         </Button>
       </p>
     )
@@ -248,24 +249,14 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             />
           )}
         </Panel>
-        <Panel title="Most-used tools" description="Top 10 by the selected metric; returned tokens are text characters / 4.">
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
+        <Panel title="Most-used tools" description="Top 10 by the selected metric. Returned tokens are text characters / 4.">
+          <SlidingSegments
             aria-label="Rank tools by"
+            options={RANK_METRICS.map(key => ({ value: key, label: METRIC_LABELS[key] }))}
             value={metric}
-            onValueChange={value => {
-              if (value === 'calls' || value === 'time' || value === 'output') setMetric(value)
-            }}
+            onValueChange={setMetric}
             className="dshx:self-start"
-          >
-            {RANK_METRICS.map(key => (
-              <ToggleGroupItem key={key} value={key}>
-                {METRIC_LABELS[key]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          />
           {rankedRows.length === 0 ? (
             <EmptyState>No tool executions in this range.</EmptyState>
           ) : (
@@ -320,7 +311,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
             </ol>
           )}
         </Panel>
-        <Panel title="Time by test runner" description="Recognized runners; outcomes are shell-call status, not parsed test output.">
+        <Panel title="Time by test runner" description="Recognized runners. Outcomes are shell-call status, not parsed test output.">
           {testRunDistribution.length === 0 ? (
             <EmptyState>No recognized test-run timings in this range.</EmptyState>
           ) : (
@@ -360,7 +351,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
                     Calls
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
-                    Succeeded
+                    Done
                   </th>
                   <th scope="col" className="dshx:py-2 dshx:pr-3">
                     Errors

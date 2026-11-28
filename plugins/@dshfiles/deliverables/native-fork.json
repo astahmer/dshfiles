@@ -40,7 +40,9 @@
   "delta": [
     "src/host.ts",
     "src/present-open.ts",
+    "src/native/ChangedFiles.module.css",
     "src/native/ChangedFiles.tsx",
+    "src/native/Deliverables.module.css",
     "src/native/FileDiff.tsx",
     "src/native/ReviewTab.tsx",
     "src/native/changes-summary.ts",

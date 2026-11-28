@@ -3,10 +3,10 @@
  * first member's seat, so the Turn's own fold still hides it with that seat; the other members hide through their own
  * seat while the run is collapsed. A failed member, or one that needs the user, is never hidden.
  */
-import { createContext, memo, useCallback, useContext, useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, memo, useCallback, useContext, useId, useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ChevronDownIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
-import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
 import { LiveElapsed, formatElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import type { RunFoldCall, RunFoldKind, RunFoldMemberState, RunFoldRuntime } from '../../run-folds.ts'
 import { RunFoldKinds } from '../../run-fold-kinds.ts'
@@ -26,9 +26,17 @@ export interface RunFoldScope {
 
 export const RunFoldContext = createContext<RunFoldScope | null>(null)
 
-/** A seat's place in a run; the head seat also renders the summary row. */
-export interface RunFoldPlacement {
+/**
+ * The run a row belongs to and how many rows it holds; the seat publishes both (`data-run-fold-run`,
+ * `data-run-fold-size`) so a row can line up with the other rows of its run (council round 23, item 1).
+ */
+export interface RunFoldMembership {
   readonly runKey: string
+  readonly size: number
+}
+
+/** A seat's place in a run; the head seat also renders the summary row. */
+export interface RunFoldPlacement extends RunFoldMembership {
   readonly head: { readonly memberKeys: readonly string[] } | undefined
 }
 
@@ -118,48 +126,105 @@ const useToolRowsSignature = (nodeStore: ChatNodeStore, keys: readonly string[],
 
 const SEPARATOR = '\n'
 const NO_PLACEMENTS: readonly (RunFoldPlacement | undefined)[] = []
+const NO_KEYS: readonly string[] = []
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Rows a process group's run took from after the group (round 21 D6): the flow leaves them out of its own runs.
+
+interface AbsorbedRows {
+  readonly keys: readonly string[]
+  readonly run: RunFoldMembership | undefined
+}
+
+const NO_ABSORBED: AbsorbedRows = { keys: NO_KEYS, run: undefined }
+const absorbedByOwner = new Map<string, AbsorbedRows>()
+let absorbedSnapshot: ReadonlyMap<string, RunFoldMembership> = new Map()
+const absorbedListeners = new Set<() => void>()
+
+const setAbsorbed = (owner: string, next: AbsorbedRows): void => {
+  const previous = absorbedByOwner.get(owner) ?? NO_ABSORBED
+  const sameRun = previous.run?.runKey === next.run?.runKey && previous.run?.size === next.run?.size
+  if (sameRun && previous.keys.length === next.keys.length && previous.keys.every((key, index) => key === next.keys[index])) return
+  if (next.keys.length === 0 || next.run === undefined) absorbedByOwner.delete(owner)
+  else absorbedByOwner.set(owner, next)
+  absorbedSnapshot = new Map(
+    [...absorbedByOwner.values()].flatMap(({ keys, run }) => (run === undefined ? [] : keys.map(key => [key, run] as const))),
+  )
+  for (const listener of absorbedListeners) listener()
+}
+
+const subscribeAbsorbed = (listener: () => void): (() => void) => {
+  absorbedListeners.add(listener)
+  return () => {
+    absorbedListeners.delete(listener)
+  }
+}
+
+/**
+ * The rows kept outside a process group that its run counts, with the run that took each; they keep their own seat and
+ * never fold again.
+ */
+export const useRunFoldAbsorbed = (): ReadonlyMap<string, RunFoldMembership> => useSyncExternalStore(subscribeAbsorbed, () => absorbedSnapshot)
 
 /**
  * Place every row of a list: undefined for a row outside any run, else its run and, for the first row, the summary.
  * @param nodeStore - the flow's node reader.
  * @param keys - the list's rows in order; undefined for a row that is not a single node (a group) and breaks a run.
  */
-export function useRunFoldPlacements(nodeStore: ChatNodeStore, keys: readonly (string | undefined)[]): readonly (RunFoldPlacement | undefined)[] {
+export function useRunFoldPlacements(
+  nodeStore: ChatNodeStore,
+  keys: readonly (string | undefined)[],
+  /** A process group's: the rows the Turn keeps outside it right after it (round 21 D6); its last run may take them. */
+  trailing: readonly string[] = NO_KEYS,
+): readonly (RunFoldPlacement | undefined)[] {
   const scope = useContext(RunFoldContext)
   const kinds = useKinds()
   const enabled = scope !== null && scope.enabled && kinds.length > 0
+  const all = useMemo(() => (trailing.length === 0 ? keys : [...keys, ...trailing]), [keys, trailing])
   const toolKeys = useMemo(
-    () => (enabled ? keys.filter((key): key is string => key !== undefined && nodeStore.get(key)?.kind === 'tool-call') : []),
-    [enabled, keys, nodeStore],
+    () => (enabled ? all.filter((key): key is string => key !== undefined && nodeStore.get(key)?.kind === 'tool-call') : []),
+    [enabled, all, nodeStore],
   )
   const read = useCallback(
     () =>
       enabled
-        ? keys
+        ? all
             .map(key => {
               const call = key === undefined ? undefined : callOfNode(nodeStore, key)
               return call === undefined ? '' : (RunFoldKinds.kindOf(call)?.id ?? '')
             })
             .join(SEPARATOR)
         : '',
-    [enabled, keys, nodeStore],
+    [enabled, all, nodeStore],
   )
   const signature = useToolRowsSignature(nodeStore, toolKeys, read)
   const sessionId = scope?.sessionId
-  return useMemo(() => {
-    if (!enabled || signature === '' || sessionId === undefined) return NO_PLACEMENTS
+  const layout = useMemo(() => {
+    if (!enabled || signature === '' || sessionId === undefined) return { placements: NO_PLACEMENTS, absorbed: NO_ABSORBED }
     const claimed = signature.split(SEPARATOR).map(kind => (kind === '' ? undefined : kind))
+    const { runs, absorbed } = RunFoldModel.partitionWithTrailing(claimed.slice(0, keys.length), claimed.slice(keys.length), true)
     const placements: (RunFoldPlacement | undefined)[] = keys.map(() => undefined)
-    for (const run of RunFoldModel.partition(claimed, true)) {
-      const memberKeys = keys.slice(run.start, run.end).filter((key): key is string => key !== undefined)
+    let last: RunFoldMembership | undefined
+    for (const run of runs) {
+      const memberKeys = all.slice(run.start, run.end).filter((key): key is string => key !== undefined)
       const first = memberKeys[0]
       if (first === undefined) continue
       const runKey = `${sessionId}${SEPARATOR}${first}`
-      placements[run.start] = { runKey, head: { memberKeys } }
-      for (let index = run.start + 1; index < run.end; index += 1) placements[index] = { runKey, head: undefined }
+      const size = memberKeys.length
+      last = { runKey, size }
+      placements[run.start] = { runKey, size, head: { memberKeys } }
+      // A taken trailing row keeps its own seat outside the group, so it has no placement here and never hides.
+      for (let index = run.start + 1; index < Math.min(run.end, keys.length); index += 1) placements[index] = { runKey, size, head: undefined }
     }
-    return placements
-  }, [enabled, signature, sessionId, keys])
+    return { placements, absorbed: absorbed === 0 ? NO_ABSORBED : { keys: trailing.slice(0, absorbed), run: last } }
+  }, [enabled, signature, sessionId, keys, all, trailing])
+  // Tell the flow which rows this group's run took, before paint, so they never fold twice.
+  const owner = useId()
+  useLayoutEffect(() => {
+    setAbsorbed(owner, layout.absorbed)
+  }, [owner, layout.absorbed])
+  useLayoutEffect(() => () => setAbsorbed(owner, NO_ABSORBED), [owner])
+  return layout.placements
 }
 
 /**
@@ -274,13 +339,10 @@ const SummaryRow = memo(function SummaryRow({ runKey, results, t }: { readonly r
           <kind.Icon className={css.iconSvg} />
         </span>
       ))}
+      {/* Council round 23, items 1 and 2: the failed clause leads with the list's ✕ (the one count treatment), and no
+          glyph trails the count: a red ✕ at the row's end read as a dismiss control. */}
       <span className={css.label} aria-hidden="true">
-        {parts.map((part, index) => (
-          <span key={`${String(index)}:${part.text}`} className={part.tone === 'plain' ? undefined : css[part.tone === 'failed' ? 'failed' : 'needsYou']}>
-            {index === 0 ? '' : ' · '}
-            {part.text}
-          </span>
-        ))}
+        <WorkCountText parts={parts} />
         {longest === undefined ? null : (
           <span className={css.elapsed}>
             {' · '}
@@ -292,7 +354,6 @@ const SummaryRow = memo(function SummaryRow({ runKey, results, t }: { readonly r
           </span>
         )}
       </span>
-      <StatusGlyph status={RunFoldModel.glyph(counts)} decorative className={css.glyph} />
     </button>
   )
 })

@@ -32,30 +32,30 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 
 ### Curated
 
-1. **Browse and clean up memory in the Memory panel** (`memory`, knowledge) — A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, reversible archive, restore, superseded history, related memories), on-demand Jev relevance suggestions with explicit per-note arch…
-2. **Preview cited memory inline** (`memory`, knowledge) — Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the…
-3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the use…
-4. **Forget a selection of notes** (`memory`, knowledge) — Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.
-5. **Attach named outside directories and git repositories to a thread** (`references`, knowledge) — Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.
-6. **Agent CLI sessions browser** (`agentsview`, knowledge) — One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their…
+1. **Browse and clean up memory in the Memory panel** (`memory`, knowledge) — Browse, edit, archive and forget notes, and read thread digests, on the Memory page.
+2. **Preview cited memory inline** (`memory`, knowledge) — Click a memory citation in a thread to see the note and where it came from.
+3. **Show what memory costs and whether it holds up** (`memory`, knowledge) — See what memory costs in tokens and whether answers that cite it hold up.
+4. **Forget a selection of notes** (`memory`, knowledge) — Select several notes and forget them with one confirmation.
+5. **Attach outside folders and repositories to a thread** (`references`, knowledge) — Attach a folder or git repository to a thread with /reference so the agent can read it.
+6. **Claude Code and Codex history** (`agentsview`, knowledge) — Browse what Claude Code and Codex recorded on this machine and read any run as a transcript.
 
 ### More
 
-1. **Digest idle threads from DSH's own session logs** (`memory`) — Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and triv…
-2. **Start every thread with one frozen memory block** (`memory`) — At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. Jujutsu workspace paths resolve to their shared…
-3. **Search, read and note memory from any agent** (`memory`) — memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a…
-4. **Serve session search from a worker-owned index** (`session-search`) — Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.
-5. **Find every match in one thread** (`session-search`) — Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.
-6. **Search the prompts sent across threads** (`session-search`) — Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…
-7. **Manage reusable prompt snippets** (`prompt-stash`, composer) — Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.
-8. **Insert prompt text without submitting** (`prompt-stash`, composer) — Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.
-9. **Browse recent text-only user messages** (`prompt-stash`, composer) — Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.
-10. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_histor…
-11. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.
-12. **Answer agent grep and glob from a resident fff index** (`fff-search`) — On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.
-13. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
-14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
-15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Register resources and attach reusable typed property packs, without modifying native content or running agents.
+1. **Digest idle threads from their logs** (`memory`) — An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.
+2. **Start every thread with one frozen memory block** (`memory`) — Each thread starts with a short memory block of notes and past threads for its project.
+3. **Search, read and note memory from any agent** (`memory`) — Agents search memory, read a digest or note, and save new notes.
+4. **Search threads in the background** (`session-search`) — Thread search runs from a background index, so searching never slows DSH down.
+5. **Find every match in one thread** (`session-search`) — Find every match for your words in one thread, in order, with a short snippet.
+6. **Search the prompts sent across threads** (`session-search`) — Find the prompts you sent across threads, newest first, each one once.
+7. **Manage reusable prompt snippets** (`prompt-stash`, composer) — Save, edit and search prompt snippets that every browser shares, and insert one into the composer.
+8. **Insert prompt text without submitting** (`prompt-stash`, composer) — Inserting a prompt adds its text at the cursor, keeps your attachments and never sends.
+9. **Browse recent text-only user messages** (`prompt-stash`, composer) — Pick from the messages you recently sent in this thread.
+10. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search every prompt you sent in any thread with Ctrl+R, and insert one without sending.
+11. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — Files and images in a draft stay with it when you switch threads and come back.
+12. **Faster grep and glob for agents** (`fff-search`) — The agent's grep and glob tools answer from a file index kept in memory.
+13. **Fetch pages as readable articles** (`web-fetch-readable`, settings) — Fetched web pages arrive as the readable article, safely across redirects.
+14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Web search and fetch results show a chip for each page they returned.
+15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Attach reusable sets of typed properties to resources without changing them.
 
 ## Enable it
 

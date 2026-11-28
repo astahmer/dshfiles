@@ -1,11 +1,20 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionListState, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentHeaderLineageProps } from './SubagentHeaderLineage.js'
+
+/** The Host's failed-turn record the menu reads (round 21 D4); a test fills it per case. */
+const failedTurns = vi.hoisted(() => new Map<string, { readonly sessionId: string; readonly failedAt: number; readonly reason: 'error' | 'max-tokens' }>())
+vi.mock('./subagent-failed-turns.js', () => ({ useSubagentFailedTurns: () => failedTurns }))
+// The live-turns read needs the Host API; the child's state line reads its step and start from it.
+vi.mock('../live-activity.js', async original => ({
+  ...(await original<typeof import('../live-activity.js')>()),
+  useLiveTurns: (ids: readonly string[]) => new Map(ids.map(id => [id, { step: undefined, startedAt: 1_000, needsYou: false }])),
+}))
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconChevronDownOutlineRegular: () => null,
@@ -139,42 +148,132 @@ const props = (): SubagentHeaderLineageProps => ({
   openChild: vi.fn(),
   openChildAside: vi.fn(),
   refreshProjection: vi.fn(),
+  copy: {
+    count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`,
+    summary: {
+      working: count => `${String(count)} working`,
+      failed: count => `${String(count)} failed`,
+      stopped: count => `${String(count)} stopped`,
+      done: count => `${String(count)} done`,
+    },
+    working: 'Working',
+    needsYou: 'Needs you',
+    done: 'Done',
+    stopped: 'Stopped',
+    failed: 'Failed',
+  },
   sessionId: CHILD,
   lineageSessionId: CHILD,
   displayTitle: 'worker',
   t: translate,
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  failedTurns.clear()
+})
 
 describe('SubagentHeaderLineage route provenance', () => {
-  it('shows the latest safe model route in the child header and catalog row', () => {
-    render(<SubagentHeaderLineage {...props()} />)
+  it('keeps the model in the child header as the kit mark and name, out of the catalog row (council round 17 B1.1)', () => {
+    const { container } = render(<SubagentHeaderLineage {...props()} />)
 
-    expect(screen.getByText('openai/gpt-6.1-luna')).not.toBeNull()
+    const model = container.querySelector('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('gpt-6.1-luna')
+    expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    // The provider id is not a name to show, and the badge carries no native hover title.
+    expect(container.textContent).not.toContain('openai/')
+    expect(container.querySelector('[title]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'switcher.aria' }))
-    expect(screen.getAllByText(/openai\/gpt-6\.1-luna/)).toHaveLength(2)
+    expect(document.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
   })
 
-  it('shows active subagents over the total and labels each working row', () => {
+  it('says a running child\'s state right after its model, not in the header\'s middle (council round 22, item 7)', () => {
+    const running: SessionListState = { ...sessionList, byId: { [CHILD]: { ...childSummary, running: true } } }
+    const { container } = render(<SubagentHeaderLineage {...props()} useSessions={select => select(running)} />)
+    const model = container.querySelector('[data-subagent-route]')
+    const state = container.querySelector('[data-subagent-live-state]')
+    if (model === null || state === null) throw new Error('no model or no live state in the child header')
+    // Document order: the model, then its state.
+    expect(model.compareDocumentPosition(state)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(state.querySelector('[data-testid="thread-header-live-activity"]')?.textContent).toContain('Working')
+    // One clock on the child view (council round 24, item 6): the transcript says "Working for 33s", so the header
+    // reads "deepseek-v4-flash · ○ Working", as the phone does.
+    expect(state.querySelector('[data-live-elapsed]')).toBeNull()
+    expect(state.querySelector('[data-live-elapsed-separator]')).toBeNull()
+    // An idle child names no state there.
+    cleanup()
+    const idle = render(<SubagentHeaderLineage {...props()} />)
+    expect(idle.container.querySelector('[data-subagent-live-state]')).toBeNull()
+  })
+
+  it('shows no model while no route names one: no mark, no guess', () => {
+    const { container } = render(<SubagentHeaderLineage {...props()} useProjection={() => undefined} />)
+    expect(container.querySelector('[data-slot="route-model"]')).toBeNull()
+  })
+
+  it('counts the subagents with the one formula, with the spinner while one works and no "2/34"', () => {
     const state = sessionListWithRunningSubagents()
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
 
-    const trigger = screen.getByRole('button', { name: '2 running' })
-    expect(trigger.textContent).toContain('2/34 subagents')
+    // Council round 22, item 3: `2 working`, never "34 subagents"; the 32 with no known state count in no part.
+    const trigger = screen.getByRole('button', { name: '2 working' })
+    expect(trigger.textContent).toBe('2 working')
+    expect(trigger.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
 
     fireEvent.click(trigger)
-    const activeRow = screen.getByRole('treeitem', { name: /^worker-1 / })
-    const inactiveRow = screen.getByRole('treeitem', { name: /^worker-3 / })
-    expect(within(activeRow).getByRole('status').textContent).toBe('Running')
-    expect(within(inactiveRow).queryByRole('status')).toBeNull()
+    const activeRow = screen.getByRole('treeitem', { name: /^worker-1 · Working/ })
+    const inactiveRow = screen.getByRole('treeitem', { name: /^worker-3$/ })
+    expect(activeRow.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+    expect(inactiveRow.querySelector('[data-slot="status-glyph"]')).toBeNull()
+  })
+
+  it('shows a finished 300 s child as Done for 5m 00s, with no token count and no raw prompt', () => {
+    // The row read "[[once call bash {\"command\":\"sleep 300\"…", "0 tok" and a duration from core's own formatter.
+    const finished: SessionListState = {
+      ...sessionList,
+      byId: {
+        [CHILD]: {
+          ...childSummary,
+          title: '[[once call bash {"command":"sleep 300"}]]',
+          projectionValues: {
+            ...childSummary.projectionValues,
+            subagentTiming: { settledMs: 300_000, lastTurnCompleted: true },
+            tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          },
+        },
+      },
+    }
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(finished)} />)
+    fireEvent.click(screen.getByRole('button', { name: '1 done' }))
+    const row = screen.getByRole('treeitem', { name: 'worker · Done · 5m 00s' })
+    expect(row.textContent).toContain('5m 00s')
+    expect(row.textContent).not.toMatch(/tok|once call/u)
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
+  })
+
+  it('shows a child whose turn failed as Failed, and keeps Stopped for one the user stopped (round 21 D4)', () => {
+    const ended: SessionListState = {
+      ...sessionList,
+      byId: { [CHILD]: { ...childSummary, projectionValues: { ...childSummary.projectionValues, subagentTiming: { settledMs: 0, lastTurnCompleted: false } } } },
+    }
+    failedTurns.set(CHILD, { sessionId: CHILD, failedAt: 1, reason: 'error' })
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
+    fireEvent.click(screen.getByRole('button', { name: '1 failed' }))
+    const failed = screen.getByRole('treeitem', { name: /^worker · Failed/ })
+    expect(failed.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    cleanup()
+    failedTurns.clear()
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
+    fireEvent.click(screen.getByRole('button', { name: '1 stopped' }))
+    const stopped = screen.getByRole('treeitem', { name: /^worker · Stopped/ })
+    expect(stopped.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('stopped')
   })
 
   it('hovers the catalog open and closed with its delays, and a click pins it open', () => {
     vi.useFakeTimers()
     try {
       render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(sessionList)} />)
-      const trigger = screen.getByRole('button', { name: /subagent/ })
+      const trigger = screen.getByRole('button', { name: '1 subagent' })
 
       fireEvent.mouseOver(trigger)
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -212,7 +311,19 @@ describe('SubagentHeaderLineage route provenance', () => {
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(timed)} />)
 
     fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
-    const row = screen.getByRole('treeitem', { name: /^worker / })
-    expect(row.textContent).toContain('duration.')
+    const row = screen.getByRole('treeitem', { name: /^worker/ })
+    expect(row.textContent).toContain('1m 05s')
+  })
+
+  it('reads `N working · ✕ M failed`: the failed clause leads with its cross, in failed ink (council round 23, item 2)', () => {
+    const state = sessionListWithRunningSubagents()
+    failedTurns.set('child-3', { sessionId: 'child-3', failedAt: 1, reason: 'error' })
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
+    const trigger = screen.getByRole('button', { name: '2 working · 1 failed' })
+    const failed = trigger.querySelector('[data-work-count-tone="failed"]')
+    expect(failed?.textContent).toBe('1 failed')
+    expect(failed?.className).toContain('dshx:text-destructive')
+    expect(failed?.firstElementChild?.getAttribute('data-status')).toBe('failed')
+    expect(trigger.querySelector('[data-work-count-tone="plain"]')?.textContent).toBe('2 working')
   })
 })

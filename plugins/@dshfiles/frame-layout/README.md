@@ -1,12 +1,12 @@
 # @dshfiles/frame-layout
 
-![Hand the frame's regions to plugin surfaces](docs/screenshots/panel-seats.png)
+![Main area and side panels](docs/screenshots/panel-seats.png)
 
 ![On a phone the stage takes the full width above the sidebar's own tab bar](docs/screenshots/phone-navigation-seat.png)
 
 ![The status strip along the bottom of the frame, here with the Quota item](docs/screenshots/status-strip.png)
 
-![On a phone the strip is one pill that names its first items and opens the list](docs/screenshots/status-strip-phone.png)
+![On a phone status is a 44px button in the top bar that opens the items as a sheet](docs/screenshots/status-strip-phone.png)
 
 ![Settings › General › Status bar: show, hide and reorder the strip's items](docs/screenshots/status-bar-settings.png)
 
@@ -25,11 +25,13 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
   reload reopens the sidebar at its **last open width and last state** and keeps the right panel's px preference.
 - **Collapse is remembered**: closing the sidebar boots back closed, and reopening restores the last open width instead of
   the 280px contract default. A narrow frame (<1024px) keeps its own responsive auto-collapse rather than restoring a stored
-  wide-frame override. The frame stores the right panel's width; Workbench owns whether its persistent right-pane tabs are shown.
+  wide-frame override. Until a width is dragged the sidebar takes the default for the frame, 316px (a 256px thread
+  column beside the 60px labelled rail) from 1440px, 280px below; that untouched width is never stored, so a stored width
+  always wins. The frame stores the right panel's width; Workbench owns whether its persistent right-pane tabs are shown.
 - **Recovery reveal**: the owned `ctx.frameSidebar.show()` presentation port opens the left sidebar idempotently from live frame state. Repeated synchronous Reset layout calls cannot toggle it closed again; remembered widths and the prior wide-frame preference survive narrow expansion. The resolved sidebar track takes at most half the frame, so reopening a remembered 420px sidebar on a 360px frame leaves both left and centre at 180px instead of hiding the conversation. The right track still concedes first, and wider frames restore the saved width. This does not add a method to native `ILayout`.
 - **Storage failure degrades to upstream behavior**: a blocked or full store (private mode, quota) leaves the geometry
   in-memory, exactly as the native package.
-- **Phone navigation seat**: below 640px a left occupant that draws its own phone navigation sets `data-shell-phone-nav` on the document; the frame then drops the 56px rail track and the right track, hides the clipped sidebar column and reserves `--dsh-phone-nav-height` for the occupant's bottom bar. A pure CSS rule; without the mark the narrow frame behaves as upstream.
+- **Phone navigation seat**: below 640px a left occupant that draws its own phone navigation sets `data-shell-phone-nav` on the document; the frame then drops the 60px rail track and the right track, hides the clipped sidebar column and reserves `--dsh-phone-nav-height` for the occupant's bottom bar. A pure CSS rule; without the mark the narrow frame behaves as upstream.
 - **Zen mode**: **Zen mode** in ⌘K, or Mod+Shift+. anywhere, leaves only the thread and its composer. See
   [zen mode](#zen-mode).
 - **Left-content seat**: the public `shell.left` contract is declared/rendered by the owned thread sidebar, not by AppFrame.
@@ -81,6 +83,7 @@ whole delta is:
 | `src/main-surface.ts`                   | new: adapts the frame store to the observable main-surface seat; delegates frame-authorized keyed-main rendering with a legacy-workbench recursion guard and the installed renderer's native fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `src/right-panel.ts`                    | new: frame-lifetime dock action registration; latest live registration wins, independent disposers preserve other registrations, teardown clears all actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `src/zen-mode.ts`                       | new: the browser-local zen record (`dshfiles.frame-layout.zen.v1`), the `ctx.zen` seat and the `<html data-dshfiles-zen>` mirror. `AppFrame.tsx` drops the sidebar and right tracks to 0 px while zen is on above the drawer breakpoint, hides their drag handles and the leading seat and draws Leave zen mode in its place; `AppFrame.module.css` hides those columns, the status strip and the `shell.beforeMain` rows; `service.ts` leaves zen on a sidebar toggle instead of toggling                                                                                                                                                                                                      |
+| `src/status-blank.ts` | new (unslop r5 C6, council round 4): the strip marks an item `data-status-blank` while it draws no text and no graphic (an empty text node defeats `:empty`); `AppFrame.module.css` hides it and draws a divider only after a shown item, so the strip never ends in a stray hairline |
 | `src/regions.ts`                        | new: the public `MainSurfaceSeat`, `MainSurfaceOwnerProps`, `BeforeMainOwnerProps`, `RightPanelSeat`, `DockPaneActions`, `DockPaneOwnerProps` and `FrameBottomSeat` contracts, their Context augmentations, and `shell.main`/`shell.beforeMain`/`shell.dock` declarations                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 `src/native/index.ts` stays upstream's no-op Host body; it is also the dshx Host entry, so no extra forwarding module
@@ -119,7 +122,21 @@ within a side and the first registration per `id` wins, so one plugin cannot fil
 `compact` (phone width) and the frame's `useSessions`, and returns null while it has nothing to say; one that throws
 hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one pill that
 names its first two items in their own words ("1 working · Quota CC1 56%", never a bare "Status"; the frame reads each
-item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. frame-layout owns this registry because it depends on no plugin, so any provider
+item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. The pill
+belongs to the overview screens: with the thread sidebar's phone navigation it shows only while the Threads or Inbox
+tab is current, so an open thread, Land, More and the pages opened from More (Settings, Backlog…) get its row back.
+With the phone shell's navigation (round five C2) even that row is gone unless an item needs the user: status opens
+from a 44 px top-bar button, and the pill row returns only while an item marks `data-status-actionable` on what it
+renders (a quota running out, a lost connection). The owner of a screen's top bar places the button through the
+`PhoneStatus` contract on the same module:
+
+```tsx
+import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
+const status = useContract(PhoneStatus) // inactive without frame-layout
+return status.status === 'active' ? <status.value.Button /> : null // the button is null off the phone, or with no item
+```
+
+frame-layout owns this registry because it depends on no plugin, so any provider
 (ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
 
 An item may declare `open`: the strip renders it as a button that opens its full page (Working: the thread list on its

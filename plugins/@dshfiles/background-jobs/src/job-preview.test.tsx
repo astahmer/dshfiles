@@ -63,11 +63,21 @@ const fakeJobs = (rows: readonly JobView[] = [row()]) => {
 }
 
 // SAFETY: the card reads only these fields of the native owner.
-const owner = (input: { readonly text?: string; readonly expanded?: boolean; readonly toggle?: () => void; readonly toolName?: string }) =>
+const owner = (input: {
+  readonly text?: string
+  readonly expanded?: boolean
+  readonly toggle?: () => void
+  readonly toolName?: string
+  readonly argsRaw?: string
+}) =>
   ({
     phase: 'result',
     toolName: input.toolName ?? 'bash',
-    block: { isError: false, content: [{ type: 'text', text: input.text ?? `started background job ${JOB_ID}` }] },
+    block: {
+      isError: false,
+      content: [{ type: 'text', text: input.text ?? `started background job ${JOB_ID}` }],
+      call: input.argsRaw === undefined ? null : { name: input.toolName ?? 'bash', argsRaw: input.argsRaw },
+    },
     useDisclosure: () => ({ expanded: input.expanded ?? false, toggle: input.toggle ?? (() => undefined) }),
   }) as unknown as ToolCallSectionProps['owner']
 
@@ -99,16 +109,45 @@ describe('JobPreviewSection', () => {
     expect(card()).toBeNull()
   })
 
-  it('shows the job state and label, without streaming output while collapsed', () => {
-    const { observe } = renderCard({})
-    expect(card()?.getAttribute('data-state')).toBe('running')
-    expect(screen.getByRole('status').textContent).toContain('statusRunning')
+  it('renders nothing while the job runs (the dock shows it), and the finished card after', () => {
+    const fake = renderCard({})
+    expect(card()).toBeNull()
+    act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 125_000 })] } }))
+    expect(card()?.getAttribute('data-state')).toBe('completed')
+    expect(card()?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
+    expect(screen.getByRole('status').textContent).toBe('statusCompleted')
     expect(screen.getByText('pnpm build')).toBeTruthy()
-    expect(observe).not.toHaveBeenCalled()
+    // One clock in the kit's grammar, no visible status badge and no "Background job" label.
+    expect(screen.getByText('2m 05s')).toBeTruthy()
+    expect(card()?.querySelector('[data-slot="badge"]')).toBeNull()
+    expect(screen.queryByText('previewKind')).toBeNull()
+    expect(fake.observe).not.toHaveBeenCalled()
+  })
+
+  it('titles the job by the description its call carried, with the command as the second line', async () => {
+    const fake = fakeJobs([row({ label: 'for i in 1 2 3; do echo compiled; done' })])
+    render(
+      <PluginQueryProvider>
+        <JobPreviewSection
+          {...bindings}
+          jobs={fake.jobs}
+          owner={owner({ argsRaw: JSON.stringify({ command: 'for i in 1 2 3; do echo compiled; done', description: 'Build', run_in_background: true }) })}
+          sessionId={SESSION}
+        />
+        <JobPreviewDock {...bindings} jobs={fake.jobs} sessionId={SESSION} />
+      </PluginQueryProvider>,
+    )
+    // C7/Q4: a running job is one card on screen, in the dock, titled by its description.
+    await waitFor(() => expect(document.querySelectorAll('[data-job-title]')).toHaveLength(1))
+    expect(document.querySelectorAll('[data-job-id]')).toHaveLength(1)
+    expect(document.querySelector('[data-job-title]')?.textContent).toBe('Build')
+    expect(document.querySelector('[data-job-command]')?.textContent).toBe('for i in 1 2 3; do echo compiled; done')
+    expect(document.querySelector('[data-dshfiles-live-preview-seat="dock"]')?.getAttribute('aria-label')).toBe('previewKind: Build')
+    expect(document.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
   })
 
   it('streams output only while open and releases the stream on collapse', () => {
-    const fake = fakeJobs()
+    const fake = fakeJobs([row({ status: 'completed', finishedAt: STARTED_AT + 5_000 })])
     const stopStream = vi.fn()
     fake.observe.mockReturnValue(stopStream)
     const Toggle = () => {
@@ -152,7 +191,12 @@ describe('JobPreviewSection', () => {
   })
 
   it('stops a job only after an explicit confirmation, which can be backed out of', async () => {
-    renderCard({ expanded: true })
+    render(
+      <PluginQueryProvider>
+        <JobPreviewDock {...bindings} jobs={fakeJobs().jobs} sessionId={SESSION} />
+      </PluginQueryProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /previewToggle/ }))
     fireEvent.click(screen.getByRole('button', { name: 'stop' }))
     expect(kill).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'stopCancel' }))
@@ -170,14 +214,14 @@ describe('JobPreviewSection', () => {
 
   it('links a job owned by another thread to that thread', () => {
     // SAFETY: the card treats the owner as an opaque id.
-    renderCard({ expanded: true }, fakeJobs([row({ owner: 'session-2' as NonNullable<JobView['owner']> })]))
+    renderCard({ expanded: true }, fakeJobs([row({ owner: 'session-2' as NonNullable<JobView['owner']>, status: 'completed', finishedAt: STARTED_AT + 5_000 })]))
     fireEvent.click(screen.getByRole('button', { name: /previewThread/ }))
     expect(bindings.openThread).toHaveBeenCalledWith('session-2')
     expect(screen.queryByText('previewThisThread')).toBeNull()
   })
 
   it('names the current thread as owner without a link to itself', () => {
-    renderCard({ expanded: true })
+    renderCard({ expanded: true }, fakeJobs([row({ status: 'completed', finishedAt: STARTED_AT + 5_000 })]))
     expect(screen.getByText('previewThisThread')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /previewThread/ })).toBeNull()
   })
@@ -201,6 +245,35 @@ describe('JobPreviewDock', () => {
     act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 1 })] } }))
     expect(dockCards()).toHaveLength(0)
     expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
+  })
+
+  it('leads an untitled row with its state word, the command after it in mono, and ends with Open in Processes (council round 8 C3)', () => {
+    // SAFETY: the dock treats the job id as an opaque key; a fresh id has no title from an earlier card.
+    renderDock(fakeJobs([row({ id: 'bash-9e8f' as JobView['id'] })]))
+    const dock = dockCards()[0]
+    expect(dock?.querySelector('[data-slot="composer-row-label"]')?.textContent).toBe('previewStateRunning')
+    const command = dock?.querySelector('[data-job-command]')
+    expect(command?.textContent).toBe('pnpm build')
+    expect(command?.className).toContain('dshx:font-mono!')
+    // The state word is the label, so no second status line is read out.
+    expect(dock?.querySelector('[role="status"]')).toBeNull()
+    const link = dock?.querySelector('[data-slot="composer-row-actions"] [data-job-open-processes]')
+    expect(link?.textContent).toBe('previewOpenProcesses')
+    if (!(link instanceof HTMLElement)) throw new Error('no Open in Processes')
+    fireEvent.click(link)
+    expect(bindings.openProcesses).toHaveBeenCalled()
+  })
+
+  it("ends in the dock's fixed action column, so its clock lines up with a subagent row's (council round 18, B1.2)", () => {
+    // SAFETY: the dock treats the job id as an opaque key; a fresh id has no title from an earlier card.
+    renderDock(fakeJobs([row({ id: 'bash-col' as JobView['id'] })]))
+    const link = dockCards()[0]?.querySelector('[data-job-open-processes]')
+    if (!(link instanceof HTMLElement)) throw new Error('no Open in Processes')
+    expect(link.hasAttribute('data-live-work-action')).toBe(true)
+    expect(link.className).toContain('dshx:min-w-34')
+    expect(link.className).toContain('dshx:justify-end')
+    expect(link.className).toContain('dshx:@max-pane-narrow:min-w-0')
+    expect(link.classList.contains('dshx:shrink')).toBe(false)
   })
 
   it('renders nothing for a thread with no running job', () => {

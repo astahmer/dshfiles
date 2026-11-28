@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "secret-credential-port",
-      "title": "One Host service port for credentials kept in a secrets catalog",
-      "summary": "Name the scopes a catalog can address and the calls a credential consumer makes, with compatible Promise and opt-in Effect APIs.",
+      "title": "One way to read credentials from a secrets catalog",
+      "summary": "Features read credentials from your secrets catalog through one shared service.",
+      "details": "Name the scopes a catalog can address and the calls a credential consumer makes, with compatible Promise and opt-in Effect APIs.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

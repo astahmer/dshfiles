@@ -10,8 +10,11 @@ describe('stalled streams', () => {
   it('tells the user how to retry and how to turn on the automatic fallback', () => {
     const advice = StalledStream.turnAdvice({ silentMs: 120_000, fallbackOn: false })
     expect(advice).toContain('sent no data for 2 min')
-    expect(advice).toContain('Resume to retry it')
+    // The advice names the button the turn actually shows: Retry.
+    expect(advice).toContain('Retry it, or pick another model')
+    expect(advice).not.toContain('Resume')
     expect(advice).toContain('Fall back on stalled streams')
+    expect(advice).toContain('Settings › AI accounts › Failure recovery › Edit')
   })
 
   it('points at the fallback chain once the automatic fallback is on', () => {

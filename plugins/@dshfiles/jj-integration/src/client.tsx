@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
-import { Changes, createApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { Changes, createApiClient, defineClient, subscribeApiEvent, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
@@ -30,9 +30,13 @@ import { IntegrationTimeline, type IntegrationRecord } from './integration-timel
 import { InlineIntegrateOffer } from './inline-integrate.js'
 import { LandPreview } from './land-preview.js'
 import { IntegrationRecovery } from './integration-recovery.js'
-import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
+import { announceRepositoryChange, landResultToast } from './land-feedback.js'
+import { IntegrationMarkerLine } from './integration-marker.js'
+import { useMinuteTick } from './relative-label.js'
+import { followRepositoryChanges } from './repository-change-events.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
-import { ThreadWorkspacesPanel, threadQueryKeys } from './panel.js'
+import { threadQueryKeys } from './thread-query-keys.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
@@ -45,6 +49,9 @@ import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
+import { createHeaderLandPresence } from './header-land-presence.js'
+import { ThreadHeaderLand } from './thread-header-land.js'
+import { createLandRequests } from './land-requests.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -56,9 +63,13 @@ import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
-import { ProjectMainBranchPanel } from './project-main-branch-panel.js'
 import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
+
+/** The Workspaces page and the main-branch panel load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const ThreadWorkspacesPanel = lazyView(() => views().then(module => module.LazyViews.ThreadWorkspacesPanel), { label: 'Workspaces' })
+const ProjectMainBranchPanel = lazyView(() => views().then(module => module.LazyViews.ProjectMainBranchPanel), { label: 'Main branch' })
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
@@ -316,6 +327,19 @@ export default defineClient({
       },
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    // Round three item 28: a jj operation in a thread's repository re-reads that thread's status (and its Land) at once.
+    // A Host from before the event never publishes it; the idle and turn-end polls still cover that case.
+    ctx.effect(
+      () =>
+        followRepositoryChanges({
+          subscribe: onEvent => subscribeApiEvent(jjThreads, 'repositoryChanged', { onEvent }),
+          queryClient: pluginQueryClient(),
+        }),
+      'jj-integration: thread status follows repository changes',
+    )
+    // Which threads show a header Land right now: the land card beside the header and the turn-end offer read it, so a
+    // screen keeps one Land.
+    const headerLand = createHeaderLandPresence()
     const integrationTimeline = new IntegrationTimeline()
     const TURN_END_STATUS_REFRESH_WINDOW_MS = 30_000
     const ThreadIntegrationMarkers = (props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
@@ -330,6 +354,12 @@ export default defineClient({
         () => undefined,
       )
       const newestTurnHasEnded = props.turn.end?.time !== undefined && nextTurnStartedAt === undefined
+      const headerLandShown = useSyncExternalStore(
+        headerLand.subscribe,
+        () => headerLand.shown(String(props.sessionId)),
+        () => false,
+      )
+      const now = useMinuteTick()
       const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
       const statusQueryKey = useMemo(() => threadQueryKeys.threadAt(path ?? '', props.sessionId), [path, props.sessionId])
@@ -487,7 +517,9 @@ export default defineClient({
           announceRepositoryChange()
           await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
           await pluginQueryClient().invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
-          if (result !== undefined && result !== null) noticeToast.show({ text: describeLandResult(translate, result), success: result.status === 'landed' })
+          // Round three item 27: a clean land confirms in the header and in the marker below; only a warning or a stop toasts.
+          const report = result === undefined || result === null ? undefined : landResultToast(translate, result)
+          if (report !== undefined) noticeToast.show({ text: report, success: false })
         },
       })
       if (thread === null || thread === undefined || turnStartedAt === undefined) return noticeToast.element
@@ -523,16 +555,18 @@ export default defineClient({
               ) : (
                 <ClockIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
               )}
-              <span className="dshx:min-w-0">
-                {marker.kind === 'integrated'
-                  ? marker.tipChangeId === undefined
-                    ? translate('rebaseNotice', { bookmark })
-                    : translate('rebaseNoticeWithTip', { bookmark, revisionId: marker.tipChangeId })
-                  : translate(marker.kind === 'queued' ? 'integrationQueuedNotice' : 'integrationUnqueuedNotice', { bookmark })}
-              </span>
-              <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
-                {new Date(marker.at).toLocaleString()}
-              </time>
+              {marker.kind === 'integrated' ? (
+                <IntegrationMarkerLine at={marker.at} bookmark={bookmark} now={now} t={translate} tipChangeId={marker.tipChangeId} />
+              ) : (
+                <>
+                  <span className="dshx:min-w-0">
+                    {translate(marker.kind === 'queued' ? 'integrationQueuedNotice' : 'integrationUnqueuedNotice', { bookmark })}
+                  </span>
+                  <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
+                    {new Date(marker.at).toLocaleString()}
+                  </time>
+                </>
+              )}
               <span aria-hidden="true" className="dshx:h-px dshx:min-w-4 dshx:flex-1 dshx:bg-border" />
               {marker !== activeQueueMarker ? null : (
                 <Button
@@ -594,7 +628,9 @@ export default defineClient({
             // answer the user just read, and it disappears as soon as the work is integrated.
             <LandPreview
               bookmark={bookmark}
+              headerLandShown={headerLandShown}
               landing={landing}
+              sessionId={String(props.sessionId)}
               onLand={() => land.mutate({ path: thread.path })}
               pending={land.isPending}
               revisions={thread.unlanded}
@@ -1183,6 +1219,55 @@ export default defineClient({
     // The export plugin draws its trigger and its progress modal in one header cell. A lower priority shadows that
     // cell, so this plugin owns the trigger (a row in the workspace menu) and keeps the feedback the modal carried.
     const sessionLog = createSessionLogDownloadPort()
+    // Round two item 17: the phone top bar shows the header utilities only inside its ⋯ sheet, so jujutsu seats this
+    // Land in the bar itself (conversation.session.header.changes); it opens the header's confirmation.
+    const PhoneLand = (props: { readonly sessionId: string }): JSX.Element => (
+      <PluginQueryProvider>
+        <ThreadWorkspaceControl
+          sessionId={SessionId(props.sessionId)}
+          sessions={ctx.sessions}
+          t={translate}
+          bookmark={useBookmark()}
+          sessionLog={sessionLog}
+          openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+          headerLand={headerLand}
+          seat="phone-bar"
+        />
+      </PluginQueryProvider>
+    )
+    // The thread list's row verb and Inbox › Waiting threads ask here instead of landing: the request opens this header's
+    // confirmation for that thread, with the same guards, and only its confirm lands.
+    const landRequests = createLandRequests()
+    const LandRequestHost = (): JSX.Element | null => {
+      const request = useSyncExternalStore(landRequests.subscribe, landRequests.current, landRequests.current)
+      const bookmark = useBookmark()
+      if (request === null) return null
+      return (
+        <PluginQueryProvider>
+          <ThreadWorkspaceControl
+            key={request.sequence}
+            sessionId={SessionId(request.sessionId)}
+            sessions={ctx.sessions}
+            t={translate}
+            bookmark={bookmark}
+            sessionLog={sessionLog}
+            openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+            seat="request"
+            onRequestDone={() => landRequests.finish(request.sequence)}
+          />
+        </PluginQueryProvider>
+      )
+    }
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-jj-integration-land-request', order: 123 }, decorate(LandRequestHost)),
+    )
+    if (metadata?.plugin !== undefined)
+      metadata.plugin.provide(ThreadHeaderLand, {
+        PhoneLand: metadata.plugin.bind(PhoneLand),
+        confirm: landRequests.request,
+        shown: headerLand.shown,
+        subscribe: headerLand.subscribe,
+      })
     ctx.inject(['sessionLogDownload'], scoped => {
       const controller = scoped.sessionLogDownload
       sessionLog.current = controller
@@ -1220,6 +1305,7 @@ export default defineClient({
               bookmark={useBookmark()}
               sessionLog={sessionLog}
               openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+              headerLand={headerLand}
             />
           </PluginQueryProvider>
         )),

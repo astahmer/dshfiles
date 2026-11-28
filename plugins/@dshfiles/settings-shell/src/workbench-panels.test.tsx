@@ -163,6 +163,8 @@ describe('Settings workbench sources', () => {
       expect(modalNavigation).not.toHaveBeenCalled()
       expect(host.querySelector('[role="dialog"]')).toBeNull()
       expect(host.querySelectorAll('[data-settings-view="tab"]')).toHaveLength(2)
+      // The pane's own tab closes a docked hub: its header draws no second close button.
+      expect(host.querySelectorAll('[data-settings-close]')).toHaveLength(0)
       expect(fields.every(field => field === undefined)).toBe(true)
 
       await act(async () => {
@@ -215,6 +217,64 @@ describe('Settings workbench sources', () => {
       expect(host.querySelector('input[aria-label="Original General control"]')).not.toBeNull()
       await act(async () => root.render(hub(true)))
       expect(host.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('drops its own list while a side column draws it, and reports what it shows to that column (council round 4 B1)', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const groups = createSnapshotStore<readonly GroupedEntries[]>(
+      SettingsGroups.group({ sections: [{ id: 'general', label: 'General', order: 0 }], pages: [page], panels: new Set() }),
+    )
+    const columns = createSnapshotStore(0)
+    const report = vi.fn()
+    const router = createSettingsHubRouter()
+    const Hub = createSettingsWorkbenchHub({
+      groups,
+      router,
+      closeSettings: vi.fn(),
+      columns,
+      report,
+      view: input => ({
+        ...input,
+        rows: [],
+        pluginPages: SettingsGroups.searchablePages(input.groups),
+        shortcuts: [],
+        openPanel: vi.fn(),
+        sectionEntries: [],
+        sectionTarget: undefined,
+        onReveal: vi.fn(),
+        renderSlot: () => null,
+        renderPluginPage: () => null,
+        renderMatches: () => null,
+        sectionOwner: { close: vi.fn() },
+        t: key => key,
+        onSelect: vi.fn(),
+        onSearch: vi.fn(),
+      }),
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => root.render(<Hub panelId="settings-one" />))
+      expect(host.querySelector('[data-nav-id="general"]')).not.toBeNull()
+      expect(report).toHaveBeenLastCalledWith({ activeId: undefined, query: '', originFilter: 'all' })
+      await act(async () => columns.set(1))
+      expect(host.querySelector('[data-nav-id="general"]')).toBeNull()
+      await act(async () => {
+        router.open({ sectionId: 'plugin:example' })
+      })
+      expect(report).toHaveBeenLastCalledWith({ activeId: 'plugin:example', query: '', originFilter: 'all' })
+      // Without a shell filter the pane keeps its own; the column lists the categories it keeps.
+      await act(async () => columns.set(0))
+      await act(async () => host.querySelector<HTMLButtonElement>('[data-settings-origin-filter] [data-origin-option="dsh"]')?.click())
+      expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ originFilter: 'dsh' }))
+      await act(async () => root.render(<Hub panelId="settings-one" visible={false} />))
+      expect(report).toHaveBeenLastCalledWith(undefined)
     } finally {
       await act(async () => root.unmount())
       host.remove()

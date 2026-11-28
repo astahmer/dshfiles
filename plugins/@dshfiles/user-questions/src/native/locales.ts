@@ -22,6 +22,7 @@ export const zh = {
   'nav.minimize': '收起问题卡片',
   'nav.maximize': '展开问题卡片',
   'nav.cancel': '放弃整组问题',
+  'nav.later': '稍后回答',
   'nav.close': '收起问题面板，可从工具调用重新打开',
   'text.expand': '展开',
   'text.collapse': '收起',
@@ -33,6 +34,9 @@ export const zh = {
   'plan.approve': '同意执行',
   'plan.decline': '拒绝',
   'plan.discuss': '要求修改',
+  'row.asked': '已提问',
+  'row.show': '显示问题',
+  'row.inspect': '检查',
 } satisfies Record<string, string>
 
 /** The question namespace key union. */
@@ -42,9 +46,9 @@ export type QuestionKey = keyof typeof zh
 export const en = {
   'error.incomplete': 'Please complete this question first.',
   'error.unanswered': 'Please select an option or enter a custom answer.',
-  'error.unavailable': 'Cannot submit right now; try again in a moment.',
-  'error.resubmit': 'The answer did not arrive before work continued; submit it again.',
-  'status.sent': 'Reply sent; the panel could not close.',
+  'error.unavailable': 'Cannot submit right now. Try again in a moment.',
+  'error.resubmit': 'The answer did not arrive before work continued. Submit it again.',
+  'status.sent': 'Reply sent. The panel could not close.',
   'wait.takeTime': 'Take time',
   'wait.countdown': 'Continuing in {seconds}s',
   'wait.paused': 'Paused · {seconds}s remaining',
@@ -60,6 +64,7 @@ export const en = {
   'nav.minimize': 'Collapse the question card',
   'nav.maximize': 'Expand the question card',
   'nav.cancel': 'Dismiss all questions',
+  'nav.later': 'Answer later',
   'nav.close': 'Close the panel — reopen it from the tool call',
   'text.expand': 'Expand',
   'text.collapse': 'Collapse',
@@ -71,6 +76,9 @@ export const en = {
   'plan.approve': 'Approve',
   'plan.decline': 'Refuse',
   'plan.discuss': 'Request changes',
+  'row.asked': 'Asked',
+  'row.show': 'Show the question',
+  'row.inspect': 'Inspect',
 } satisfies Record<QuestionKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -95,6 +103,7 @@ export const ja = {
   'nav.minimize': '質問カードを折りたたむ',
   'nav.maximize': '質問カードを展開',
   'nav.cancel': 'すべての質問を閉じる',
+  'nav.later': '後で回答',
   'nav.close': 'パネルを閉じる — ツール呼び出しから再度開けます',
   'text.expand': '展開',
   'text.collapse': '折りたたむ',
@@ -106,6 +115,9 @@ export const ja = {
   'plan.approve': '承認',
   'plan.decline': '拒否',
   'plan.discuss': '変更を依頼',
+  'row.asked': '質問',
+  'row.show': '質問を表示',
+  'row.inspect': '調べる',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -130,6 +142,7 @@ export const es = {
   'nav.minimize': 'Contraer la tarjeta de preguntas',
   'nav.maximize': 'Ampliar la tarjeta de preguntas',
   'nav.cancel': 'Descartar todas las preguntas',
+  'nav.later': 'Responder más tarde',
   'nav.close': 'Cierre el panel; vuelva a abrirlo desde la llamada de la herramienta',
   'text.expand': 'Expandir',
   'text.collapse': 'Contraer',
@@ -141,6 +154,9 @@ export const es = {
   'plan.approve': 'Aprobar',
   'plan.decline': 'Rechazar',
   'plan.discuss': 'Solicitar cambios',
+  'row.asked': 'Preguntado',
+  'row.show': 'Mostrar la pregunta',
+  'row.inspect': 'Inspeccionar',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -165,6 +181,7 @@ export const fr = {
   'nav.minimize': 'Réduire la fiche de questions',
   'nav.maximize': 'Développer la carte de question',
   'nav.cancel': 'Ignorer toutes les questions',
+  'nav.later': 'Répondre plus tard',
   'nav.close': "Fermez le panneau - rouvrez-le à partir de l'appel de l'outil",
   'text.expand': 'Développer',
   'text.collapse': 'Réduire',
@@ -176,6 +193,9 @@ export const fr = {
   'plan.approve': 'Approuver',
   'plan.decline': 'Refuser',
   'plan.discuss': 'Demander des modifications',
+  'row.asked': 'Question posée',
+  'row.show': 'Afficher la question',
+  'row.inspect': 'Inspecter',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -200,6 +220,7 @@ export const de = {
   'nav.minimize': 'Reduzieren Sie die Fragenkarte',
   'nav.maximize': 'Erweitern Sie die Fragenkarte',
   'nav.cancel': 'Alle Fragen ablehnen',
+  'nav.later': 'Später antworten',
   'nav.close': 'Schließen Sie das Panel – öffnen Sie es erneut über den Tool-Aufruf',
   'text.expand': 'Ausklappen',
   'text.collapse': 'Einklappen',
@@ -211,6 +232,9 @@ export const de = {
   'plan.approve': 'Genehmigen',
   'plan.decline': 'Ablehnen',
   'plan.discuss': 'Fordern Sie Änderungen an',
+  'row.asked': 'Gefragt',
+  'row.show': 'Frage anzeigen',
+  'row.inspect': 'Prüfen',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -235,6 +259,7 @@ export const ru = {
   'nav.minimize': 'Свернуть карточку с вопросом',
   'nav.maximize': 'Развернуть карточку с вопросом',
   'nav.cancel': 'Отклонить все вопросы',
+  'nav.later': 'Ответить позже',
   'nav.close': 'Закрыть панель — открыть ее снова из вызова инструмента',
   'text.expand': 'Развернуть',
   'text.collapse': 'Свернуть',
@@ -246,6 +271,9 @@ export const ru = {
   'plan.approve': 'Утвердить',
   'plan.decline': 'Отказаться',
   'plan.discuss': 'Запросить изменения',
+  'row.asked': 'Вопрос',
+  'row.show': 'Показать вопрос',
+  'row.inspect': 'Проверить',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -270,6 +298,7 @@ export const pt = {
   'nav.minimize': 'Recolher o cartão de perguntas',
   'nav.maximize': 'Expanda o cartão de perguntas',
   'nav.cancel': 'Dispense todas as perguntas',
+  'nav.later': 'Responder depois',
   'nav.close': 'Feche o painel – reabra-o na chamada da ferramenta',
   'text.expand': 'Expandir',
   'text.collapse': 'Recolher',
@@ -281,4 +310,7 @@ export const pt = {
   'plan.approve': 'Aprovar',
   'plan.decline': 'Recusar',
   'plan.discuss': 'Solicitar alterações',
+  'row.asked': 'Perguntado',
+  'row.show': 'Mostrar a pergunta',
+  'row.inspect': 'Inspecionar',
 } satisfies Record<keyof typeof en, string>

@@ -79,3 +79,11 @@ describe('addressable resource presentation bridge', () => {
     expect(closeB).toHaveBeenCalledWith('tab1')
   })
 })
+
+describe('resource panel ids', () => {
+  it('reads the thread back from a resource panel id and refuses any other panel id', () => {
+    expect(SidebarResourcePanelModel.sessionIdOf(SidebarResourcePanelModel.id('session a/b', 'tab2'))).toBe('session a/b')
+    expect(SidebarResourcePanelModel.sessionIdOf('dshfiles-editor.main')).toBeUndefined()
+    expect(SidebarResourcePanelModel.sessionIdOf('dshfiles-resource/only-one-part')).toBeUndefined()
+  })
+})

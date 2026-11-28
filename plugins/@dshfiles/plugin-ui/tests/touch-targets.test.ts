@@ -11,8 +11,8 @@ describe('touch targets', () => {
     expect(styles).toContain('@media (pointer: coarse)')
     for (const slot of ['button', 'toggle', 'toggle-group-item']) expect(coarse).toContain(`[data-slot='${slot}']`)
     expect(coarse).toContain("[data-slot='tabs-trigger'])::before")
-    expect(coarse.match(/inset: min\(0px, calc\(\(100% - 44px\) \/ 2\)\) min\(0px, calc\(\(100% - 44px\) \/ 2\)\);/gu)).toHaveLength(2)
-    // The rule is base layer: a positioning utility on a control still wins.
+    expect(coarse.match(/inset: min\(0px, calc\(\(100% - 44px\) \/ 2\)\) min\(0px, calc\(\(100% - 44px\) \/ 2\)\);/gu)).toHaveLength(3)
+    // Kit controls, page tabs (::before) and the plain dshx-hit-44 class. The rule is base layer: a positioning utility on a control still wins.
     expect(styles.lastIndexOf('@layer base', styles.indexOf('@media (pointer: coarse)'))).toBeGreaterThan(-1)
   })
 
@@ -22,6 +22,19 @@ describe('touch targets', () => {
     const escaped = rawButton.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
     expect(coarse).toMatch(new RegExp(`\\[data-slot='toggle-group-item'\\],[^{]*${escaped}\\s*\\) \\{`, 'u'))
     expect(coarse).toMatch(new RegExp(`\\[data-slot='toggle-group-item'\\],[^{]*${escaped}\\s*\\)::after \\{`, 'u'))
+  })
+
+  it('hides keycaps, menu shortcut slots and key legends on a coarse pointer, not keycaps in content (unslop phone 4)', () => {
+    const rule = /:where\(([^{]*)\)\s*\{\s*display: none !important;\s*\}/u.exec(coarse)
+    expect(rule).not.toBeNull()
+    const selectors = rule?.[1] ?? ''
+    for (const slot of ['kbd', 'kbd-group', 'key-hint', 'dropdown-menu-shortcut', 'context-menu-shortcut', 'command-shortcut']) {
+      expect(selectors).toContain(`[data-slot='${slot}']`)
+    }
+    expect(selectors).toContain('[data-key-legend]')
+    expect(selectors).toContain("[role='menuitem']")
+    // A bare `kbd` would also hide keys an assistant wrote in Markdown.
+    expect(selectors.split(',').map(part => part.trim())).not.toContain('kbd')
   })
 
   it('gives menu, select and command rows a 44px row on a coarse pointer', () => {

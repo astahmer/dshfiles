@@ -146,7 +146,7 @@ const transferOutcomeText = (outcome: TransferOutcome): string => {
   if (outcome.kind !== 'moved') return outcome.message
   return outcome.destination === 'queue'
     ? `Moved to the queue of ${outcome.target.title}.`
-    : `Moved into the composer of ${outcome.target.title}, which was idle; it is open now.`
+    : `Moved into the composer of ${outcome.target.title}, which was idle. It is open now.`
 }
 
 /**
@@ -349,7 +349,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                   label="Edit queued message"
                   tooltip={
                     editor === undefined
-                      ? 'This DSH version cannot hand queued messages to the composer'
+                      ? 'Update DSH to edit queued messages in the composer'
                       : row.editable
                         ? 'Edit in the composer'
                         : 'This message holds content the composer cannot edit'
@@ -363,7 +363,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
                   label="Move queued message to another thread"
                   tooltip={
                     !transfer.available
-                      ? 'This DSH version cannot hand queued messages to another thread'
+                      ? 'Update DSH to move queued messages to another thread'
                       : row.editable
                         ? 'Move to thread…'
                         : 'This message holds content that cannot be moved'

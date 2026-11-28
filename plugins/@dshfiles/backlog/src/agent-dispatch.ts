@@ -19,6 +19,8 @@ export interface AgentChoice {
   readonly name: string
   readonly glyph: string
   readonly description: string
+  /** The agent's chosen identity colour slot (0–5); without one the glyph tile takes the slot hashed from the handle. */
+  readonly tone?: number | undefined
 }
 
 export interface AgentContinuationThread {
@@ -54,7 +56,8 @@ export interface AgentDispatchPort {
 export class AgentComments {
   /** The fields inline completion and the panel need, without the instructions. */
   static choice(agent: Agent): AgentChoice {
-    return { handle: agent.handle, name: agent.name, glyph: agent.glyph, description: agent.description }
+    const fields = { handle: agent.handle, name: agent.name, glyph: agent.glyph, description: agent.description }
+    return agent.tone === undefined ? fields : { ...fields, tone: agent.tone }
   }
 
   /** The request fields an agent contributes to a start-thread call. */

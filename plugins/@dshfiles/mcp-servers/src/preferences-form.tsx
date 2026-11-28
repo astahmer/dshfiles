@@ -1,3 +1,4 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
@@ -67,9 +68,14 @@ export const PreferencesForm = (props: { readonly t: McpServersTranslate; readon
             ) : null}
           </CardContent>
           <CardFooter className="dshx:flex dshx:items-center dshx:gap-3">
-            <form.AppForm>
-              <form.SubmitButton>{t('savePreferences')}</form.SubmitButton>
-            </form.AppForm>
+            {/* Add server is this page's one primary action, so saving preferences is a secondary button. */}
+            <form.Subscribe selector={state => [state.canSubmit, state.isSubmitting] as const}>
+              {([canSubmit, isSubmitting]) => (
+                <Button disabled={!canSubmit || isSubmitting} type="submit" variant="outline">
+                  {t('savePreferences')}
+                </Button>
+              )}
+            </form.Subscribe>
             {save.isSuccess ? (
               <span className="dshx:text-xs dshx:text-muted-foreground" role="status">
                 {t('preferencesSaved')}

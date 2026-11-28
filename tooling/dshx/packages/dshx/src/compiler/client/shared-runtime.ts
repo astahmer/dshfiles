@@ -2,14 +2,15 @@ import * as Schema from 'effect/Schema'
 import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type { Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import { decodeJson } from '../../json.js'
+import { exportNames } from './export-names.js'
 
-/** What the export-name probe prints: each provided specifier's sorted export names. */
-const exportNamesSchema = Schema.Record(Schema.String, Schema.Array(Schema.String))
+/** What the export-name probe prints: each importable specifier's sorted export names, and the ones Node could not import. */
+const exportNamesSchema = Schema.Struct({ names: Schema.Record(Schema.String, Schema.Array(Schema.String)), failed: Schema.Array(Schema.String) })
 
 /**
  * Opt-in shared runtime: one supplier package's Client chunk carries third-party modules and the shared plugin sheet
@@ -45,19 +46,37 @@ export class SharedRuntime {
   }): Plugin {
     let modules: Readonly<Record<string, readonly string[]>> = {}
     let sources: readonly { readonly key: string; readonly request: string }[] = []
+    /** Provided specifiers Node cannot import (TypeScript sources of a workspace kit): named from this build instead. */
+    let unprobed: readonly string[] = []
     return {
       name: 'dshx-shared-runtime-supplier',
       enforce: 'pre',
       async buildStart() {
         const keyed = (await options.keyedModules?.()) ?? []
+        const probed = await SharedRuntime.exportNames(options.root, options.provide)
+        unprobed = probed.failed
         modules = {
-          ...(await SharedRuntime.exportNames(options.root, options.provide)),
+          ...probed.names,
           ...Object.fromEntries(keyed.map(module => [module.key, module.names])),
         }
         sources = [
           ...options.provide.map(specifier => ({ key: specifier, request: specifier })),
           ...keyed.map(module => ({ key: module.key, request: module.file })),
         ]
+      },
+      async generateBundle() {
+        if (unprobed.length === 0) return
+        const built: Record<string, readonly string[]> = {}
+        for (const specifier of unprobed) {
+          const resolved = await this.resolve(specifier, resolve(options.root, 'package.json'))
+          const names = resolved === null || resolved.external !== false ? undefined : await exportNames(this, resolved.id)
+          if (names === undefined)
+            throw new DshxError('DSHX1208', `Cannot read the export names of client.sharedRuntime.provide module ${JSON.stringify(specifier)}.`, {
+              hint: 'Each provided module must be installed in the supplier and importable from Node, or be a source module this build compiles.',
+            })
+          built[specifier] = [...names].filter(name => name !== '__esModule').sort()
+        }
+        modules = { ...modules, ...built }
       },
       resolveId: source => (source === SharedRuntime.supplierModule ? source : null),
       load(id) {
@@ -77,8 +96,8 @@ export class SharedRuntime {
    * Export names of each provided module, read by importing it in Node from the supplier root. Consumers re-export
    * exactly these names, so importing a name the module does not export fails the consumer build.
    */
-  private static async exportNames(root: string, provide: readonly string[]): Promise<Readonly<Record<string, readonly string[]>>> {
-    const script = `const specifiers = ${JSON.stringify(provide)}; const names = {}; for (const specifier of specifiers) names[specifier] = Object.keys(await import(specifier)).filter(name => name !== '__esModule').sort(); process.stdout.write(JSON.stringify(names))`
+  private static async exportNames(root: string, provide: readonly string[]): Promise<typeof exportNamesSchema.Type> {
+    const script = `const specifiers = ${JSON.stringify(provide)}; const names = {}; const failed = []; for (const specifier of specifiers) { try { names[specifier] = Object.keys(await import(specifier)).filter(name => name !== '__esModule').sort() } catch { failed.push(specifier) } } process.stdout.write(JSON.stringify({ names, failed }))`
     try {
       const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '--eval', script], { cwd: root, maxBuffer: 16 * 1024 * 1024 })
       return decodeJson(exportNamesSchema, stdout)
@@ -145,19 +164,43 @@ export class SharedRuntime {
     return { modules: new Map(Object.entries(modules as Record<string, readonly string[]>)), cssHash }
   }
 
-  /** Consumer side: resolve every provided module to a side-effect-free facade over the supplier's table. */
+  /**
+   * Consumer side: resolve every provided module to a side-effect-free facade over the supplier's table. A provided
+   * workspace source file (a kit component outside node_modules) is also matched when a relative import reaches it,
+   * such as the kit's own `./ui/button.js` from a kit module the supplier does not provide.
+   */
   static consumerPlugin(options: {
     readonly supplier: string
     readonly modules: ReadonlyMap<string, readonly string[]>
     readonly bundleDependencies: readonly string[]
+    /** Where provided workspace files resolve from; without it only exact specifiers are matched. */
+    readonly root?: string
+    /** Filled with the provided workspace source files (file → specifier), which the provided-module guard reads. */
+    readonly byFile?: Map<string, string>
   }): Plugin {
     const bundled = (source: string): boolean => options.bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
+    const byFile = options.byFile ?? new Map<string, string>()
     return {
       name: 'dshx-shared-runtime-consumer',
       enforce: 'pre',
-      resolveId(source, importer) {
-        if (importer === undefined || importer.startsWith(SharedRuntime.facadePrefix) || !options.modules.has(source) || bundled(source)) return null
-        return `${SharedRuntime.facadePrefix}${source}`
+      async buildStart() {
+        byFile.clear()
+        if (options.root === undefined) return
+        const from = resolve(options.root, 'package.json')
+        for (const specifier of options.modules.keys()) {
+          // DSHX Client runtime snapshot keys have their own consumer plugin.
+          if (bundled(specifier) || specifier.startsWith('@dshfiles/dshx/')) continue
+          const resolved = await this.resolve(specifier, from).catch(() => null)
+          if (resolved !== null && resolved.external === false && isAbsolute(resolved.id) && !resolved.id.includes('/node_modules/')) byFile.set(resolved.id, specifier)
+        }
+      },
+      async resolveId(source, importer, resolveOptions) {
+        if (importer === undefined || importer.startsWith(SharedRuntime.facadePrefix) || bundled(source)) return null
+        if (options.modules.has(source)) return `${SharedRuntime.facadePrefix}${source}`
+        if (byFile.size === 0 || !source.startsWith('.')) return null
+        const resolved = await this.resolve(source, importer, { ...resolveOptions, skipSelf: true })
+        const specifier = resolved === null ? undefined : byFile.get(resolved.id)
+        return specifier === undefined ? null : `${SharedRuntime.facadePrefix}${specifier}`
       },
       load(id) {
         if (!id.startsWith(SharedRuntime.facadePrefix)) return null

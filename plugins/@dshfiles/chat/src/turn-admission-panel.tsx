@@ -122,7 +122,7 @@ export const TurnAdmissionDock = (props: { readonly sessionId: string }): JSX.El
           {waitingLine({ ahead: waiting.ahead, running: data.running, limit: data.policy.maxRunningThreads })}
         </span>
         <Button size="sm" variant="outline" className="dshx:shrink-0" disabled={start.isPending} onClick={() => start.mutate()}>
-          {start.isError ? 'Try again' : 'Start now'}
+          {start.isError ? 'Retry' : 'Start now'}
         </Button>
       </div>
       {start.isError ? (

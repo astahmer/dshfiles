@@ -38,13 +38,13 @@ const headings = {
   memory: { title: 'Memory', description: 'The start block a new thread in this folder gets.', empty: 'Memory has no start block for this project.' },
   skills: {
     title: 'Skills',
-    description: 'Each skill costs its catalog line; its instructions load only when it is used.',
+    description: 'Each skill costs its catalog line. Its instructions load only when it is used.',
     empty: 'No skills are available here.',
   },
   mcp: { title: 'MCP servers', description: "Enabled servers, costed by their tools' names and descriptions.", empty: 'No MCP server is enabled.' },
   references: {
     title: 'References',
-    description: 'Attached references add one context line each; their files are read on demand.',
+    description: 'Attached references add one context line each. Their files are read on demand.',
     empty: 'No reference is attached to this thread.',
   },
 } satisfies Record<ContextSectionId, SectionHeading>

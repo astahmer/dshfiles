@@ -52,10 +52,10 @@ const SUMMARY_VARIANT = {
 const SUMMARY_TITLE = {
   'up-to-date': 'Up to date',
   applied: 'Done',
-  'restart-required': 'Saved; waits for a restart',
+  'restart-required': 'Saved. Waits for a restart',
   partial: 'Partly done',
   manual: 'Install by hand',
-  cancelled: 'Cancelled',
+  cancelled: 'Stopped',
   failed: 'Not changed',
 } as const satisfies Record<PackSummary['kind'], string>
 
@@ -162,7 +162,7 @@ const PreviewBody = (props: { readonly preview: PackPreview; readonly copy: (tex
         <Section heading="Restart" id="restart">
           <p className="dshx:text-xs dshx:text-muted-foreground">
             {preview.restart === 'required'
-              ? `Installed plugins load after a restart: DSH reads the profile at boot. ${RESTART_GUIDANCE}`
+              ? `Installed plugins load after DSH restarts. ${RESTART_GUIDANCE}`
               : 'The plugin manager reports, per plugin, whether the change applied live or waits for a restart.'}
           </p>
         </Section>
@@ -243,13 +243,13 @@ const ChangeBody = (props: Omit<PackChangeDialogProps, 'target'> & { readonly ta
           {verb} {target.title}
         </DialogTitle>
         <DialogDescription>
-          {state.phase === 'reviewing' ? 'Nothing changes until you confirm.' : state.phase === 'applying' ? 'Working one plugin at a time.' : 'Finished.'}
+          {state.phase === 'reviewing' ? 'Nothing changes until you confirm.' : state.phase === 'applying' ? 'Working one plugin at a time.' : 'Done.'}
         </DialogDescription>
       </DialogHeader>
       {state.phase === 'reviewing' ? (
         preview.isPending ? (
           <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
-            <Spinner className="dshx:size-4" /> Reading the profile…
+            <Spinner className="dshx:size-4" /> Reading installed plugins…
           </p>
         ) : data === undefined ? (
           <p className="dshx:text-sm" role="alert">

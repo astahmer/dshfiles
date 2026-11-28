@@ -2,11 +2,15 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, UsersRoundIcon } from '@dshfiles/plugin-ui/icons'
+import { useApi } from '@dshfiles/dshx/client'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { AccountDetail } from './account-detail.js'
-import { filterPageAccounts } from './account-page-model.js'
+import { accountsPageCount, filterPageAccounts } from './account-page-model.js'
 import { AccountRail } from './account-rail.js'
+import { aiAccountsQueries } from './accounts-queries.js'
+import { aiAccountsApi } from './api.js'
 import { AccountsToolbar } from './accounts-toolbar.js'
 import { QuotaContinuations } from './quota-continuations.js'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
@@ -14,6 +18,9 @@ import { NativeProviderDetail } from './native-provider-detail.js'
 import type { AccountSection } from './account-connection-status.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { CredentialSetupPort } from './credential-setup-port.js'
+
+/** The page's own leaf glyph from the Settings column (Models & accounts), in its violet identity tone (council round 8, D4). */
+const ACCOUNTS_MARK = <UsersRoundIcon className="dshx:text-identity-2" strokeWidth={1.5} />
 
 /** The reference's rail and detail share one selection; Query owns data and the existing queue owns writes. */
 export const AccountsPanel = (props: {
@@ -24,6 +31,8 @@ export const AccountsPanel = (props: {
   readonly folderPicker: WorkspacePickerPorts
 }): JSX.Element => {
   const state = useAccountsPanelState(props.credentialSetup)
+  // The built-in providers listed under the accounts share this query (one request), so the heading counts them too.
+  const nativeProviders = useQuery(aiAccountsQueries.nativeProviders(useApi(aiAccountsApi)))
   const [search, setSearch] = useState('')
   const [section, setSection] = useState<AccountSection>('models')
   const [nativeEntry, setNativeEntry] = useState<string | null>(null)
@@ -48,7 +57,7 @@ export const AccountsPanel = (props: {
     })
   if (state.file === null)
     return (
-      <Page heading="AI accounts" description="Manage your accounts and model settings.">
+      <Page mark={ACCOUNTS_MARK} heading="AI accounts" description="Manage your accounts and model settings.">
         <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
           {state.notice === null ? <Spinner /> : null}
           {state.notice ?? 'Loading accounts…'}
@@ -56,7 +65,7 @@ export const AccountsPanel = (props: {
         {state.notice === null ? null : (
           <div>
             <Button variant="outline" size="sm" type="button" onClick={() => void state.load()}>
-              Try again
+              Retry
             </Button>
           </div>
         )}
@@ -68,13 +77,15 @@ export const AccountsPanel = (props: {
       <Page
         data-account-dashboard
         scroll
-        className="dshx:bg-muted/10"
+        width="wide"
+        className="dshx:surface-stage"
+        mark={ACCOUNTS_MARK}
         heading="AI accounts"
         description="Manage your accounts and model settings."
-        count={state.file.accounts.length}
+        count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}
         primaryAction={{ id: 'add-account', label: 'Add account', icon: <PlusIcon aria-hidden />, onSelect: addAccount }}
       >
-        <div className="dshx:mx-auto dshx:grid dshx:w-full dshx:max-w-[1680px] dshx:grid-cols-[minmax(300px,36%)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
+        <div className="dshx:grid dshx:w-full dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
             <AccountsToolbar file={state.file} onSearchChange={setSearch} search={search} state={state} />
             <AccountRail
@@ -83,7 +94,6 @@ export const AccountsPanel = (props: {
               searching={search.trim() !== ''}
               search={search}
               state={state}
-              activeSection={section}
               selectedNative={nativeEntry}
               onSelect={selectAccount}
               onSection={selectSection}
@@ -127,7 +137,7 @@ export const AccountsPanel = (props: {
                   : 'Select an account to manage its models, settings and usage.'}
               </EmptyState>
             )}
-            <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:px-4 dshx:py-2.5">
+            <details className="dshx:disclosure dshx:rounded-lg dshx:border dshx:bg-card dshx:px-4 dshx:py-2.5">
               <summary className="dshx:cursor-pointer dshx:text-xs dshx:text-muted-foreground">Quota recovery</summary>
               <QuotaContinuations accountId={state.selectedId} />
             </details>

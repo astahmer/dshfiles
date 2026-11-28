@@ -27,6 +27,17 @@
   border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
 }
 
+/* dshfiles (unslop r5 B8): under Workbench's reserved host corner the reserving wrapper (src/conversation-header.tsx)
+   draws the header's rule across the whole pane, so it no longer stops 32px short of the right edge; only a header that
+   has a rule hands it over (the blank New thread header has none). */
+:global([data-conversation-header-reserved]):has(.header:not(.headerBlank)) {
+  border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
+}
+
+:global([data-conversation-header-reserved]) .header {
+  border-bottom: none;
+}
+
 /* Seated in a Workbench group's tab row (T1.4): the tabs' row is the header
    row, so the header draws no band, rule or minimum height of its own. */
 :global([data-conversation-header-seated]) .header {
@@ -59,15 +70,19 @@
 }
 
 /* A narrow inline header (a half-width split) keeps the title readable: the
-   view switch and actions wrap under it rather than squeezing it to "F…". */
-.titleCluster {
-  flex-wrap: wrap;
-  row-gap: 6px;
-}
+   view switch and actions wrap under it rather than squeezing it to "F…".
+   dshfiles (unslop H2): only there. In a wider row the title takes the room up to the status chip and the chips beside
+   it shrink first; the 45% cap used to cut it at about 200px beside an empty header. The title row is the container. */
+@container (max-width: 36rem) {
+  .titleCluster {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
 
-.crumbs {
-  flex: 0 1 auto;
-  max-width: max(45%, 140px);
+  .crumbs {
+    flex: 0 1 auto;
+    max-width: max(45%, 140px);
+  }
 }
 
 /* Blank Sessions retain navigation controls without conversation title or tabs.
@@ -204,6 +219,14 @@
   cursor: default;
 }
 
+/* dshfiles (unslop H2): naming the thread is the header's job. The current title takes the room the row has (the chips
+   beside it shrink first) and ends in an ellipsis only when the row is full; ancestor crumbs keep the 220px cap. */
+.crumb.crumbCurrent {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+
 .crumbSubagent {
   font-size: 12px;
   line-height: 18px;
@@ -329,7 +352,7 @@ button.crumbEditable {
 
 /* PhoneThreadMenu (upstream #76): a composer tool whose launcher, our phone ⋯ sheet, is on screen hides in place and is
    listed in the sheet instead (ConversationSession). Only the hiding rule is taken: the sheet keeps our styles. */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool-hidden]) {
     display: none !important;
   }
@@ -363,8 +386,11 @@ button.crumbEditable {
   cursor: pointer;
 }
 
-.tab:hover {
-  color: var(--dsw-alias-label-primary);
+/* dshfiles (round four R12): hover styles sit behind (hover: hover), so a tap does not leave them stuck on a phone. */
+@media (hover: hover) {
+  .tab:hover {
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .tab:focus-visible {
@@ -388,7 +414,11 @@ button.crumbEditable {
 /* Phone shell (T1.4): the shell's 44pt top bar already shows Back and the
    title, so the conversation header gives up its row; its view switch and
    actions live in the `⋯` sheet below, portalled into that top bar. */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) :global([data-conversation-header-reserved]):has(.header) {
+    border-bottom: none;
+  }
+
   :global(html[data-shell-phone-nav]) .header {
     display: none;
   }
@@ -403,7 +433,9 @@ button.crumbEditable {
 
 .phoneBar {
   position: fixed;
-  top: calc(var(--dsh-phone-top-height, 44px) - 44px);
+  /* The top height includes the strip a child thread shows under the bar ("Subagent of … ›", council round 22 item 4,
+     --dsh-phone-top-strip, 0px elsewhere), so the ⋯ stays in the bar row. */
+  top: calc(var(--dsh-phone-top-height, 44px) - 44px - var(--dsh-phone-top-strip, 0px));
   right: max(4px, env(safe-area-inset-right, 0px));
   z-index: 42;
   display: flex;
@@ -435,14 +467,23 @@ button.crumbEditable {
   color: var(--dsw-alias-label-primary);
 }
 
+/* The kit's scrim token (plugin-ui color-roles.css, council round 30, item 3): this sheet and the row menu's dim alike. */
 .phoneScrim {
   position: fixed;
   inset: 0;
   z-index: 1040;
   border: none;
-  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent);
+  background: var(--dshx-scrim);
 }
 
+/* A kit sheet opened over this one (More thread actions, In the project, the subagent list) draws the one scrim, over the
+   page and this sheet, which reads as the layer below (council round 34 A5's rule for kit sheets). */
+:global(body:has([data-slot='dropdown-menu-content'], [data-slot='popover-content'], [data-slot='context-menu-content'], [data-slot='select-content'])) .phoneScrim {
+  background: transparent;
+}
+
+/* Council round 35 P2 (Opus, Fable): the kit sheet's surface, edge and insets, so the thread ⋯ sheet and the row menu's
+   sheet (plugin-ui styles.css, "Phone: every menu and picker is a bottom sheet") are one material. */
 .phoneSheet {
   position: fixed;
   right: 0;
@@ -451,13 +492,14 @@ button.crumbEditable {
   z-index: 1041;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   max-height: 80vh;
-  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
+  border-top: 1px solid var(--dsw-alias-border-l2);
   border-top-left-radius: var(--dsw-radius-panel, 16px);
   border-top-right-radius: var(--dsw-radius-panel, 16px);
-  background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2));
+  background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dshx-elevation-3);
   color: var(--dsw-alias-label-primary);
 }
@@ -469,10 +511,27 @@ button.crumbEditable {
 
 .phoneGrabber {
   align-self: center;
+  flex: none;
   width: 36px;
   height: 4px;
+  margin-bottom: 4px;
   border-radius: 999px;
   background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+}
+
+/* The thread it acts on, as the row menu's sheet names its row (council round 34, B9): 14px semibold at the rows' text
+   edge, up to two lines. */
+.phoneSheetTitle {
+  display: -webkit-box;
+  margin: 0;
+  padding: 4px 8px 8px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* In the sheet the view switch spans the width with 44pt segments. */
@@ -487,11 +546,68 @@ button.crumbEditable {
   font-size: 15px;
 }
 
+/* The header's chips (the subagent count, dev servers), at the rows' text edge. */
 .phoneSheetActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding-inline: 8px;
+}
+
+.phoneSheetActions:not(:has(*)) {
+  display: none;
+}
+
+/* The header's utilities as rows (council round 35 P2): each control takes the sheet's width. */
+.phoneSheetRows {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.phoneSheetRows :global([data-header-live-slot]:empty) {
+  display: none;
+}
+
+.phoneSheetRows > :global([data-slot]) > :global(*) {
+  width: 100%;
+}
+
+/* "In the project": jj-integration's place chip read as a pill beside a bare ⋯; here it is a row like the tools, its
+   glyph at 20px in the ink, the label at the row's size, and its menu chevron turned to point onward at the end. */
+.phoneSheetRows :global([data-workspace-place]) {
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  box-shadow: none;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dshx-density-text-ui, 15px);
+  font-weight: 400;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(span) {
+  font-size: inherit;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(svg:first-child) {
+  width: 20px;
+  height: 20px;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(svg:last-child) {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  rotate: -90deg;
+  opacity: 1;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 /* Composer tools listed by the PhoneThreadMenu contract: one 44px row each, picked from the sheet. */
@@ -502,28 +618,73 @@ button.crumbEditable {
   padding-top: 6px;
 }
 
+/* The row menu's sheet row (the kit's 44px menu row, 8px in): a 20px glyph in the ink, the label, then a right-aligned
+   detail in the tertiary ink and a chevron on a row that opens something (council round 35 P2). */
 .phoneSheetTool {
-  display: block;
+  display: flex;
+  align-items: center;
+  /* The kit menu row's 8px gap, so the labels start on the row menu sheet's text column plus the larger glyph. */
+  gap: 8px;
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: none;
   border-radius: var(--dsw-radius-md);
   background: transparent;
   font: inherit;
-  font-size: var(--dsh-content-font-size, 15px);
-  line-height: 44px;
+  /* The kit menu row's type (text-sm, the density's UI size: 15px on a phone). */
+  font-size: var(--dshx-density-text-ui, 15px);
+  line-height: 20px;
   text-align: left;
   color: var(--dsw-alias-label-primary);
-  /* A full-width row keeps its label on one line; a label longer than the row ends in an ellipsis. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   cursor: pointer;
 }
 
 .phoneSheetTool:active,
 .phoneSheetTool:focus-visible {
-  background: var(--dsw-alias-bg-layer-2);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.phoneSheetToolIcon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.phoneSheetToolIcon > :global(svg) {
+  width: 20px;
+  height: 20px;
+}
+
+/* A full-width row keeps its label on one line; a label longer than the row ends in an ellipsis. */
+.phoneSheetToolLabel {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneSheetToolDetail {
+  flex: none;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.phoneSheetToolChevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.phoneSheetToolDetail + .phoneSheetToolChevron {
+  margin-left: 0;
 }
 
 /* The More launcher centers its 22px box on the tab's 16px text line. */
@@ -644,6 +805,13 @@ button.crumbEditable {
   display: none;
 }
 
+/* The phone shell has no width to drag (council picker round 4, T11). A strip there resolves to zero width but keeps its
+   offset (`left: 50% + content width / 2 + 24px`), so it widened .body's scrollable overflow to 565 px on a 390 px
+   screen, and WebKit scrolled the transcript's overflow-hidden column 162 px sideways behind the model picker's sheet. */
+:global(html[data-shell-phone-nav]) .widthHandle {
+  display: none;
+}
+
 /* Composer context stack (Figma 9:937): standalone dock cards share one
    rhythm above the input card. */
 .composerStack {
@@ -654,6 +822,224 @@ button.crumbEditable {
   display: flex;
   flex-direction: column;
   gap: var(--dsh-composer-stack-gap);
+}
+
+/* Dock entries share the composer card's two edges (DESIGN.md, Layout). The kit's dock row (jobs, To-dos) and core's
+   goal strip each subtract four dock insets on their own and sat 16px inside the card on both sides, under subagent
+   rows that already matched it. The queue keeps its insets: it is a tab attached to the card's top edge. */
+.composerStack > :global([data-slot='conversation.input.dock']) :is(:global([data-slot='composer-row'][data-variant='card']), :global([data-goal-bar])) {
+  --dsh-composer-dock-inset: 0px;
+}
+
+/* Round six C2: on a wide screen the live work above the composer (background-jobs' running jobs, thread-sidebar's
+   working subagents) reads as one dock: one neutral surface with the composer card's edges, 32px collapsed rows split
+   by a 1px divider, 8px above the composer. The rows stay their owners'; the stack takes away their card frames. The
+   phone shell keeps its chips and its Live work fold (below). */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+  /* Council round 7 C6: the composer card draws its hairline as a 1px ring outside its box, so the dock's border box is
+     1px wider on each side to take the composer's exact edges (it sat 1px inside them). */
+  width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2 + 2px);
+  max-width: calc(var(--dsh-composer-card-max-width) + 2px);
+  margin-inline: auto;
+  /* Council round 8 C3: the composer card's own fill, so the dock reads as the composer's top, not a panel above it.
+     Council round 19 C2: its top and side edges are the card's 3:1 field edge, so dock and composer read as one field
+     (a border-l2 outline read as a paler object sitting on the card); the dividers inside it stay hairlines. */
+  background: var(--dsw-specific-input-major);
+  border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+  border-radius: var(--dsw-radius-lg);
+}
+
+/* A jobs dock and a subagents dock that follow each other are one surface: the second joins the first under a 1px
+   divider instead of standing a stack gap away. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):has(+ :global([data-dshfiles-live-preview-dock])) {
+  border-bottom-width: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]) {
+  margin-top: calc(-1 * var(--dsh-composer-stack-gap));
+  border-top-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > * + * {
+  border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+/* Each row (and a fold row) gives up its own card: no border, radius or margin; the fold row stays opaque while sticky. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+  margin-block: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--dsw-specific-input-major);
+}
+
+/* The hairline between rows, restated after the row rule above: its `border: 0` would otherwise win (round seven). */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > * + :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+  border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+/* A job row is the kit's dock row: it fills the surface instead of drawing a card inside it. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row'][data-variant='card']) {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Council round 8 C3: one row grammar for the dock. A subagent row leads with its disclosure chevron (8px inset, 14px
+   chevron, 6px gap, so its glyph sits 28px in); a job row draws the same chevron in the same seat instead of a trailing
+   one, turning with its disclosure, so every row leads with one chevron and every glyph sits on one column. Labels are
+   13/500 sans and details 13 regular (a job's command in mono); both rows end with their worded link out. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) {
+  gap: 4px;
+  padding-inline: 8px 4px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) > :global(button) {
+  gap: 6px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) > :global(button)::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--dsw-alias-label-secondary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row'][data-expanded]) > :global(div:first-child) > :global(button)::before {
+  rotate: 90deg;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row-meta']) > :global(svg:last-child) {
+  display: none;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :is(:global([data-slot='composer-row-label']), :global([data-slot='composer-row-meta']), :global([data-dshfiles-live-preview='agent'])) {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row-label']) {
+  font-weight: 500;
+}
+
+/* 32px collapsed rows, the subagent row's height; a touch screen keeps the owners' 44pt targets. */
+@media (pointer: fine) {
+  :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) {
+    height: 32px;
+    min-height: 32px;
+  }
+}
+
+/* Council round 34 B8: the working subagents scroll inside four rows under their fold plate, as the phone's frame shows
+   two; the dock grew to 288px (eight rows) before it scrolled. The frame is the top edge, the 32px plate, four 33px
+   rows (32px and the hairline above each) and half the fifth, which peeks through the edge's fade so the rows past the
+   fourth have a cue (council round 35 P6: at 8px of the next row they had none); a touch screen's rows are 44px. An
+   open row (its feed and Stop) is taller:
+   the frame grows to at least that row and the plate, so its actions are never cut (thread-sidebar sets
+   --dshfiles-dock-open-row, one row open at a time). The plate stays on top and an edge with more rows past it fades. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+  --dshfiles-dock-row: 32px;
+  max-height: calc(1px + var(--dshfiles-dock-row) + 4.5 * (var(--dshfiles-dock-row) + 1px));
+  min-height: calc(1px + var(--dshfiles-dock-open-row, 0px));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+  min-height: calc(1px + var(--dshfiles-dock-row) + var(--dshfiles-dock-open-row, 0px));
+  scroll-padding-top: var(--dshfiles-dock-row);
+}
+
+@media (pointer: coarse) {
+  :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    --dshfiles-dock-row: 44px;
+  }
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before,
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+  position: sticky;
+  z-index: 2;
+  display: block;
+  flex: none;
+  height: 16px;
+  content: '';
+  pointer-events: none;
+  opacity: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+  top: 0;
+  margin-bottom: -16px;
+  background: linear-gradient(180deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold]))::before {
+  top: var(--dshfiles-dock-row);
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+  bottom: 0;
+  margin-top: -16px;
+  /* No solid band: the peeking fifth row's words show through, fading out toward the edge (council round 35 P6). */
+  background: linear-gradient(0deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before,
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-below])::after {
+  opacity: 1;
+}
+
+/* Council round 8 C3: the dock attaches to the composer card. Its bottom edge meets the card's top, so the card's 1px
+   ring is the one line between them; only the dock's top corners are rounded (the composer's 12px), and the card's top
+   corners square off under it, so dock and composer read as one object. Council round 25, item 5: the ring is drawn
+   outside the card's box, so the dock ends on the ring's top, not 1px inside the card: overlapping it, ring and card
+   covered the last row's bottom 2px (31px under 33px rows); now every row is 33px and the frame edge sits outside. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child {
+  margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) + 1px);
+  border-bottom-width: 0;
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]):last-child {
+  border-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack:has(> :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child) :global([data-composer-card]) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* An entry fades in where it lands; the seat is pinned to the floor, so the input never moves. */
+.composerStack > :global([data-slot='conversation.input.dock']) > * {
+  transition:
+    opacity var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease-out),
+    translate var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease-out);
+}
+
+@starting-style {
+  .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    transition: opacity var(--dshx-duration-fade, 120ms) linear;
+  }
+
+  @starting-style {
+    .composerStack > :global([data-slot='conversation.input.dock']) > * {
+      translate: none;
+    }
+  }
 }
 
 /* Common seat for the composer chain (fallback + elected overlay siblings). */
@@ -695,11 +1081,11 @@ button.crumbEditable {
   /* Shared width axis for the transcript, dock cards, composer, and takeover
      cards. Main width controls publish the live body width and optional user
      preference; embedded occurrences override this adaptive axis below. */
-  --dsh-chat-content-width: var(
-    --dsh-chat-user-width,
-    clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px)
-  );
-  --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
+  /* dshfiles (unslop r5 C3): one transcript column; the dock and the input card share the column's edges instead of
+     standing 16px out on each side. Round five C1 (council round 3): the default is 680px (prose stops at 36em inside it, council round 11 C5),
+     so code, cards and prose read as one column. A width the user dragged (--dsh-chat-user-width) still wins. */
+  --dsh-chat-content-width: var(--dsh-chat-user-width, 680px);
+  --dsh-composer-card-max-width: var(--dsh-chat-content-width);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
 }
@@ -707,9 +1093,34 @@ button.crumbEditable {
 .embeddedBody {
   overflow: hidden;
   --dsh-chat-content-width: min(calc(100% - 32px), 920px);
-  --dsh-composer-card-max-width: min(calc(100% - 16px), 952px);
+  --dsh-composer-card-max-width: var(--dsh-chat-content-width);
   --dsh-composer-side-clearance: 8px;
   --dsh-composer-dock-inset: 8px;
+}
+
+/* Council round 9 (lane B's phone gutter, B4): every phone screen fills from 12px and sets its text at 24px. The
+   composer card, its dock and the transcript column fill from 12px; chat sets bare transcript text 12px further in. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .body:not(.embeddedBody) {
+    --dsh-composer-side-clearance: 12px;
+  }
+
+  /* Council round 24, item 4: the scroller's top edge, right under the phone top bar's hairline, sliced the line
+     scrolling past it into glyph slivers (17). An 8px fade sticks to that edge: it takes no room, catches no touch, and
+     sits over the transcript's text but under its sticky code banners, pinned header and turn rail (z-index 6, 7). A
+     view's composer overlay leaves this box unscrolled, so it draws none there. */
+  :global(html[data-shell-phone-nav]) .body[data-content-phase='active']:not(.embeddedBody) .scrollBody:not(:has([data-conversation-composer-overlay]))::before {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: block;
+    flex: none;
+    height: 8px;
+    margin-bottom: -8px;
+    content: '';
+    pointer-events: none;
+    background: linear-gradient(180deg, var(--dsw-alias-bg-base), color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent));
+  }
 }
 
 .scrollBody {
@@ -777,6 +1188,31 @@ button.crumbEditable {
   );
 }
 
+/* Council round 22, item 6: the band above sits behind the dock and the card, both opaque, so a transcript line resting
+   on the dock's top edge was sliced in full ink ("Answered by …" in 15). A 16px fade over the text column ends where
+   the dock starts (on the phone 8px into the seat, under its clear top band), so the line dissolves instead. Desktop's
+   24px end padding keeps the last line above it at the tail; it stays clear of the back-to-bottom control in the
+   gutter. Council round 23, item 4: opaque exactly at the dock's edge, a line resting there still showed faint and
+   sliced by it. On desktop the fade is opaque 8px before the edge (a solid band under it); the phone's clear seat band
+   already does that, so it sets no solid band. At the tail, desktop's 24px end padding still keeps the last line above
+   the whole 24px band. */
+.body[data-content-phase='active'] .composerSeat::before {
+  position: absolute;
+  bottom: calc(100% - var(--dsh-composer-seat-fade-inset, 0px));
+  left: 50%;
+  width: min(calc(100% - var(--dsh-composer-side-clearance, 0px) * 2), var(--dsh-composer-card-max-width));
+  height: calc(16px + var(--dsh-composer-seat-fade-solid, 8px));
+  content: '';
+  pointer-events: none;
+  translate: -50% 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
+    var(--dsw-alias-bg-base) 16px,
+    var(--dsw-alias-bg-base) 100%
+  );
+}
+
 /* Views may opt into a composer overlay while ConversationRoot retains
    ownership of the seat geometry and its active-phase precedence. */
 .scrollBody:has([data-conversation-composer-overlay]) {
@@ -799,6 +1235,10 @@ button.crumbEditable {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.scrollBody:has([data-conversation-composer-overlay]) > .composerSeat::before {
+  display: none;
 }
 
 .scrollBody:has([data-conversation-composer-overlay]) > .composerSeat {
@@ -831,6 +1271,32 @@ button.crumbEditable {
      width as the docked composer at every viewport. */
   width: min(calc(var(--dsh-composer-card-max-width) + 2 * var(--dsh-composer-side-clearance)), 100%);
   z-index: 1;
+}
+
+/* dshfiles (unslop r5 C5, council round 5): the heading sits 24px above the composer (16px here plus the stack's 8px
+   gap); it was 9px, closer than the composer is to the suggestions under it. */
+.composerHero > :global([data-hero-shell]) {
+  margin-bottom: 16px;
+}
+
+/* dshfiles (unslop r5 C5, council round 5): in a pane at least 800px tall the New thread block is the pane's centre (a
+   phone keeps its bottom-anchored stack), with no 32px foot lifting it. Council round 7 C7: the heading, the composer
+   and the suggestion lines centre as one block, equal space above and below; centring the heading and composer alone
+   (a 48 or 88px top pad for what hung below) left the whole block ~43px under the pane's centre at 1440x900. */
+@media (min-height: 800px) and (min-width: 640px) {
+  .composerHero {
+    padding-bottom: 0;
+  }
+
+  /* Round six C5: the main hero always sits under the blank header (36px, no rule), which reads as part of the pane, but
+     the pair was centred in the scroll body under it: 366px below the tab strip and 329px above the status bar at
+     1440x900. A foot gives half of it back. Keyed on the main body, not `.root`: under Workbench the content is
+     not inside the root that holds the header. An embedded body has no such header. Council round 8 C6: measured in
+     the rendered capture (ink from the tab strip's edge down, and up from the status bar), a 36px foot left the block
+     303px under the tab strip and 307px over the status bar; 32px puts the same space above and below it. */
+  .body:not(.embeddedBody)[data-content-phase='hero'] .composerHero {
+    padding-bottom: 32px;
+  }
 }
 
 .heroWorkspaceRow {
@@ -882,6 +1348,11 @@ button.crumbEditable {
   order: -2;
 }
 
+/* Unslop r5 C5: the project's mark sits where the chip's folder was, so the name keeps its place. */
+.runProject > :global([data-slot='project-mark']) {
+  margin-inline: 6px -2px;
+}
+
 .runSegment {
   display: inline-flex;
   align-items: center;
@@ -920,10 +1391,16 @@ button.crumbEditable {
   outline: none;
 }
 
-.runSummary:hover,
 .runSummary:has(:focus-visible) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+@media (hover: hover) {
+  .runSummary:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-secondary);
+  }
 }
 
 .runSummaryText {
@@ -950,9 +1427,54 @@ button.crumbEditable {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  /* dshfiles (unslop r5 C4, council round 3): Resume and Inbox form one quiet navigation line 12px below the composer;
+     the starters (onboarding) take their own line under it. Council round 13 C6: every chip sits 8px apart; council
+     round 14 C4: the two lines sit 14px apart, with no divider (the starter row's margin below). */
+  column-gap: 8px;
+  row-gap: 8px;
   min-width: 0;
-  padding: 8px var(--dsh-composer-side-clearance) 0;
+  padding: 12px var(--dsh-composer-side-clearance) 0;
+}
+
+/* One chip style for every entry under the composer (council round 13 C6): thread-sidebar's Resume, Review and Inbox
+   and onboarding's starters are 32px chips on the raised fill, no border, the 8px radius, 12px padding and an 8px gap
+   inside, so the two lines read as one family of controls. Flat: the hero's one elevated card stays the composer. The
+   hover steps to the selected surface (the owners' own hover wash would lighten the fill). */
+.heroSuggestions :global([data-hero-card]) {
+  height: 32px;
+  gap: 8px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dshx-tone-raised, var(--dsw-alias-bg-module-platform));
+}
+
+@media (hover: hover) {
+  .heroSuggestions :global([data-hero-card]):hover {
+    background: var(--dshx-tone-selected, var(--dsw-specific-sidebar-nav-item-active));
+  }
+}
+
+/* Council round 16 C1: under the filled Resume and Inbox chips, onboarding's starters are lighter text-and-icon actions:
+   no fill at rest (the hover above still steps to the selected surface), 8px padding and a 6px gap. */
+.heroSuggestions :global([data-hero-card^='starter-']) {
+  gap: 6px;
+  padding-inline: 8px;
+  background: none;
+}
+
+/* A touch screen keeps the 44pt target. */
+@media (pointer: coarse) {
+  .heroSuggestions :global([data-hero-card]) {
+    height: 44px;
+  }
+}
+
+/* The starters (~450px) never share the navigation line in the 680px column. Council round 14 C4: the 16px hairline
+   between the two lines (round 13 C6) read as a stray dash, so space alone separates them: the 8px row gap plus 6px,
+   14px in all. Without a navigation chip the starters lead and take only the hero's 12px. */
+.heroSuggestions:has(:global([data-hero-card]:not([data-hero-card^='starter-']))) :global([data-starter-row]) {
+  margin-top: 6px;
 }
 
 .heroSuggestions > * {
@@ -966,9 +1488,34 @@ button.crumbEditable {
 /* Phone (visual refresh T3.5): the new-thread stack sits at the bottom of the stage so the composer rides on the
    keyboard (the shell shrinks the frame to the visual viewport); the headline and the cards stack above it, full
    width, as in the phone mockup. */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]) .body[data-content-phase='hero'] .scrollBody {
     justify-content: flex-end;
+  }
+
+  /* Unslop r5 C1 (council round 4): the transcript ends above the dock in a 24px fade band the seat owns, so its last
+     visible line dissolves instead of being cut by the dock's first row; at the tail, Chat's 12px end padding keeps
+     the last line above the band. The curve eases out, opaque from 20px, so the next line's cap tops never show as
+     a row of grey dashes on the dock's edge. Council round 7 C3: that band was shorter than one 24px line, so a line
+     still showed as a half-faded strip over the dock. The band is 36px (1.5 lines) and turns opaque exactly where the
+     dock surface starts: the line above the dock dissolves through the whole band instead of being sliced. Council
+     round 8 C5: 36px greyed the last readable line as well. The band is 16px: it only overlaps text while the
+     transcript continues under the dock (at the end, Chat's end padding keeps the last line above it, in full ink),
+     and the line above it stays full ink. Council round 10 C1: 16px is shorter than a line, so the line the dock cut
+     still showed its cap tops as a half-clipped strip on the Live work card's edge. The band is one 28px line-height,
+     opaque exactly at the card's top, on an even ease (30/62/88% at 7/14/21px), so a line resting in the band fades as
+     a whole instead of keeping its top and losing its foot; Chat's phone end padding gives the 12px back, so the last
+     line still ends 40px above the card at the tail. Council round 17 C4 (Astra): the 28px band greyed a whole line of
+     prose over the dock while the transcript scrolled. The fade is the last 8px above the card; Chat's phone end
+     padding takes the 20px back (32px), so the last line still ends 40px above the card at the tail. */
+  :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
+    /* Council round 22, item 6: the 8px band is clear; the seat's 16px fade (above) ends at its foot, where the dock
+       starts, so the fade reaches 8px above the seat. */
+    --dsh-composer-seat-fade-inset: 8px;
+    --dsh-composer-seat-fade-solid: 0px;
+
+    padding-top: 8px;
+    background: linear-gradient(180deg, transparent 0px, transparent 8px, var(--dsw-alias-bg-base) 8px);
   }
 
   :global(html[data-shell-phone-nav]) .composerHero {
@@ -980,6 +1527,7 @@ button.crumbEditable {
 
   :global(html[data-shell-phone-nav]) .composerHero > :global([data-hero-shell]) {
     order: -2;
+    margin-bottom: 0;
     justify-content: flex-start;
     padding: 0 var(--dsh-composer-side-clearance);
   }
@@ -987,8 +1535,17 @@ button.crumbEditable {
   :global(html[data-shell-phone-nav]) .heroSuggestions {
     order: -1;
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: stretch;
     padding-top: 0;
+  }
+
+  /* Council round 16 C1: in that column the starters' line takes its content's height, not a 100% basis (which, with
+     the row's wrapping, pushed it into a second column off the right edge), and its actions start at the left edge
+     under Resume and Inbox, wrapping onto a second line. */
+  :global(html[data-shell-phone-nav]) .heroSuggestions :global([data-starter-row]) {
+    flex-basis: auto;
+    justify-content: flex-start;
   }
 }
 
@@ -996,7 +1553,7 @@ button.crumbEditable {
    instead of a stack of full-width cards. A closed disclosure shrinks to a chip; an open one, or an entry without a
    disclosure (a list such as the queue), takes the whole width. Each owner keeps its own row and toggle; desktop keeps
    the stack. */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) {
     /* The slot outlet carries an inline display: contents. */
     display: flex !important;
@@ -1011,8 +1568,10 @@ button.crumbEditable {
     display: none !important;
   }
 
+  /* A closed entry keeps a 10rem floor: a disclosure whose rows are all `w-full` has no content width of its own and
+     would otherwise shrink to its border. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
-    flex: 0 1 auto;
+    flex: 1 1 10rem;
     width: auto;
     min-width: 0;
     max-width: 100%;
@@ -1038,11 +1597,259 @@ button.crumbEditable {
   }
 }
 
+/* Live work on a narrow phone (unslop r5 C1, src/live-work.tsx): below 28rem two chips side by side kept about 170px
+   each and truncated everything (a clipped elapsed time read as a stray "^"). Every dock entry takes the whole width,
+   and running jobs and working subagents fold into one 44px "Live work · 1 job · 1 subagent" row that opens to them.
+   The summary renders only while it counts live work, so without it nothing hides. */
+.liveWork {
+  display: none;
+}
+
+/* The phone dock's head row (unslop r5 C1, council round 4, src/live-work.tsx PhoneDockHead): Live work. Chat's "Back to
+   bottom" control floats above the composer stack as on a desktop (council round 35 P7). Only the narrow phone renders
+   it. */
+.dockHead {
+  display: none;
+}
+
+@media (max-width: 27.99rem) {
+  /* The composer card's edges, like the dock entries under it. */
+  :global(html[data-shell-phone-nav]) .dockHead {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    margin-inline: var(--dsh-composer-side-clearance, 0px);
+  }
+
+  /* No live work: the row takes no room and no stack gap. */
+  :global(html[data-shell-phone-nav]) .dockHead:not(:has([data-live-work-summary])) {
+    display: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .liveWork {
+    display: flex;
+    flex: 1 1 auto;
+    width: auto;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    flex-basis: 100%;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+    display: none;
+  }
+
+  /* Council round 22, item 5: Live work is the phone's one header. While it holds only subagents, the subagent dock's
+     own "6 subagents working" fold row repeated it under it; it is hidden, and the rows (thread-sidebar keeps them
+     mounted below 28rem) list under Live work directly. Beside running jobs the fold row stays, and while it is closed
+     the rows behind it hide. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):not(:has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents'])))) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview-fold]) {
+    display: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold][aria-expanded='false'])) > :global([data-dshfiles-live-preview]) {
+    display: none;
+  }
+
+  /* Council round 22, item 5: the subagent rows are one card with 1px dividers, as on desktop (each row was its own
+     outlined card), on the composer's fill with its field edge. Council round 23, item 5: the list shows two whole rows
+     (thread-sidebar's two-line row is 54px); rows snap to whole positions, so a model line never shows at the top
+     without its title. Council round 24, item 4: the 8px under them is the next row's divider and padding (at the end,
+     the row above's bottom padding), never text; a 31px title peek there left a blank half-row under the last row at
+     the scroll end, and resting that row on the bottom edge instead would have cut a model line from its title at the
+     top. The edge fades (below) say the list scrolls. An open row (its feed and Stop) is taller than that frame: the
+     frame grows to at least the one open row (thread-sidebar's dock sets --dshfiles-dock-open-row, one row open at a
+     time), so its actions are never cut; closed, the frame is two rows again. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(2 * 54px + 1px + 8px + 2px);
+    min-height: calc(var(--dshfiles-dock-open-row, 0px) + 2px);
+    scroll-snap-type: y mandatory;
+    background: var(--dsw-specific-input-major);
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+    border-radius: var(--dsw-radius-lg);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+    margin-block: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--dsw-specific-input-major);
+  }
+
+  /* Council round 22, item 6 (17b): scrolled, the card's edges sliced a row's text in full ink. A fade sticks to each
+     scroll edge, over the rows and under the fold plate; it takes no room, and only text scrolling past an edge
+     dissolves. Council round 24, item 4: 16px, its first 8px the fill, so at a snap position the edge's padding and the
+     next row's divider 7px in stay clean (a plain linear fade left that divider half drawn, a second hairline beside
+     the frame's edge); and only on an edge with more rows past it (thread-sidebar's dock marks data-more-above and
+     data-more-below), so the top no longer fades at rest nor the bottom at the end; the fades say the list scrolls. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before,
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+    position: sticky;
+    z-index: 2;
+    display: block;
+    flex: none;
+    height: 16px;
+    content: '';
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+    top: 0;
+    margin-bottom: -16px;
+    background: linear-gradient(180deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+    bottom: 0;
+    margin-top: -16px;
+    background: linear-gradient(0deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before {
+    opacity: 1;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-below])::after {
+    opacity: 1;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) {
+    scroll-snap-align: start;
+  }
+
+  /* The scroll range ends with the last row on the frame's bottom edge (council round 24, item 4): no spacer under it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global(section[data-dshfiles-live-preview]:last-of-type) {
+    scroll-snap-align: end;
+  }
+
+  /* Between rows only: a row after the (hidden or sticky) fold row takes the plate's hairline instead. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview]) {
+    border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  /* Beside running jobs the fold row stays: a sticky, opaque, square, full-width plate whose bottom hairline is drawn
+     over the rows under it, so no row text or border shows through or above it (17b: its 4px margin let row text
+     scroll into view above it, its own rounded card showed row borders at its corners). */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview-fold]) {
+    top: 0;
+    width: 100%;
+    background: var(--dsw-specific-input-major);
+    box-shadow: 0 1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(44px + 2 * 54px + 1px + 8px + 2px);
+    scroll-padding-top: 44px;
+  }
+
+  /* With its fold row (four or more subagents), the open row's frame also holds the 44px plate over it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+    min-height: calc(44px + var(--dshfiles-dock-open-row, 0px) + 2px);
+  }
+
+  /* There the top fade sits under the 44px plate, not behind it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+    top: 44px;
+  }
+
+  /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
+    display: none !important;
+  }
+
+  /* Council round 9 C4: with nothing else in the dock between them, the Live work strip is the composer card's top, as
+     the desktop dock is (council round 8 C3): the card's fill and hairline, 1px wider on each side to take the card's
+     ring edges; closed, its bottom edge sits on the card's top, so the card's 1px ring is the one divider. Only the
+     strip's top corners are rounded and the card's top corners square off under it. Open, the rows join under it
+     (council round 23, item 5, below). Council round 11 C4: the strip sits on the nav surface (#F4F2F0 light, the nav step in dark), a
+     status band above the composer's own fill. Council round 19 C2: its top and side edges are the card's 3:1 field
+     edge (round 11 C3), so strip and card read as one field; the card's ring stays its one separator from the input. */
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
+    margin-inline: calc(var(--dsh-composer-side-clearance, 0px) - 1px);
+    margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) - 1px);
+    background: var(--dshx-surface-nav, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)));
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+    border-bottom-width: 0;
+    border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  }
+
+  /* The row takes the shared fill and the desktop dock rows' 8px inset. */
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead > [data-live-work-summary] {
+    padding-inline: 8px 4px;
+    background: transparent;
+  }
+
+  /* Council round 18 C4: the strip has no bottom edge, and the card's seam layer (InputBar.module.css) covers dark's s1
+     top highlight with the card fill, which read as a second line under the ring: one seam in both schemes. */
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))):has(> .dockHead > [data-live-work-summary]) :global([data-composer-card]) {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    --dsh-composer-card-seam: var(--dsh-composer-card-fill);
+  }
+
+  /* Council round 23, item 5: open, the strip and the rows stay the composer card's top section, one frame as when
+     closed and as on desktop. The strip floated flat on the page above a separate card of rows, 6px from it and 6px
+     from the composer. Now the strip keeps its frame and draws the one hairline over the rows; the rows run on the
+     card's side edges with no frame, radius or gap of their own, and the card's ring is the line under them. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
+    margin-bottom: calc(-1 * var(--dsh-composer-stack-gap));
+    border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) {
+    row-gap: 0;
+    /* The rows end on the card ring's top: they are stacking contexts (container queries) and painted over the ring,
+       which then showed only beside their scrollbar as a stray tick. */
+    margin-bottom: calc(1px - var(--dsh-composer-stack-gap));
+  }
+
+  /* 1px wider on each side, as the strip is, to take the card ring's edges. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+    flex-basis: calc(100% + 2px);
+    max-width: none;
+    margin-inline: -1px;
+    background: var(--dsw-specific-input-major);
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+    border-block-width: 0;
+    border-radius: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]) {
+    border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  /* No card edges of their own: 117px of rows, plus the plate beside running jobs (and the divider above it there). */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(2 * 54px + 1px + 8px);
+    min-height: var(--dshfiles-dock-open-row, 0px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(44px + 2 * 54px + 1px + 8px + 1px);
+    min-height: calc(var(--dshfiles-dock-open-row, 0px) + 1px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+    min-height: calc(44px + var(--dshfiles-dock-open-row, 0px) + 1px);
+  }
+
+  /* A running job's row and fold row lie on the section too, instead of drawing a card inside it. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :is(:global([data-slot='composer-row'][data-variant='card']), :global([data-dshfiles-live-preview-fold])) {
+    margin-block: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+}
+
 /* Phone pickers as bottom sheets (visual refresh T3.5). The composer's pickers belong to their owners (kit Dialog,
    Radix popovers, the native menu); while one of them is open from the composer card on the phone shell, its layer
    presents as a 16px-radius sheet on the bottom edge with a grabber, the only shadowed layer besides the composer.
    The owners keep their contents, keyboard handling and dismissal; only the geometry changes. */
-@media (max-width: 639.98px) {
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-radix-popper-content-wrapper]),
   :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([data-menu-material][role='menu']),
   :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content']) {
@@ -1074,14 +1881,20 @@ button.crumbEditable {
     border-width: 1px 0 0 !important;
     border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
     /* A solid raised fill (no translucent menu material over the composer) and a dim scrim drawn as a spread shadow;
-       a tap outside still closes the picker through its owner. */
+       a tap outside still closes the picker through its owner. The kit scrim (council round 31, item 2): a mix of the
+       text ink brightened the page in dark, where the ink is near-white. */
     background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
     backdrop-filter: none !important;
     box-shadow:
       var(--dshx-elevation-3),
-      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+      0 0 0 100vmax var(--dshx-scrim) !important;
     overflow-y: auto;
     animation: composer-picker-sheet-in var(--dshx-duration-sheet, 280ms) var(--dshx-motion-ease-enter, ease) both;
+  }
+
+  /* A dialog sheet already dims the page with its own overlay: one dimming layer, so it keeps only its elevation. */
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content']) {
+    box-shadow: var(--dshx-elevation-3) !important;
   }
 
   /* The grabber says it is a sheet. */
@@ -1115,133 +1928,162 @@ button.crumbEditable {
   }
 }
 
-/* Where the thread runs (b:4qjm). A wide bar dissolves the group: its pickers sit in the run row as before and the phone
-   chip, headings and Done stay out of it. */
-.runPlace,
-.placeSheet {
+/* Where the thread runs (b:4qjm; council round 16 C1). The project chip leads the group; the host and the working
+   location are ONE location chip ("Local", with "Own workspace from main" or a remote host added only when it differs
+   from the default) that opens a panel in the card holding both pickers. A wide bar dissolves the group into the run
+   row; the panel takes a line of its own under the bar (the card clips anything drawn outside it). */
+.runPlace {
   display: contents;
 }
 
-.placeSummary,
+.placeSummary {
+  display: inline-flex;
+  order: -1;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.placeSummary > svg {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* No host or location picker is installed: nothing to choose, so no chip. */
+.placeSummary[data-place-empty] {
+  display: none;
+}
+
+.placeSummary:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.placeSummary:focus-visible,
+.runPlace[data-place-open] .placeSummary {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (hover: hover) {
+  .placeSummary:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.placeSheet,
 .placeHeading,
 .placeLabel,
 .placeDone {
   display: none;
 }
 
-/* A phone bar: the group is one chip on its own first line, ahead of +; the pickers wait in a panel the chip opens in
-   the card, under it (the card clips anything drawn outside it). The attribute selectors outrank the new-thread bar's
-   `.rowHero .runRow > *` (flex: none), which would otherwise keep the chip beside +. */
+.runPlace[data-place-open] .placeSheet {
+  display: grid;
+  order: 3;
+  flex: 0 0 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  box-sizing: border-box;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+}
+
+.runPlace[data-place-open] .placeSheet > * {
+  grid-column: 1 / -1;
+}
+
+.runPlace[data-place-open] .placeHeading {
+  display: block;
+  grid-row: 1;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 600;
+}
+
+.runPlace[data-place-open] .placeLabel {
+  display: block;
+  grid-column: 1;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.runPlace[data-place-open] [data-place-label='host'] {
+  grid-row: 2;
+}
+
+.runPlace[data-place-open] [data-place-label='workspace'] {
+  grid-row: 3;
+}
+
+.runPlace[data-place-open] .placeSheet :global(span:has(> [data-run-segment='host'])) {
+  grid-row: 2;
+  grid-column: 2;
+  justify-self: start;
+}
+
+.runPlace[data-place-open] .placeSheet :global([data-run-segment='workspace']) {
+  grid-row: 3;
+  grid-column: 2;
+  justify-self: start;
+}
+
+.runPlace[data-place-open] .placeDone {
+  display: inline-flex;
+  justify-self: end;
+  height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.placeDone:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+/* A phone bar: the project and location chips share a line of their own, ahead of +; the panel opens under them. The
+   attribute selectors outrank the new-thread bar's `.rowHero .runRow > *` (flex: none). */
 @container (max-width: 560px) {
   .runPlace[data-run-place][data-row-break] {
     display: flex;
     flex: 0 0 100%;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
     order: -10;
     min-width: 0;
   }
 
-  .placeSummary {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 100%;
+  .runPlace[data-run-place][data-row-break] > .runProject {
     min-width: 0;
-    height: 28px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: var(--dsw-radius-sm);
-    background: none;
-    color: var(--dsw-alias-label-secondary);
-    font: inherit;
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-    white-space: nowrap;
-    cursor: pointer;
   }
 
-  .placeSummary:hover,
-  .placeSummary:focus-visible,
-  .runPlace[data-place-open] .placeSummary {
-    background: var(--dsw-alias-interactive-bg-hover);
-    color: var(--dsw-alias-label-primary);
-  }
-
-  .placeSheet {
-    display: none;
+  .placeSummary {
+    flex: 0 1 auto;
   }
 
   .runPlace[data-place-open] .placeSheet {
-    display: grid;
-    flex: 0 0 100%;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 4px 12px;
-    margin: 4px 0;
-    padding: 8px 10px;
-    border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-  }
-
-  .runPlace[data-place-open] .placeSheet > * {
-    grid-column: 1 / -1;
-  }
-
-  .runPlace[data-place-open] .placeHeading {
-    display: block;
-    grid-row: 1;
-    color: var(--dsw-alias-label-secondary);
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-    font-weight: 600;
-  }
-
-  .runPlace[data-place-open] .placeLabel {
-    display: block;
-    grid-column: 1;
-    color: var(--dsw-alias-label-tertiary);
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-  }
-
-  .runPlace[data-place-open] [data-place-label='project'] {
-    grid-row: 2;
-  }
-
-  .runPlace[data-place-open] [data-place-label='host'] {
-    grid-row: 3;
-  }
-
-  .runPlace[data-place-open] [data-place-label='workspace'] {
-    grid-row: 4;
-  }
-
-  .runPlace[data-place-open] .placeSheet > .runProject {
-    grid-row: 2;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeSheet :global(span:has(> [data-run-segment='host'])) {
-    grid-row: 3;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeSheet :global([data-run-segment='workspace']) {
-    grid-row: 4;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeDone {
-    display: inline-flex;
-    justify-self: end;
-    height: 28px;
-    align-items: center;
-    padding: 0 10px;
-    border: 0;
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-interactive-bg-hover);
-    color: var(--dsw-alias-label-primary);
-    font: inherit;
-    cursor: pointer;
+    margin-bottom: 4px;
   }
 }

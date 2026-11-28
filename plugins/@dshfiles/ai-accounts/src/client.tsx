@@ -11,7 +11,7 @@ import type {} from './sidebar-footer-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { AccountsPanel } from './accounts-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { createAccountSetupController } from './account-setup-controller.js'
 import { AccountSetupOverlay } from './account-setup-dialog.js'
 import { useServingAccount, type UseServingAccountSessions } from './use-serving-account.js'
@@ -20,28 +20,23 @@ import { QuotaStrip } from './quota-footer.js'
 import { QuotaStatusItem } from './quota-status-item.js'
 import { QuotaStatusLine } from './quota-status-line.js'
 import { ThreadAccountSurface } from './thread-account-dialog.js'
-import { UsageHistoryPanel } from './usage-history-panel.js'
-import { QuotaForecastPanel } from './quota-forecast-panel.js'
-import { QuotaAccountsView } from './quota-accounts-view.js'
 import { AccountQuotaViews, UsageNavigation, type QuotaViewProps, type UsageQuotaTarget, type UsageQuotaView } from './quota-views.js'
 import { useEffect } from 'react'
 import { useContract } from '@dshfiles/dshx/client'
 import { EdgeUsageWidget } from './edge-usage.js'
-import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry, SessionUsageCost } from './session-cost.js'
 import { IdleCacheWarningDockEntry } from './idle-cache-warning.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { TurnCostEstimate } from './turn-cost-estimate.js'
-import { CredentialRecoveryMessage } from './credential-recovery-message.js'
+import { CredentialRecoveryAction, CredentialRecoveryTail } from './credential-recovery-message.js'
 // Type-only: the owned Chat fork's seat beside Resume on a failed turn.
-import type {} from '@dshfiles/chat/turn-error-action'
+import type { TurnErrorActionOwnerProps } from '@dshfiles/chat/turn-error-action'
 import type { TurnUsageCostOwnerProps } from '@dshfiles/chat/turn-usage-cost'
 import type { SessionUsageCostOwnerProps } from '@dshfiles/chat/session-usage-cost'
 import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
 import { StalledStreamMessage } from './stalled-stream-message.js'
-import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 
 /**
@@ -49,6 +44,15 @@ import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
  * provider panels use, so it sits directly below Plugins instead of adding a
  * second place to look for account settings.
  */
+/** The account pages load when one first opens (a page, the Models footer, the Settings section), not at page boot. */
+const views = () => import('./lazy-views.js')
+const AccountsPanel = lazyView(() => views().then(module => module.LazyViews.AccountsPanel), { label: 'AI accounts' })
+const UsageHistoryPanel = lazyView(() => views().then(module => module.LazyViews.UsageHistoryPanel), { label: 'Usage history' })
+const QuotaForecastPanel = lazyView(() => views().then(module => module.LazyViews.QuotaForecastPanel), { label: 'Quota forecast' })
+const QuotaAccountsView = lazyView(() => views().then(module => module.LazyViews.QuotaAccountsView), { label: 'Accounts' })
+const ModelsPageAccounts = lazyView(() => views().then(module => module.LazyViews.ModelsPageAccounts), { label: 'Accounts' })
+const AiAccountsSettingsSection = lazyView(() => views().then(module => module.LazyViews.AiAccountsSettingsSection), { label: 'AI accounts' })
+
 const PANEL_ID = 'ai-accounts'
 const USAGE_PANEL_ID = 'ai-accounts-usage'
 const FORECAST_PANEL_ID = 'ai-accounts-forecast'
@@ -72,14 +76,14 @@ export default defineClientPlugin({
         : {
             describe: async ref => {
               const result = await remoteCredentials.describe([ref])
-              if (!result.ok) throw new Error('Credential status is unavailable.')
+              if (!result.ok) throw new Error('Credential status did not load. Reopen this page to retry.')
               const info = result.value[ref]
-              if (info === undefined) throw new Error('Credential status is unavailable.')
+              if (info === undefined) throw new Error('Credential status did not load. Reopen this page to retry.')
               return info
             },
             set: async (ref, value) => {
               const result = await remoteCredentials.set(ref, value)
-              if (!result.ok) throw new Error('The key could not be stored in DSH credentials.')
+              if (!result.ok) throw new Error('The key was not stored in DSH credentials. Save it again.')
             },
           }
     const setupController = createAccountSetupController()
@@ -236,13 +240,11 @@ export default defineClientPlugin({
         <TurnCostEstimate {...props} />
       </PluginQueryProvider>
     )
-    const CredentialRecoveryMessageView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
-      <CredentialRecoveryMessage
-        turn={props.turn}
-        onOpenAccounts={openAccounts}
-        hint={translate('credentialRecoveryHint')}
-        actionLabel={translate('credentialRecoveryAction')}
-      />
+    const CredentialRecoveryActionView = (props: TurnErrorActionOwnerProps): JSX.Element | null => (
+      <CredentialRecoveryAction code={props.code} message={props.message} seq={props.seq} onOpenAccounts={openAccounts} actionLabel={translate('credentialRecoveryAction')} />
+    )
+    const CredentialRecoveryTailView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
+      <CredentialRecoveryTail turn={props.turn} onOpenAccounts={openAccounts} actionLabel={translate('credentialRecoveryAction')} />
     )
     const QuotaRetryMessageView = (props: { readonly turn: TurnLocation; readonly sessionId: string }): JSX.Element => (
       <PluginQueryProvider>
@@ -305,7 +307,7 @@ export default defineClientPlugin({
     api.ui.register({ name: 'conversation.chat.turnUsageCost', id: 'ai-accounts-turn-cost', order: 0 }, TurnCostEstimateView)
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-credential-recovery', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
-      CredentialRecoveryMessageView,
+      CredentialRecoveryTailView,
     )
     api.ui.register(
       {
@@ -320,6 +322,11 @@ export default defineClientPlugin({
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-stalled-stream', order: 30, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
       StalledStreamMessageView,
+    )
+    // First in the failed turn's action row: for a credential failure the card offers no Retry, so this leads.
+    api.ui.register(
+      { name: 'conversation.chat.turnErrorAction', id: 'ai-accounts-credential-recovery-card', order: -10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
+      CredentialRecoveryActionView,
     )
     // Beside Resume on the failed turn itself, so the per-thread choice lives
     // where the user decides to resume. Declared by the owned Chat fork.

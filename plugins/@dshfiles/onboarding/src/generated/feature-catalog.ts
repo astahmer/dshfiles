@@ -12,7 +12,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "activity-timeline",
       "description": "Unified chronological activity timeline across agents, sessions, communication, and jj workspaces.",
       "ui": true,
-      "features": 7
+      "features": 8
     },
     {
       "name": "agent-communication",
@@ -60,7 +60,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "agents",
       "description": "Persistent, mentionable agents: identity, instructions, model route and tool preset, dispatched into an ordinary thread.",
       "ui": true,
-      "features": 8
+      "features": 9
     },
     {
       "name": "agentsview",
@@ -102,7 +102,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "backlog",
       "description": "One capture feed for notes, tasks and agent work that organizes and ages itself.",
       "ui": true,
-      "features": 51
+      "features": 52
     },
     {
       "name": "backlog-jira",
@@ -634,7 +634,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "tool-meta",
-      "description": "Start time and duration on every tool call in the chat transcript, counting live while the call runs.",
+      "description": "How long each tool call took, in the chat transcript, counting live while the call runs.",
       "ui": true,
       "features": 4
     },
@@ -648,7 +648,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 2
+      "features": 3
     },
     {
       "name": "traces",
@@ -684,7 +684,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "user-questions",
       "description": "Owned fork of DSH's native question form: markdown questions with sandboxed HTML previews, and an answered question stays closed while its reply waits for admission.",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "vcs-provider-port",
@@ -740,8 +740,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "activity-timeline#activity-feed",
       "plugin": "activity-timeline",
       "id": "activity-feed",
-      "title": "Unified agent activity feed",
-      "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
+      "title": "Activity feed",
+      "summary": "One feed of thread, agent and workspace events, with search and filters.",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity",
       "reach": [
@@ -809,8 +809,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "activity-timeline#activity-condensation",
       "plugin": "activity-timeline",
       "id": "activity-condensation",
-      "title": "Deterministic condensation and attention visibility",
-      "summary": "Collapses routine runs and correlated events into traceable groups while keeping errors, blocked integrations, and attention-required events individually visible; a detailed mode expands every retained event.",
+      "title": "Grouped activity, errors kept visible",
+      "summary": "Routine events fold into groups, while errors and items that need you stay on their own row.",
       "destination": "inbox",
       "currentSurface": "left-nav: Activity Timeline: Activity › attention filter",
       "reach": [],
@@ -821,8 +821,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "activity-timeline#verification-receipts",
       "plugin": "activity-timeline",
       "id": "verification-receipts",
-      "title": "Inspect verification receipts in the Activity Timeline",
-      "summary": "Project Checks publishes a strict, bounded v2 receipt summary with its verification stage after persistence; the timeline still accepts v1, keeps peer targets, workspaces and failure text out of storage, deduplicates replay, marks failures and timeouts for attention, and opens o…",
+      "title": "Check results in the activity feed",
+      "summary": "See each project check's result in the activity feed and open the thread it ran for.",
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity › receipt detail",
       "reach": [
@@ -855,10 +855,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Open Session\"",
+          "text": "expect button \"Open thread\"",
           "action": "expect",
           "by": "button",
-          "name": "Open Session",
+          "name": "Open thread",
           "value": null
         }
       ],
@@ -870,7 +870,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "attention-inbox",
       "title": "One attention inbox for everything that needs you",
-      "summary": "Host-owned inbox items (reason, source, subject, severity, verbs, dedupe key) in the dshfiles_attention storage domain. Providers publish, resolve or reconcile through the attention-api module; the user and the Agent list, mark done, snooze (until a time or until it changes), re…",
+      "summary": "Everything that needs you lands in one inbox that you and the agent can mark done, snooze or mute.",
       "destination": "inbox",
       "currentSurface": "Host contract: attention-api module and attention_* agent tools",
       "reach": [],
@@ -882,7 +882,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-panel",
       "title": "Inbox page with one Needs you badge",
-      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row leads with the thread or item it is about, then the sentence saying what it is about and its detail, with one direct action (Review th…",
+      "summary": "The Inbox page lists what needs you, one action per row, with a single badge on its rail icon.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
       "reach": [
@@ -891,13 +891,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Inbox",
-          "value": null
-        },
-        {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
           "value": null
         },
         {
@@ -921,13 +914,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Inbox",
-          "value": null
-        },
-        {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
           "value": null
         },
         {
@@ -958,7 +944,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-opens-subject",
       "title": "Open an Inbox item's source in one click",
-      "summary": "Every Inbox row whose subject another page owns offers its own direct action: Review thread for a finished turn, Open thread for a thread subject (an archived one says so), and Open <subject> for a page such as a backlog item, which opens that item in the Backlog page. Any text…",
+      "summary": "Each Inbox row opens the thread or page it is about in one click.",
       "destination": "inbox",
       "currentSurface": "Inbox: Open on an item's subject",
       "reach": [
@@ -1000,9 +986,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-push",
       "title": "Push blocking Inbox items to a device",
-      "summary": "Below the in-tab alerts, the Inbox offers Push blocking items to this device. Turning it on asks for notification permission, registers a service worker the Host serves from its own origin (/dshfiles-web-push/sw.js, scope its own folder, so it controls no page), subscribes the b…",
+      "summary": "Get a notification on this device when something needs you, even when DSH is not open.",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Push blocking items to this device",
+      "currentSurface": "left-nav: Inbox › More actions › Alerts on this device",
       "reach": [
         {
           "text": "click tab \"Inbox\"",
@@ -1012,17 +998,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Needs you\"",
-          "action": "click",
-          "by": "button",
-          "name": "Needs you",
-          "value": null
-        },
-        {
           "text": "expect heading \"Inbox\"",
           "action": "expect",
           "by": "heading",
           "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"More actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Alerts on this device\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Alerts on this device",
           "value": null
         },
         {
@@ -1037,11 +1030,66 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "activity-timeline#thread-question-strip",
+      "plugin": "activity-timeline",
+      "id": "thread-question-strip",
+      "title": "Answer a subagent's question in its parent thread",
+      "summary": "A subagent's question shows above its parent thread's composer, so you can answer it there.",
+      "destination": "transcript",
+      "currentSurface": "thread: above the composer while a subagent's question waits",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Ship the hotfix now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Ship\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022hold\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Hold\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022ship\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or threads*",
+          "value": "[[once call subagent {\"description\":\"Release check\",\"prompt\":\"\\u005b\\u005bonce call ask_parent_question \\u007b\\u0022question\\u0022:\\u0022Ship the hotfix now?\\u0022,\\u0022options\\u0022:\\u005b\\u007b\\u0022id\\u0022:\\u0022ship\\u0022,\\u0022label\\u0022:\\u0022Ship\\u0022\\u007d,\\u007b\\u0022id\\u0022:\\u0022hold\\u0022,\\u0022label\\u0022:\\u0022Hold\\u0022\\u007d\\u005d,\\u0022recommendedOptionId\\u0022:\\u0022ship\\u0022,\\u0022expiryBehavior\\u0022:\\u0022recommended\\u0022,\\u0022timeoutMs\\u0022:1800000\\u007d\\u005d\\u005d\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"A subagent asks: Ship the hotfix now?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "A subagent asks: Ship the hotfix now?",
+          "value": null
+        },
+        {
+          "text": "click button \"Hold\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hold",
+          "value": null
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "agent-communication#agent-directory",
       "plugin": "agent-communication",
       "id": "agent-directory",
-      "title": "Discover Agents and peers",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
+      "title": "Find running agents",
+      "summary": "Agents can find the other running agents, with the ones in the same project listed first.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
@@ -1052,15 +1100,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#passive-messaging",
       "plugin": "agent-communication",
       "id": "passive-messaging",
-      "title": "Durable direct peer mail with a bounded request wake",
-      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
+      "title": "Store and browse agent messages",
+      "summary": "Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
         "firstAction": "Open Agents › Messages and send a direct message to a live Agent.",
-        "doneWhen": "Your message shows in that Agent’s conversation.",
+        "doneWhen": "Your message shows in that Agent’s thread.",
         "open": {
           "panel": "agent-communication"
         }
@@ -1071,7 +1119,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-communication",
       "id": "human-browser",
       "title": "Send direct messages from the Messages panel",
-      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
+      "summary": "Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [
@@ -1134,7 +1182,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-communication",
       "id": "durable-inbox",
       "title": "Read and acknowledge direct messages",
-      "summary": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
+      "summary": "Agents read and acknowledge their own direct messages, which survive a restart.",
       "destination": "none",
       "currentSurface": "agent tool: dshx_comm_inbox / dshx_comm_ack",
       "reach": [],
@@ -1145,8 +1193,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-loop#settled-stream-size",
       "plugin": "agent-loop",
       "id": "settled-stream-size",
-      "title": "Store a settled attempt's replay metadata once",
-      "summary": "Owned fork of the native agent loop. A settled assistant message carries the provider's replay envelope on its message source; the same envelope's per-block list was also written into the durable compact stream, so every assistant message kept its block signatures twice. This fo…",
+      "title": "Store reply metadata once",
+      "summary": "Each finished reply's replay data is stored once instead of twice, so thread logs stay smaller.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -1158,7 +1206,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-loop",
       "id": "tool-argument-limit",
       "title": "Stop a runaway tool call",
-      "summary": "A model that keeps streaming one tool call's arguments past a size or time bound (2026-11-11: an apply_patch call streamed 199 KB of whitespace for 15 minutes until the provider dropped the connection and the step failed) is stopped at the stream read. The provider request is ab…",
+      "summary": "A tool call whose arguments keep streaming past a limit is stopped, and the agent is told to resend smaller calls.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -1170,7 +1218,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-loop",
       "id": "output-limit-continuation",
       "title": "Continue a reply cut at the output-token limit",
-      "summary": "Off by default. When a reply stops on the output-token limit (finish max-tokens), the turn runs up to maxOutputLimitContinuations extra steps instead of ending. The cut reply stays in history once, exactly as streamed; each extra step adds only a short note asking the model to c…",
+      "summary": "Off by default: a reply cut at the output limit carries on in extra steps instead of ending the turn.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -1181,8 +1229,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-plan#plan-card",
       "plugin": "agent-plan",
       "id": "plan-card",
-      "title": "Plan card for todo_write",
-      "summary": "Each todo_write call is drawn as a plan card: \"Step 2 of 3 · Fix the rounding bug\", expanding to every step with a done, active or pending glyph and how long it took. Timing comes from the times of successive todo_write calls, followed back across turns while the plan keeps a st…",
+      "title": "Plan card for the agent's to-do list",
+      "summary": "The agent's plan shows as a card with each step, its state and how long it took.",
       "destination": "transcript",
       "currentSurface": "transcript: todo_write tool card",
       "reach": [
@@ -1264,7 +1312,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "pinned-step",
       "title": "Current plan step pinned beside the composer",
-      "summary": "While the latest turn's plan has steps left, a chip beside the native plan-mode control says \"Step 2 of 3 · Fix the rounding bug · 12s\" and opens the whole plan. It sits beside the native control rather than replacing it.",
+      "summary": "The current plan step sits beside the composer and opens the whole plan.",
       "destination": "composer",
       "currentSurface": "composer: plan chip beside plan mode",
       "reach": [
@@ -1305,7 +1353,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "live-activity-strip",
       "title": "Live activity strip beside the composer controls",
-      "summary": "While anything runs, a strip beside the native composer activity says what: the running tool call, background jobs and subagents, with a live timer; it opens the full list with a timer per row. It reads Session events only (tool/call, tool/result, job/registered, job/settled) an…",
+      "summary": "While the agent runs a tool, a strip beside the composer names it with a timer.",
       "destination": "composer",
       "currentSurface": "composer: activity strip",
       "reach": [
@@ -1345,10 +1393,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-plan#failure-card",
       "plugin": "agent-plan",
       "id": "failure-card",
-      "title": "Retry and Ask to fix under failed turns",
-      "summary": "Under a native turn-error row, and under a model-retry row once retrying gave up, a bar shows the retry count and two actions: Retry puts a retry request in the composer, Ask to fix inserts the failure with a request to fix it. Neither sends: the user reviews and sends. Stopped…",
+      "title": "Ask to fix on a failed turn",
+      "summary": "A failed turn offers Ask to fix, which drafts a fix request in the composer for you to review and send.",
       "destination": "transcript",
-      "currentSurface": "transcript: turn error row",
+      "currentSurface": "transcript: failed turn action row",
       "reach": [
         {
           "text": "seed jev-setup-chat-thread",
@@ -1387,7 +1435,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "compaction-meter",
       "title": "Tokens left before automatic compaction",
-      "summary": "In the composer's context meter panel, under the occupancy breakdown, a row says how many tokens remain before automatic compaction (\"Compacts in ~40K\", then \"Compacts next step\") and gives the trigger and window, so the meter line carries one context item. The trigger comes fro…",
+      "summary": "The context meter shows how many tokens are left before the thread compacts.",
       "destination": "composer",
       "currentSurface": "composer: meter line",
       "reach": [
@@ -1442,7 +1490,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-preset",
       "id": "draft-preset-selection",
       "title": "Choose an agent preset before typing",
-      "summary": "The native new-task preset chip changes a client-local draft's metadata without creating a Host Session or calling agentPresets.select for a nonexistent id. Settings defaults and both Creator routes use the same controller. Materialized blank Sessions retain the native Host sele…",
+      "summary": "Pick a preset for a new thread before you type its first message.",
       "destination": "composer",
       "currentSurface": "composer: agent mode chip, shown for a non-default preset or from ⋯ › Agent mode… (b:4v6p)",
       "reach": [
@@ -1526,8 +1574,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-questions#parent-child-question",
       "plugin": "agent-questions",
       "id": "parent-child-question",
-      "title": "Ask and answer a child-agent question",
-      "summary": "A child asks its direct parent with bounded context and a recommendation policy; only the parent can deliver the answer.",
+      "title": "Ask and answer a subagent's question",
+      "summary": "A subagent can ask its parent thread a question, and only the parent can answer it.",
       "destination": "inbox",
       "currentSurface": "agent tool: ask_parent_question / answer_parent_question",
       "reach": [
@@ -1617,8 +1665,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-questions#question-expiry",
       "plugin": "agent-questions",
       "id": "question-expiry",
-      "title": "Resolve question expiry safely",
-      "summary": "Expiry either returns the recommended choice or writes a private deferred Markdown record without treating it as an answer.",
+      "title": "Handle an expired question",
+      "summary": "An expired question returns its recommended choice or is saved for later, never taken as an answer.",
       "destination": "none",
       "currentSurface": "agent tool: ask_parent_question expiry",
       "reach": [
@@ -1665,8 +1713,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-questions#revision-pinned-feedback",
       "plugin": "agent-questions",
       "id": "revision-pinned-feedback",
-      "title": "Submit and resolve anchored Markdown feedback",
-      "summary": "Submit line-anchored feedback against the current document revision and deliver accepted, rejected, or deferred resolution receipts to the child.",
+      "title": "Give anchored feedback on a document",
+      "summary": "Leave line-anchored feedback on a subagent's document and send back what was accepted or rejected.",
       "destination": "none",
       "currentSurface": "agent tool: submit_markdown_feedback",
       "reach": [
@@ -1714,7 +1762,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "bounded-batch-resolution",
       "title": "Resolve feedback in bounded batches",
-      "summary": "Accept at most twenty feedback resolutions atomically and reject oversized batches before writing any receipt.",
+      "summary": "Resolve up to twenty feedback items at once, all or nothing.",
       "destination": "none",
       "currentSurface": "agent tool: resolve_parent_feedback",
       "reach": [
@@ -1761,8 +1809,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-questions#root-timed-questions",
       "plugin": "agent-questions",
       "id": "root-timed-questions",
-      "title": "Root timed questions keep the Agent working",
-      "summary": "With the web seed's tool-ask-user row in mode: timed, a root Agent's ask_user_question shows a counting-down card; when the foreground wait ends the Agent gets a pending result and keeps working, a later answer arrives as a user message tagged answer_to_pending_question, and sto…",
+      "title": "Timed questions keep the agent working",
+      "summary": "A timed question counts down while the agent keeps working, and a later answer still reaches it.",
       "destination": "transcript",
       "currentSurface": "transcript: native question card",
       "reach": [],
@@ -1779,8 +1827,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-questions#question-card-layout",
       "plugin": "agent-questions",
       "id": "question-card-layout",
-      "title": "Steady countdown and compact native question card",
-      "summary": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
+      "title": "Steady countdown on question cards",
+      "summary": "The question card keeps a steady countdown and folds long questions to three lines.",
       "destination": "transcript",
       "currentSurface": "transcript: native question card",
       "reach": [],
@@ -1792,7 +1840,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "cross-thread-question-inbox",
       "title": "List and answer thread questions",
-      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
+      "summary": "Agents can list open questions across threads and answer the ones they are allowed to.",
       "destination": "inbox",
       "currentSurface": "agent tool: list_thread_questions / answer_thread_question",
       "reach": [
@@ -1883,7 +1931,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "child-questions-inbox",
       "title": "Subagent questions in the Inbox, answerable in place",
-      "summary": "Every pending, unexpired child-to-parent question is a blocking Inbox item about the parent thread, with the question options as answer choices. Choosing one answers as the parent thread (which must be running), wakes the waiting subagent, and resolves the item; a question answe…",
+      "summary": "A subagent's question appears in the Inbox, and choosing an option answers it and wakes the subagent.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Subagent question",
       "reach": [
@@ -1895,10 +1943,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
-          "name": "commands, @ files or s*",
+          "name": "commands, @ files or threads*",
           "value": "[[once call subagent {\"description\":\"Release check\",\"prompt\":\"\\u005b\\u005bonce call ask_parent_question \\u007b\\u0022question\\u0022:\\u0022Deploy the release now?\\u0022,\\u0022options\\u0022:\\u005b\\u007b\\u0022id\\u0022:\\u0022deploy\\u0022,\\u0022label\\u0022:\\u0022Deploy\\u0022\\u007d,\\u007b\\u0022id\\u0022:\\u0022wait\\u0022,\\u0022label\\u0022:\\u0022Wait\\u0022\\u007d\\u005d,\\u0022recommendedOptionId\\u0022:\\u0022deploy\\u0022,\\u0022expiryBehavior\\u0022:\\u0022recommended\\u0022,\\u0022timeoutMs\\u0022:1800000\\u007d\\u005d\\u005d\"}]]"
         },
         {
@@ -1916,6 +1964,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        },
+        {
           "text": "expect text \"A subagent asks: Deploy the release now?\"",
           "action": "expect",
           "by": "text",
@@ -1923,17 +1978,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Deploy\"",
+          "text": "click button \"Deploy*\"",
           "action": "click",
           "by": "button",
-          "name": "Deploy",
+          "name": "Deploy*",
           "value": null
         },
         {
-          "text": "expect text \"Nothing needs you right now.\"",
+          "text": "expect text \"Answered “Deploy”*\"",
           "action": "expect",
           "by": "text",
-          "name": "Nothing needs you right now.",
+          "name": "Answered “Deploy”*",
           "value": null
         }
       ],
@@ -1945,10 +2000,38 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-questions",
       "id": "native-questions-inbox",
       "title": "Thread questions in the Inbox",
-      "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form sa…",
+      "summary": "Questions waiting in a thread appear in the Inbox, and simple ones can be answered there.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › agent-questions.native-question",
       "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or threads*\" \"[[once call ask_user_question {\\\"questions\\\": [{\\\"id\\\": \\\"layout\\\", \\\"question\\\": \\\"Which layout should the release notes use?\\\", \\\"options\\\": [{\\\"label\\\": \\\"Grouped by plugin (Recommended)\\\"}, {\\\"label\\\": \\\"One flat list\\\"}]}], \\\"timeout\\\": -1}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or threads*",
+          "value": "[[once call ask_user_question {\"questions\": [{\"id\": \"layout\", \"question\": \"Which layout should the release notes use?\", \"options\": [{\"label\": \"Grouped by plugin (Recommended)\"}, {\"label\": \"One flat list\"}]}], \"timeout\": -1}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Which layout should the release notes use?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Which layout should the release notes use?",
+          "value": null
+        },
         {
           "text": "click tab \"Inbox\"",
           "action": "click",
@@ -1957,10 +2040,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Inbox\"",
+          "text": "expect text \"Asks: Which layout should the release notes use?\"",
           "action": "expect",
-          "by": "heading",
-          "name": "Inbox",
+          "by": "text",
+          "name": "Asks: Which layout should the release notes use?",
+          "value": null
+        },
+        {
+          "text": "click button \"One flat list\"",
+          "action": "click",
+          "by": "button",
+          "name": "One flat list",
+          "value": null
+        },
+        {
+          "text": "expect text \"Answered “One flat list”*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Answered “One flat list”*",
           "value": null
         }
       ],
@@ -1986,8 +2083,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-telemetry#agent-turn-spans",
       "plugin": "agent-telemetry",
       "id": "agent-turn-spans",
-      "title": "GenAI spans for every agent turn",
-      "summary": "Each DSH turn becomes enter_ai_application_system → invoke_agent <agent> → react step → chat <model> and execute_tool <tool> spans with the GenAI semantic-convention attributes LoongSuite emitted (gen_ai.*, dsh.session.id/turn/step), exported through dshx tracing to the OTLP end…",
+      "title": "Traces for every agent turn",
+      "summary": "Each agent turn records a trace of its model and tool calls for the Traces page or your own collector.",
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [
@@ -2056,7 +2153,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-telemetry",
       "id": "nested-tool-spans",
       "title": "Plugin work nests under the tool and model call that caused it",
-      "summary": "The tools/execute wrapper runs every agent tool body with its execute_tool span active, and the llm/stream interceptor pulls every model chunk with its chat span active, so dshx API dispatches, jj runs, secret lookups, Jev and multi-host calls land in the same trace without per-…",
+      "summary": "Work that a tool call triggers shows up nested under that call in the same trace.",
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
@@ -2068,7 +2165,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-telemetry",
       "id": "subagent-traces",
       "title": "Subagents join their parent's trace",
-      "summary": "A subagent session's turns are parented under the parent's subagent/subagent_fork/workflow tool span: the span active where DSH started the turn, else the one active when the session was created, else the parent's running delegation tool, else the parent's turn. dsh.trace.parent…",
+      "summary": "A subagent's turns appear inside its parent's trace.",
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
@@ -2079,8 +2176,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-telemetry#auxiliary-and-wait-spans",
       "plugin": "agent-telemetry",
       "id": "auxiliary-and-wait-spans",
-      "title": "Purpose model calls and wait spans",
-      "summary": "Model calls with a purpose (session-title, compaction) and any model call outside a step become chat spans with dsh.llm.purpose; compaction, approval waits, model retry waits and background jobs get spans from their DSH events, and input spliced into a running turn is counted on…",
+      "title": "Spans for side model calls and waits",
+      "summary": "Title and compaction calls, approval waits, retries and background jobs get spans of their own.",
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
@@ -2092,7 +2189,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-telemetry",
       "id": "content-capture",
       "title": "Metadata only unless content capture is switched on",
-      "summary": "No prompt, reply, system prompt, tool argument or tool result leaves the Host by default. The captureContent setting (or OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY|SPAN_AND_EVENT while it follows the environment) puts them on spans as GenAI JSON, each value cut…",
+      "summary": "Traces carry no prompts or replies unless you turn on content capture in Settings.",
       "destination": "none",
       "currentSurface": "settings: Agent telemetry › capture content",
       "reach": [],
@@ -2104,7 +2201,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-telemetry",
       "id": "span-cost",
       "title": "List-price cost on model spans",
-      "summary": "Each chat span with token usage carries dshx.cost.usd and dshx.cost.price_id, and invoke_agent the sum of its turn's calls, priced from AI Accounts' models.dev catalog and account kinds by the same pricing code as the usage ledger. An unpriced route leaves the attribute off.",
+      "summary": "Each model call in a trace shows its list-price cost when the model has a known price.",
       "destination": "none",
       "currentSurface": "host: OTel spans (read in transcript: Traces view)",
       "reach": [
@@ -2123,10 +2220,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -2145,7 +2249,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-toolkit",
       "id": "agent-toolkit-page",
       "title": "Agent toolkit page",
-      "summary": "A main panel (sidebar → Agent Toolkit: Capabilities; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and setting…",
+      "summary": "See every tool, skill, plugin and MCP server the agent can use in a thread.",
       "destination": "thread-panel",
       "currentSurface": "left-nav: Agent Toolkit: Capabilities",
       "reach": [
@@ -2164,10 +2268,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -2215,10 +2319,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -2296,10 +2400,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -2318,7 +2422,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-toolkit",
       "id": "thread-context-facet",
       "title": "See what a thread loads into its context",
-      "summary": "The thread panel Context tab lists what is loaded for the thread on the stage, each with an estimated token cost at four characters per token: the AGENTS.md-compatible instruction files DSH's own loader finds for its folder, the agent that started it, the memory start block, the…",
+      "summary": "The Context tab lists what a thread loads into its context, with an estimated token cost for each.",
       "destination": "thread-panel",
       "currentSurface": "thread panel: Context tab",
       "reach": [
@@ -2379,8 +2483,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agents#agent-registry",
       "plugin": "agents",
       "id": "agent-registry",
-      "title": "Manage persistent agents",
-      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable…",
+      "title": "Manage agents",
+      "summary": "Create, edit and remove agents with their own instructions, model and tools, shared by every browser.",
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "reach": [
@@ -2444,11 +2548,73 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       }
     },
     {
+      "key": "agents#agent-colour",
+      "plugin": "agents",
+      "id": "agent-colour",
+      "title": "Colour an agent",
+      "summary": "Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents",
+      "reach": [
+        {
+          "text": "click button \"Agents\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Luna\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Luna"
+        },
+        {
+          "text": "expect radiogroup \"Colour\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Colour",
+          "value": null
+        },
+        {
+          "text": "click radio \"Violet\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Violet",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "agents#agent-mentions",
       "plugin": "agents",
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists e…",
+      "summary": "Start a thread on an agent by typing its @handle at the start of your message.",
       "destination": "composer",
       "currentSurface": "composer: @agent mention",
       "reach": [
@@ -2481,7 +2647,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
-      "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instr…",
+      "summary": "Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.",
       "destination": "agents",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), agent kind",
       "reach": [
@@ -2599,7 +2765,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "agent-tool-access",
       "title": "An agent decides its threads' tools",
-      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched…",
+      "summary": "Each agent says which tools its threads get, and a thread takes its own agent, its parent's, its project's default or @dsh.",
       "destination": "none",
       "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree",
       "reach": [],
@@ -2611,7 +2777,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "subagent-agents",
       "title": "A subagent starts as a configured agent",
-      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own age…",
+      "summary": "A subagent can start as a configured agent, limited to the agents its caller allows.",
       "destination": "none",
       "currentSurface": "host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools",
       "reach": [],
@@ -2623,7 +2789,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "agent-tools-tree",
       "title": "Choose an agent's tools, subagents and projects",
-      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through too…",
+      "summary": "Pick the tools an agent's threads get and pin the ones they need from the start, like VS Code's Configure Tools.",
       "destination": "agents",
       "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
       "reach": [
@@ -2798,7 +2964,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "composer-agent",
       "title": "Start a new thread as the project's default agent",
-      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the pers…",
+      "summary": "A new thread starts as its project's default agent, and the chip beside the composer's tools switches or sets it.",
       "destination": "composer",
       "currentSurface": "composer: new-thread agent chip",
       "reach": [
@@ -2919,7 +3085,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agents",
       "id": "thread-tools",
       "title": "See and switch a running thread's tools",
-      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread…",
+      "summary": "A running thread shows which agent decides its tools and can switch to another agent's tools or to every tool.",
       "destination": "composer",
       "currentSurface": "composer: Tools control",
       "reach": [
@@ -3064,8 +3230,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agentsview#agent-sessions-panel",
       "plugin": "agentsview",
       "id": "agent-sessions-panel",
-      "title": "Agent CLI sessions browser",
-      "summary": "One page lists the sessions other agent CLIs recorded on this machine (Claude Code under ~/.claude/projects, Codex under ~/.codex/sessions), newest first, with title, working directory, branch, prompts, tool calls and token totals; filters them by agent and text, searches their…",
+      "title": "Claude Code and Codex history",
+      "summary": "Browse what Claude Code and Codex recorded on this machine and read any run as a transcript.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Agent CLI threads",
       "reach": [
@@ -3133,8 +3299,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ai-accounts#disabled-account-preview",
       "plugin": "ai-accounts",
       "id": "disabled-account-preview",
-      "title": "Keep disabled accounts visible and toggle routing from the usage popover",
-      "summary": "Disabled saved accounts keep their measured quota percentage and reset time in muted grey, with a compact OFF label beneath the name, without increasing the preview row height. Clicking still opens the usage popover, where each account has an Enable account toggle using the same…",
+      "title": "Turn an account on or off from the usage popover",
+      "summary": "Turned-off accounts stay visible in the usage strip, and the usage popover turns each one back on.",
       "destination": "none",
       "currentSurface": "status-strip: Quota popover",
       "reach": [
@@ -3167,8 +3333,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ai-accounts#thread-account-switch",
       "plugin": "ai-accounts",
       "id": "thread-account-switch",
-      "title": "Use a sidebar account for this thread without reselecting its model",
-      "summary": "Right-click a sidebar account to preview a thread-only selection. Keep the exact model when offered, otherwise use the deployment default if offered or the target's preferred available model, shown explicitly. Preserve compatible reasoning effort, the active request and the glob…",
+      "title": "Use another account for this thread",
+      "summary": "Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.",
       "destination": "composer",
       "currentSurface": "status-strip: Quota › Use this account for this thread",
       "reach": [
@@ -3209,10 +3375,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "quick-account-setup",
       "title": "Connect an account without leaving the chat",
-      "summary": "Minimal provider dialogs show common sign-in choices, with named credentials and custom CLI homes under More options. A pencil edits the provisional new-account name without changing route identity or restarting authentication. New profiles remain outside saved accounts and mode…",
+      "summary": "Sign in to a provider from a short dialog without leaving the thread.",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account",
       "reach": [
+        {
+          "text": "click group \"AI accounts usage*\"",
+          "action": "click",
+          "by": "group",
+          "name": "AI accounts usage*",
+          "value": null
+        },
         {
           "text": "click button \"Add AI account\"",
           "action": "click",
@@ -3235,8 +3408,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ai-accounts#active-chat-account",
       "plugin": "ai-accounts",
       "id": "active-chat-account",
-      "title": "See which account serves the active chat",
-      "summary": "Sidebar meters highlight actual wire-account metadata for the foreground chat, following distribution and failover. Idle chats show the last successful account; unknown sources are never inferred from model selection.",
+      "title": "See which account serves this thread",
+      "summary": "The usage strip highlights the account the open thread is using right now.",
       "destination": "none",
       "currentSurface": "status-strip: Quota meters",
       "reach": [
@@ -3262,8 +3435,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ai-accounts#account-lifecycle",
       "plugin": "ai-accounts",
       "id": "account-lifecycle",
-      "title": "Manage provider account drafts",
-      "summary": "Edit and persist saved account settings; confirm removals, preserve an existing profile when removal is cancelled, and retry failed writes. New accounts use provisional setup and are saved only after connection succeeds.",
+      "title": "Edit and remove accounts",
+      "summary": "Edit an account's settings or remove it, and a new account is saved only once it signs in.",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts",
       "reach": [
@@ -3310,7 +3483,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "reference-dashboard",
       "title": "Manage account Models, Settings and Usage",
-      "summary": "Reference-faithful account rail and tabbed detail with inline rename, observed connection state, model reasoning/visibility/inheritance, same-provider priority, confirmed scoped sign-out, and real exact-account request analytics. While @dshfiles/usage runs, the account Usage tab…",
+      "summary": "Each account has Models, Settings and Usage tabs, with rename and sign-out.",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs",
       "reach": [
@@ -3351,7 +3524,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "antigravity-accounts",
       "title": "Use a Google AI plan through the Antigravity CLI",
-      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in to…",
+      "summary": "Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account › Antigravity",
       "reach": [
@@ -3392,7 +3565,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "vibe-cli-route",
       "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
-      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key req…",
+      "summary": "Use the Vibe and Studio allowance of a signed-in Mistral Vibe login by running the official Vibe CLI for a thread.",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account › Vibe CLI",
       "reach": [
@@ -3418,10 +3591,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Copy Vibe sign-in command\"",
+          "text": "expect button \"Copy CLI sign-in command\"",
           "action": "expect",
           "by": "button",
-          "name": "Copy Vibe sign-in command",
+          "name": "Copy CLI sign-in command",
           "value": null
         }
       ],
@@ -3433,7 +3606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "vibe-acp-bridge",
       "title": "Run Vibe with DSH's tools through its ACP server",
-      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes an ACP tool update before invoking MCP; only the held MCP request becomes a native DSH call. The native executor applies the calling se…",
+      "summary": "Let a Vibe thread call DSH tools, and answer its own edits and commands with the thread approval policy.",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge",
       "reach": [
@@ -3460,7 +3633,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failo…",
+      "summary": "Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models",
       "reach": [
@@ -3508,7 +3681,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting…",
+      "summary": "See each account's quota, when it resets and when it was last read, with Refresh and Retry.",
       "destination": "observe",
       "currentSurface": "status-strip: Quota › usage popover",
       "reach": [
@@ -3542,7 +3715,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "strip-short-names",
       "title": "Short names in the sidebar usage strip",
-      "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
+      "summary": "Show or hide the short name beside each meter in the usage strip, and set each account's short name.",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › strip short names",
       "reach": [
@@ -3583,7 +3756,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
-      "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, apply explicit price overrides, and estimate composer and completed-turn costs without persisting provider response payloads. The history view is Observe › Usage › Quota › History while @dshfiles/usag…",
+      "summary": "Chart past usage and cost, set your own prices, and see what a draft or a turn costs.",
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Usage history",
       "reach": [
@@ -3682,8 +3855,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ai-accounts#quota-forecast",
       "plugin": "ai-accounts",
       "id": "quota-forecast",
-      "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
-      "summary": "Observe › Usage › Quota › Forecast (the former AI Accounts: Quota forecast page, still its own page when @dshfiles/usage is not loaded) projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with…",
+      "title": "Forecast when each account runs out",
+      "summary": "See when each account will run out at the current pace and which account to use next.",
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Quota forecast",
       "reach": [
@@ -3797,7 +3970,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "extra-usage-guard",
       "title": "Stop at the plan limits instead of drawing paid extra usage",
-      "summary": "A provider that reports extra usage (Claude's pay-as-you-go spend past the plan) gets a per-account “Use extra usage” switch on its usage card and in AI Accounts settings, off by default. With it off, a reading that spends the session or weekly plan window blocks the account: re…",
+      "summary": "Off by default: an account stops at its plan limit instead of paying for extra usage.",
       "destination": "none",
       "currentSurface": "status-strip: Quota popover › account card › Use extra usage",
       "reach": [],
@@ -3809,7 +3982,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "luna-reserve-routing",
       "title": "Route exhausted Luna accounts through Reserve",
-      "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",
+      "summary": "Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
       "reach": [],
@@ -3821,7 +3994,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "failure-recovery",
       "title": "Recover failed account requests per failure kind",
-      "summary": "Retry, Luna Reserve, fail over to a compatible account, wait, shrink re-sent images, then fail or hand to DSH, configured per failure kind.",
+      "summary": "Choose what happens when a request fails: retry, switch account, wait, or stop.",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
       "reach": [],
@@ -3833,7 +4006,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset — or on a 30 s to 10 min growing backoff when the provi…",
+      "summary": "A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.",
       "destination": "inbox",
       "currentSurface": "transcript: usage-limit turn tail › Resume",
       "reach": [],
@@ -3845,7 +4018,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "credential-recovery",
       "title": "Open credential setup from failed turns",
-      "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
+      "summary": "A turn that failed on missing or rejected credentials links straight to AI Accounts.",
       "destination": "transcript",
       "currentSurface": "transcript: failed turn › Open AI Accounts",
       "reach": [
@@ -3878,17 +4051,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Add or fix credentials\"",
+          "text": "expect button \"Connect an account\"",
           "action": "expect",
           "by": "button",
-          "name": "Add or fix credentials",
+          "name": "Connect an account",
           "value": null
         },
         {
-          "text": "click button \"Add or fix credentials\"",
+          "text": "click button \"Connect an account\"",
           "action": "click",
           "by": "button",
-          "name": "Add or fix credentials",
+          "name": "Connect an account",
           "value": null
         },
         {
@@ -3914,7 +4087,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "stalled-stream-recovery",
       "title": "Explain turns stopped by a stalled model stream",
-      "summary": "When a model sends no data until its idle timeout and the retries run out, the failed turn says how long it stayed silent and how to recover: Resume, another model, or the stalled-stream fallback.",
+      "summary": "A turn whose model went silent says for how long and offers Resume or another model.",
       "destination": "transcript",
       "currentSurface": "transcript: failed turn › stalled-stream advice",
       "reach": [
@@ -3955,29 +4128,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "stalled-stream-fallback-setting",
       "title": "Turn on the fallback chain for stalled streams",
-      "summary": "A transport Failure recovery switch that lets a stalled stream walk the thread's model fallback chain under any distribution.",
+      "summary": "Let a stalled model fall back to the thread's next model.",
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › Failure recovery › Fall back on stalled streams",
       "reach": [
         {
-          "text": "click text \"More\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
-          "by": "text",
-          "name": "More",
+          "by": "button",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click text \"Settings\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: AI accounts\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: AI accounts"
+        },
+        {
+          "text": "click option \"Settings: AI accounts*\"",
           "action": "click",
-          "by": "text",
-          "name": "Settings",
+          "by": "option",
+          "name": "Settings: AI accounts*",
           "value": null
         },
         {
-          "text": "click text \"AI Accounts\"",
+          "text": "click button \"Edit failure handling\"",
           "action": "click",
-          "by": "text",
-          "name": "AI Accounts",
+          "by": "button",
+          "name": "Edit failure handling",
           "value": null
         },
         {
@@ -4003,7 +4183,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "quota-inbox-items",
       "title": "Quota-blocked threads in the Inbox, resumable in place",
-      "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses…",
+      "summary": "A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › ai-accounts.quota-continuation",
       "reach": [
@@ -4045,7 +4225,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "idle-cache-warning",
       "title": "Warn before re-sending an idle thread past its prompt-cache lifetime",
-      "summary": "In the composer meter line, before the context ring, a chip appears once a long thread sat idle past its provider prompt-cache lifetime (Anthropic 5 min, OpenAI and Codex 10 min, or a per-route setting): \"cache expired · next send ≈$0.45\". Its popover gives the idle time, the pr…",
+      "summary": "After a long pause, a chip warns that the next message costs more because the prompt cache expired.",
       "destination": "composer",
       "currentSurface": "composer: meter line",
       "reach": [
@@ -4079,7 +4259,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "annotations",
       "id": "pick-element",
       "title": "Pick an element and add it to the draft",
-      "summary": "Pick an element in DSH, write a bounded note, and insert a source-linked block into the composer draft without sending it.",
+      "summary": "Pick an element on the page, write a note and add it to your draft.",
       "destination": "composer",
       "currentSurface": "composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open",
       "reach": [
@@ -4186,7 +4366,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "annotations",
       "id": "backlog-composers",
       "title": "Annotate from Backlog composers",
-      "summary": "The element picker joins the Backlog capture box, item descriptions and replies through the ComposerTool contract, with annotations scoped to the item or capture box, so a note can be picked, reviewed and sent from a discussion.",
+      "summary": "Pick and annotate elements from Backlog's capture box, descriptions and replies too.",
       "destination": "composer",
       "currentSurface": "Backlog composer: Annotate an element",
       "reach": [
@@ -4277,7 +4457,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "annotations",
       "id": "source-resolution",
       "title": "Resolve an element to its source",
-      "summary": "Map a captured CSS class or exact visible text to a file and line inside an owned plugin bundle through its client source map.",
+      "summary": "The agent finds the file and line behind a picked element.",
       "destination": "none",
       "currentSurface": "agent tool: annotations_source",
       "reach": [],
@@ -4288,8 +4468,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "annotations#extension-intake",
       "plugin": "annotations",
       "id": "extension-intake",
-      "title": "Intake annotations from the browser extension",
-      "summary": "Pair a pinned-origin browser extension through a two-minute single-use window, then accept its annotations over a token-authenticated loopback route and keep them unassigned until the user picks a thread.",
+      "title": "Receive annotations from the browser extension",
+      "summary": "Pair the browser extension for two minutes, then its annotations wait until you pick a thread.",
       "destination": "none",
       "currentSurface": "agent tool: annotations_intake (browser extension)",
       "reach": [],
@@ -4301,7 +4481,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "annotations",
       "id": "preview-file",
       "title": "Annotate an HTML preview",
-      "summary": "Open a workspace HTML file in a sandboxed, instrumented preview and annotate an element inside it with the file as its source.",
+      "summary": "Open an HTML file from the workspace in a safe preview and annotate an element in it.",
       "destination": "thread-panel",
       "currentSurface": "dialog: annotate an HTML preview",
       "reach": [],
@@ -4313,7 +4493,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "annotations",
       "id": "chrome-picker",
       "title": "Pick on any page in a DSH-owned Chrome",
-      "summary": "Launch a Chrome profile with a loopback debugging port, open a configured start URL, and inject the same bounded picker over the DevTools protocol — on the focused tab by default, or on a listed tab.",
+      "summary": "Open a separate Chrome window and pick elements on any page you load in it.",
       "destination": "composer",
       "currentSurface": "composer: ⋯ › Point at UI… › DSH-owned Chrome",
       "reach": [],
@@ -4324,8 +4504,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "apply-patch#apply-patch-tool",
       "plugin": "apply-patch",
       "id": "apply-patch-tool",
-      "title": "Edit a file the Agent inspected without the native read tool",
-      "summary": "The apply_patch agent tool reads the file itself, records that read on the Host's observation policy, applies literal replacements in order with a whitespace-tolerant fallback, and writes once; it never creates a file.",
+      "title": "Edit a file with literal replacements",
+      "summary": "The agent edits an existing file by replacing exact text, and never creates a new one.",
       "destination": "none",
       "currentSurface": "agent tool: apply_patch",
       "reach": [],
@@ -4337,7 +4517,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "attachment-gallery",
       "id": "image-gallery-navigation",
       "title": "Navigate image previews",
-      "summary": "Open a draft image or an image of a sent message and move among all images of that draft or message with left/right keyboard controls or the thumbnail strip.",
+      "summary": "Open an image and move through the others in the same draft or message with arrow keys or thumbnails.",
       "destination": "transcript",
       "currentSurface": "transcript: image previews (and composer attachments)",
       "reach": [
@@ -4542,8 +4722,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "background-jobs#jobs-board",
       "plugin": "background-jobs",
       "id": "jobs-board",
-      "title": "Cross-Session background jobs board",
-      "summary": "The Jobs tab of Observe › Processes: One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
+      "title": "Background jobs across threads",
+      "summary": "The Jobs tab in Processes lists every background job of every thread, running or finished.",
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs",
       "reach": [
@@ -4612,7 +4792,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "background-jobs",
       "id": "batch-stop-jobs",
       "title": "Stop a selection of running jobs",
-      "summary": "Running rows carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible running rows, and stopping the selection goes through one confirmation that names the count. Each kill still passes the registry's owner fence.",
+      "summary": "Select several running jobs and stop them with one confirmation.",
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs › batch stop",
       "reach": [
@@ -4646,7 +4826,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "background-jobs",
       "id": "outlived-jobs",
       "title": "Jobs that outlived their turn",
-      "summary": "A running job whose owner thread no longer runs a turn (finished, settled or archived) carries an \"outlived its turn\" badge with the time that was first seen, beside its Stop, on Observe › Processes and in the thread's Jobs facet; board rows expose it as `outlivedSince` to `back…",
+      "summary": "A job still running after its turn ended is marked, and after two hours it is stopped.",
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs › outlived its turn",
       "reach": [
@@ -4700,8 +4880,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "background-jobs#processes-page",
       "plugin": "background-jobs",
       "id": "processes-page",
-      "title": "Observe › Processes: jobs, dev servers and RAM on one page",
-      "summary": "One Processes page (docs/ade-ux §6 \"Processes in 3 boards\") owned by background-jobs: Jobs, then the tabs other plugins add through the `@dshfiles/background-jobs/process-views` registry (Dev servers from preview, RAM from worktree-memory). Its navigation glyph carries their mar…",
+      "title": "Processes: jobs, dev servers and RAM",
+      "summary": "One Processes page holds jobs, dev servers and RAM, each in its own tab.",
       "destination": "observe",
       "currentSurface": "observe: Processes",
       "reach": [
@@ -4763,8 +4943,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "background-jobs#thread-jobs-facet",
       "plugin": "background-jobs",
       "id": "thread-jobs-facet",
-      "title": "Thread panel Jobs facet",
-      "summary": "A Jobs tab in the thread panel (the right pane's tab chooser): this thread's background jobs with output and Stop, then each Processes view that can filter to one thread (its dev servers, the RAM its process trees use), and a link to Observe › Processes. Registered as a right-pa…",
+      "title": "Jobs tab in the thread panel",
+      "summary": "The thread panel's Jobs tab shows this thread's jobs, dev servers and RAM, with Stop.",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Jobs",
       "reach": [
@@ -4805,9 +4985,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "background-jobs",
       "id": "transcript-job-preview",
       "title": "Live job preview in the transcript and above the composer",
-      "summary": "Under the tool card that started a background job, and above the composer while it runs, an expandable preview shows the job's lifecycle, progress and elapsed time and streams its output while open, with Stop behind a confirmation, the owning thread and a way to Processes.",
+      "summary": "A running job is one row above the composer, and its card moves under its tool call once it finishes.",
       "destination": "transcript",
-      "currentSurface": "transcript: under the tool card that started the job; composer dock while it runs",
+      "currentSurface": "composer dock while it runs; transcript: under the tool card that started the job once it finished",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -4860,7 +5040,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "capture-and-triage",
       "title": "Capture anything and let it sort itself",
-      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project. With its setting on, an image-only capture is named by the vision model of the tr…",
+      "summary": "Type anything into one capture box, and its kind, title, tags and links are worked out for you.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog",
       "reach": [
@@ -4879,6 +5059,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4890,6 +5077,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -4907,6 +5101,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4921,6 +5122,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4928,10 +5136,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click button \"Triage\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "Triage",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -4986,6 +5201,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -4993,13 +5215,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5007,13 +5243,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Board\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Board\"",
+          "action": "click",
+          "by": "option",
           "name": "Board",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5021,13 +5271,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Projects\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Projects\"",
+          "action": "click",
+          "by": "option",
           "name": "Projects",
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -5035,10 +5299,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click combobox \"Backlog view\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Triage\"",
+          "action": "click",
+          "by": "option",
+          "name": "Triage",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "New",
           "value": null
         },
         {
@@ -5083,7 +5361,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "jev-settings",
       "title": "Configure Jev from the Backlog panel",
-      "summary": "Configure the backlog's Jev switch, automatic triage and TypeSafe secret reference in a dedicated panel tab; the same settings remain available in DSH Settings.",
+      "summary": "Set up Jev, automatic triage and its key from a tab in the Backlog panel or in Settings.",
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings",
       "reach": [
@@ -5102,10 +5380,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -5152,7 +5437,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status…",
+      "summary": "The feed shows pinned items, then recent activity, and items left idle sink out of the way.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Feed",
       "reach": [
@@ -5168,6 +5453,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -5320,6 +5612,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Feed item to close\"",
           "action": "fill",
           "by": "textbox",
@@ -5348,9 +5647,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -5453,7 +5759,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "inline-title-edit",
       "title": "Rename an item in place",
-      "summary": "Double-clicking an item in the feed, an Items row or a board card swaps its title for an inline editor; Enter or a click elsewhere saves, Escape leaves the item untouched, and the quick gesture never opens the peek or card detail.",
+      "summary": "Double-click an item's title to rename it in place, Enter to save and Escape to cancel.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › rows",
       "reach": [],
@@ -5465,7 +5771,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
-      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or…",
+      "summary": "See items on a board by status, link them to threads, revisions and other items, and read their history.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Board / item detail",
       "reach": [
@@ -5481,6 +5787,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -5505,10 +5818,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"b:#1\"",
+          "text": "click article \"Item b:#1\" at 8,8",
           "action": "click",
-          "by": "text",
-          "name": "b:#1",
+          "by": "article",
+          "name": "Item b:#1",
           "value": null
         },
         {
@@ -5625,7 +5938,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "board-column-preferences",
       "title": "Customize Backlog board columns",
-      "summary": "Reorder or hide status columns on the board without changing item states; the preference stays in this browser across Host restarts, and the Items view still contains every item.",
+      "summary": "Reorder or hide board columns in this browser without changing any item.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Board › Configure board columns",
       "reach": [
@@ -5673,7 +5986,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
-      "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and…",
+      "summary": "Select items with Shift and Cmd clicks, then edit or move them all at once.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › rows",
       "reach": [
@@ -5689,6 +6002,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -5812,7 +6132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "selection-context-menu",
       "title": "Apply every context-menu action to the selection",
-      "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links (Copy submenu), status, kind, attention, project, pin, triage and permanent deletion, which confir…",
+      "summary": "Right-click a selected item to apply an action to the whole selection.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › row menu",
       "reach": [
@@ -5828,6 +6148,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -5966,6 +6293,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -6043,7 +6377,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "auto-triage",
       "title": "Triage new items automatically",
-      "summary": "With autoTriage on, each capture is triaged in the background and keeps the status it was captured with: Jev answers whether it is work to do (only when no kind was chosen) and whether it repeats the closest open item, and a configured cheap model, when set, is the sole judge an…",
+      "summary": "Each new item can be sorted in the background, with its kind, title, tags and duplicates suggested.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture",
       "reach": [],
@@ -6055,7 +6389,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "backfill-triage",
       "title": "Backfill triage on items captured before it was set up",
-      "summary": "Triage only runs on capture, so the wand in the panel header backfills it: the oldest inbox/todo tasks no triage has looked at yet, 25 per run, one at a time. The dialog reports what it applied, left as suggestions, found unchanged and how many items remain, so a second run cont…",
+      "summary": "Triage older items in batches of 25 from the wand in the Backlog header.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Backfill triage",
       "reach": [
@@ -6074,6 +6408,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -6081,9 +6422,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backfill triage\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Backfill triage\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Backfill triage",
           "value": null
         },
@@ -6118,6 +6466,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -6125,9 +6480,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backfill triage\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Backfill triage\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Backfill triage",
           "value": null
         },
@@ -6146,7 +6508,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
-      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished tu…",
+      "summary": "Items move on their own when a thread mentions them, a revision closes them or a turn gets stuck.",
       "destination": "none",
       "currentSurface": "host: thread and revision signals",
       "reach": [],
@@ -6158,7 +6520,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; …)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the sa…",
+      "summary": "Type @b: in the composer to mention a backlog item, or drag an item's label into a thread.",
       "destination": "composer",
       "currentSurface": "composer: @b: mentions",
       "reach": [],
@@ -6173,7 +6535,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "backlinks",
       "title": "See the backlog items that link to a thread or revision",
-      "summary": "A thread's header ⋯ menu has Linked backlog items (N) when items link to it; its submenu lists each item by title and reference, and choosing one opens it in Backlog. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commi…",
+      "summary": "A thread or revision lists the backlog items that link to it.",
       "destination": "work",
       "currentSurface": "thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections)",
       "reach": [],
@@ -6185,7 +6547,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "quote-reply",
       "title": "Quote a finished reply into a new backlog item",
-      "summary": "A finished reply's More actions menu offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capt…",
+      "summary": "Turn a finished reply into a backlog item from its More actions menu.",
       "destination": "work",
       "currentSurface": "conversation.chat.assistant-actions: Add to backlog",
       "reach": [],
@@ -6197,7 +6559,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "reference-preview",
       "title": "Preview a referenced item from a conversation",
-      "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnail…",
+      "summary": "Click a backlog item reference in a thread to preview the item without leaving.",
       "destination": "work",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), backlog kind",
       "reach": [
@@ -6235,6 +6597,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
         },
         {
           "text": "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
@@ -6413,7 +6782,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "search-and-views",
       "title": "Search with reasons and saved views",
-      "summary": "Relevance-ranked search (a trigram index narrows which items are scored; ranking is the token scorer's) over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators, `created:` for who captu…",
+      "summary": "Search items with filters, see why each result matched, and save the views you use.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › search",
       "reach": [],
@@ -6424,10 +6793,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#attention-inbox",
       "plugin": "backlog",
       "id": "attention-inbox",
-      "title": "Attention Inbox across items and threads",
-      "summary": "A filter view of open backlog items: attention, triage suggestions and (setting inboxThreads) linked unread thread reasons, with separate open and acknowledge actions for every thread. Filters and counts use unique items. It keeps no counter of its own: the view tab carries no b…",
+      "title": "Items that need you",
+      "summary": "A filtered view of open items that need you, with triage suggestions and unread linked threads.",
       "destination": "inbox",
-      "currentSurface": "left-nav: Backlog › Inbox filter (links to the Inbox)",
+      "currentSurface": "left-nav: Backlog › Triage view (links to the Inbox)",
       "reach": [
         {
           "text": "click tab \"Work\"",
@@ -6444,10 +6813,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click button \"Triage\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "Triage",
           "value": null
         },
         {
@@ -6481,10 +6850,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
-          "name": "Inbox",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Triage\"",
+          "action": "click",
+          "by": "option",
+          "name": "Triage",
           "value": null
         },
         {
@@ -6502,7 +6878,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "shared-activity",
       "title": "Backlog work in the Activity timeline",
-      "summary": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
+      "summary": "Backlog changes show up in the activity feed alongside thread events.",
       "destination": "none",
       "currentSurface": "host: backlog.* events into left-nav: Activity Timeline: Activity",
       "reach": [],
@@ -6514,7 +6890,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "rich-capture",
       "title": "A chat-sized capture box with files, properties and references",
-      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, or links a backlog item or a thread; the project chip picks the item's project (see project-scope); status and kind chips are editable before sending; images can be pasted, dropped or p…",
+      "summary": "The capture box takes files, images, voice and references, with project, status and kind set before you send.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture box",
       "reach": [
@@ -6530,6 +6906,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -6730,7 +7113,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "rich-item-text",
       "title": "Write descriptions and replies like a capture",
-      "summary": "The description and reply editor share mentions, Markdown, images and files; descriptions keep files and project references, and reply images stay on their comment. Smart routing uses Jev to send work to linked threads and generate AI answers for text-only discussion; answer aut…",
+      "summary": "Write descriptions and replies with mentions, Markdown, images and files, as in a capture.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail",
       "reach": [
@@ -6746,6 +7129,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -6925,7 +7315,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "project-scope",
       "title": "File and scope items by project",
-      "summary": "The searchable project filter selects several projects at once and presets the capture box when exactly one project is selected; project paths under a home directory display as `~/...`. The same single-project picker sets the project on the capture chip, on the item's details li…",
+      "summary": "File items under a project and filter every view by one project or several.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › project filter",
       "reach": [
@@ -6944,17 +7334,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
           "name": "Capture",
-          "value": null
-        },
-        {
-          "text": "expect combobox \"Filter by project\"",
-          "action": "expect",
-          "by": "combobox",
-          "name": "Filter by project",
           "value": null
         },
         {
@@ -6984,6 +7374,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "Escape"
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
         },
         {
           "text": "click combobox \"Filter by project\"",
@@ -7058,17 +7455,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
           "name": "Capture",
-          "value": null
-        },
-        {
-          "text": "expect combobox \"Filter by project\"",
-          "action": "expect",
-          "by": "combobox",
-          "name": "Filter by project",
           "value": null
         },
         {
@@ -7098,6 +7495,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "Escape"
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
         },
         {
           "text": "click combobox \"Filter by project\"",
@@ -7156,7 +7560,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "hide-agent-items",
       "title": "Hide items agents captured",
-      "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does on…",
+      "summary": "Hide items an agent captured that you never touched, with a count of what is hidden.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › header › Agent items",
       "reach": [
@@ -7172,6 +7576,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
           "value": null
         },
         {
@@ -7212,6 +7623,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Backlog view options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog view options",
+          "value": null
+        },
+        {
           "text": "click button \"Hide agent items\"",
           "action": "click",
           "by": "button",
@@ -7233,7 +7651,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "capture-project-target",
       "title": "File a thread capture under its project",
-      "summary": "A capture made from a jj thread workspace is filed under the project checkout that workspace was cut from, not under the workspace folder. The Host asks jj-integration which project owns the workspace, so a custom threads directory or a legacy workspace name folds the same way;…",
+      "summary": "An item captured from a thread's workspace is filed under that workspace's project.",
       "destination": "none",
       "currentSurface": "host: capture project resolution",
       "reach": [],
@@ -7245,7 +7663,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown f…",
+      "summary": "Right-click an item to start a linked thread, copy its link or change its status, kind or project.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Start thread",
       "reach": [
@@ -7264,6 +7682,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -7278,11 +7703,25 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"All statuses*\"",
+          "text": "click button \"Filter\"",
           "action": "click",
           "by": "button",
-          "name": "All statuses*",
+          "name": "Filter",
           "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"All*\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
@@ -7490,6 +7929,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "expect textbox \"Capture\"",
           "action": "expect",
           "by": "textbox",
@@ -7497,18 +7943,39 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
         {
-          "text": "click button \"All statuses*\"",
+          "text": "click button \"Filter\"",
           "action": "click",
           "by": "button",
-          "name": "All statuses*",
+          "name": "Filter",
           "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"All*\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
@@ -7532,9 +7999,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -7595,9 +8069,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Board\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Board\"",
+          "action": "click",
+          "by": "option",
           "name": "Board",
           "value": null
         },
@@ -7709,7 +8190,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "jev-secret-setup",
       "title": "Set up a missing Jev key from chat",
-      "summary": "When Jev is enabled but its Host-resolved key is missing or invalid, the chat turn tail offers an opt-in Secret Catalog form. Values stay on the Host and Backlog persists only the bound secret reference.",
+      "summary": "When Jev's key is missing, the thread offers a form to add it to your secrets.",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Set up missing secrets",
       "reach": [
@@ -7770,8 +8251,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#tweet-context-enrichment",
       "plugin": "backlog",
       "id": "tweet-context-enrichment",
-      "title": "Retrieve public tweet context into a backlog item",
-      "summary": "Capturing or editing tweet links automatically retrieves the first unimported public X post; older items can use the row-menu action. Text is quoted as untrusted content, images are saved as attachments, and repeated imports do not duplicate data.",
+      "title": "Bring a tweet's text into an item",
+      "summary": "A tweet link in an item brings in the post's text and images, once.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › row menu › tweet context",
       "reach": [
@@ -7780,6 +8261,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -7819,7 +8307,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "backlog-inbox-items",
       "title": "Backlog requests in the Inbox",
-      "summary": "Every open, unsnoozed backlog item whose attention is needs-input or blocked is a blocking Inbox item (Needs you); waiting is a ready item (Other). Each names the item as b:<id> with its last activity as detail. Clearing the attention, closing or snoozing the item resolves it. T…",
+      "summary": "Items that need input or are blocked show in the Inbox, and clearing them there resolves the item.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › backlog.attention",
       "reach": [
@@ -7835,6 +8323,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -7957,8 +8452,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#remote-sync",
       "plugin": "backlog",
       "id": "remote-sync",
-      "title": "Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider",
-      "summary": "Link an item to a remote item through any binding that serves its project, create one from it, or create one for each of several selected items at once, or unlink it from its row menu or its sync chips in the item detail; an item may be linked through several bindings, one chip…",
+      "title": "Sync items with Linear, GitHub Issues or Markdown files",
+      "summary": "Link items to Linear, GitHub Issues or Markdown files and keep the fields you choose in sync both ways.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips",
       "reach": [
@@ -7977,10 +8472,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8026,6 +8528,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Mirror this item in files\"",
           "action": "fill",
           "by": "textbox",
@@ -8061,8 +8570,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#remote-sync-settings",
       "plugin": "backlog",
       "id": "remote-sync-settings",
-      "title": "Configure remote sync connections and bindings, and import remote items",
-      "summary": "Backlog settings › Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked fro…",
+      "title": "Set up remote sync and import items",
+      "summary": "Add sync connections in Backlog settings, choose what syncs each way, and import remote items.",
       "destination": "settings",
       "currentSurface": "left-nav: Backlog: Items › Backlog settings › Remote sync",
       "reach": [
@@ -8081,10 +8590,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8195,10 +8711,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8293,7 +8816,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "secret-link-reveal",
       "title": "Reveal an item's secret link in place",
-      "summary": "An item that names a credential as `secret:ALIAS[@env]` shows a Reveal button beside that link in its Relationships. The Secret Catalog provides the control through the backlog's secret-link-reveal contract and reveals through its own reveal verb and policy (explicit click, hidd…",
+      "summary": "An item that names a secret shows a Reveal button beside it, and the value never reaches the backlog.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Relationships",
       "reach": [
@@ -8309,6 +8832,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8355,7 +8885,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "short-item-references",
       "title": "Name new items with a short alias",
-      "summary": "A new item is b:k3f9: four random Crockford characters with a letter, fixed for life and five once a fifth of the space is used. Legacy b:12 numbers keep resolving, digit-only means legacy, and every reference surface, search, signal and agent tool takes either form.",
+      "summary": "New items get a short name such as b:k3f9, and old numbered references still work.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog (every item label, reference card, mention chip and agent tool)",
       "reach": [
@@ -8371,6 +8901,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8403,7 +8940,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "revert-field-change",
       "title": "Revert a field change from the item history",
-      "summary": "Each field change under an event's Show changes has Revert: it writes the typed value the field held before, read from the op log, as a new change; a field that changed again since is refused with who changed it. Agents call backlog_revert only when the user asked, with `confirm…",
+      "summary": "Undo any field change from the item's history with Revert.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › activity › Show changes › Revert",
       "reach": [
@@ -8419,6 +8956,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8458,7 +9002,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "item-timeline-lanes",
       "title": "Conversation and work log in the item timeline",
-      "summary": "An item's activity reads in two lanes. The Conversation holds everything the user did and said, attention requests, reverts, comments carried over from Linear or GitHub, smart-reply answers and the agent comment that answers the user (the one right after their comment, or the fi…",
+      "summary": "An item's history shows the conversation first, with agent progress folded into one work log line.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Activity › Conversation / Work log",
       "reach": [
@@ -8474,6 +9018,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8555,7 +9106,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "agent-write-confirmation",
       "title": "Agents confirm bulk and destructive backlog writes",
-      "summary": "An agent call that reverts a field (backlog_revert), triages more than 5 items in one backfill (backlog_triage_backfill, 25 by default), or syncs every linked item (backlog_sync_now without an id) needs an explicit `confirm: true`, with no default; backlog_delete always needs it…",
+      "summary": "Agents must confirm before they revert, delete or change many items at once.",
       "destination": "none",
       "currentSurface": "agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete",
       "reach": [],
@@ -8566,8 +9117,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#export-backlog",
       "plugin": "backlog",
       "id": "export-backlog",
-      "title": "Export the backlog to JSONL or an SQLite copy",
-      "summary": "Backlog settings › Export… writes a new file on the Host: JSON Lines with one folded item per line (optionally the op log after it) or a consistent SQLite copy. A relative, existing or folderless path is refused, so nothing is overwritten. Agents call backlog_export.",
+      "title": "Export the backlog to a file",
+      "summary": "Export the backlog to a new JSON Lines or SQLite file from Backlog settings.",
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings › Export",
       "reach": [
@@ -8586,10 +9137,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8630,10 +9188,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -8658,7 +9223,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "shipped-digest",
       "title": "See what shipped per hour, day, week, month or year",
-      "summary": "The Shipped view lists items that reached done per period (Hour, Day, Week, Month, Year), newest first, as a timeline with each period's count and its change against the period before, grouped by project, each item with its kind, linked revisions and pull requests. Only items do…",
+      "summary": "The Shipped view lists what was done in each hour, day, week, month or year, grouped by project.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Shipped",
       "reach": [
@@ -8674,6 +9239,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -8812,6 +9384,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
           "action": "fill",
           "by": "textbox",
@@ -8840,9 +9419,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -8896,9 +9482,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Shipped\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Shipped\"",
+          "action": "click",
+          "by": "option",
           "name": "Shipped",
           "value": null
         },
@@ -8931,7 +9524,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "shipped-summary",
       "title": "Summarize a shipped period with the triage model",
-      "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings › Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items cha…",
+      "summary": "Ask the triage model to write a short summary of what shipped in a period.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Shipped › Summarize",
       "reach": [
@@ -8947,6 +9540,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9085,6 +9685,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
           "action": "fill",
           "by": "textbox",
@@ -9113,9 +9720,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Feed\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Feed\"",
+          "action": "click",
+          "by": "option",
           "name": "Feed",
           "value": null
         },
@@ -9169,9 +9783,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Shipped\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Shipped\"",
+          "action": "click",
+          "by": "option",
           "name": "Shipped",
           "value": null
         },
@@ -9204,7 +9825,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "item-priority",
       "title": "Set an item's priority",
-      "summary": "Every item has a Linear priority: none, urgent, high, medium or low. Set it from the row's priority glyph, the inspector, or the Priority submenu of any item menu (keys 0 to 4 while the menu is open), or write `!1` (urgent) to `!4` (low) anywhere in a capture. Items can be sorte…",
+      "summary": "Give an item a priority from urgent to low, then sort, group and search by it.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Items › priority column",
       "reach": [
@@ -9220,6 +9841,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9274,6 +9902,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!2 Priority demo\"",
           "action": "fill",
           "by": "textbox",
@@ -9288,9 +9923,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9309,7 +9951,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "sub-issues",
       "title": "Break an item into sub-issues with a progress roll-up",
-      "summary": "An item can sit under a parent as a sub-issue, three levels deep at most. The inspector lists sub-issues with a done/total progress bar, adds one with Sub-issue, and links back to the parent (Set parent takes a `b:<ref>`, the cross removes it). Rows and cards show the roll-up as…",
+      "summary": "Break an item into sub-issues, up to three levels deep, with a progress count on the parent.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Sub-issues",
       "reach": [
@@ -9325,6 +9967,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9390,6 +10039,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9442,7 +10098,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "ready-queue",
       "title": "Pull the next ready item from the Ready view",
-      "summary": "The Ready view lists open items (Inbox or Todo) that are not snoozed, wait on no open item (a `depends-on` link, or another item's `blocks` link), have no open sub-issue and are not claimed, grouped by priority, urgent first then oldest. `is:ready` and `is:blocked-by-deps` searc…",
+      "summary": "The Ready view lists open items nothing blocks, most urgent and oldest first.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Ready",
       "reach": [
@@ -9458,6 +10114,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9568,6 +10231,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"!1 Fix the login outage\"",
           "action": "fill",
           "by": "textbox",
@@ -9638,9 +10308,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Ready\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Ready\"",
+          "action": "click",
+          "by": "option",
           "name": "Ready",
           "value": null
         },
@@ -9658,8 +10335,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "backlog#agent-claims",
       "plugin": "backlog",
       "id": "agent-claims",
-      "title": "Agents claim items with a lease; you release them",
-      "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renew…",
+      "title": "Agents claim items while they work on them",
+      "summary": "An agent claims an item while it works on it, and the claim lapses when the agent goes idle.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Owner · Delegate › Release",
       "reach": [
@@ -9675,6 +10352,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9726,6 +10410,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9764,7 +10455,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "agent-run-state",
       "title": "See what the agent on an item is doing",
-      "summary": "Open items worked on by an agent thread (its delegate, else its most recent linked thread) show the agent's run state on rows, cards and the inspector: Working while its turn runs, Awaiting input when the turn stopped on a question, Error when it failed, Stale after half an hour…",
+      "summary": "Items an agent works on show whether that agent is working, waiting for you, failed or done.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Items, Board and item detail › agent chip",
       "reach": [
@@ -9780,6 +10471,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -9834,6 +10532,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Run state demo\"",
           "action": "fill",
           "by": "textbox",
@@ -9848,9 +10553,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -9869,7 +10581,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "acceptance-criteria",
       "title": "Check off acceptance criteria, write a plan and a final summary",
-      "summary": "An item carries an acceptance checklist that rolls up as 3/5 on the item and its row, a plan an agent writes and may ask the user to approve (the item asks for input until approved; only the user approves), and a final summary written when it closes, which the Shipped view and i…",
+      "summary": "Give an item a checklist, a plan the agent writes for your approval, and a final summary.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail",
       "reach": [
@@ -9885,6 +10597,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10009,6 +10728,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
           "action": "fill",
           "by": "textbox",
@@ -10023,9 +10749,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10114,7 +10847,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "capture-templates",
       "title": "Start a capture from a template",
-      "summary": "Named templates in Backlog settings (Bug report, Feature spec and Research question ship by default) carry a title prefix, kind, priority, tags, a body to fill in and acceptance criteria. A capture picks one with the Template chip, by writing /template <name> in its text, or wit…",
+      "summary": "Start a capture from a template such as Bug report, with its fields filled in.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture box",
       "reach": [
@@ -10130,6 +10863,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10191,6 +10931,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
           "action": "fill",
           "by": "textbox",
@@ -10205,9 +10952,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10233,7 +10987,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "due-dates",
       "title": "Give items a due date and see what is overdue",
-      "summary": "A date-only due date set from the item detail, the item menu, backlog_capture or backlog_update. Rows and cards show a chip that warns when it is close and turns red once an open item is past it; the list sorts by due date and groups into Overdue, Today, Next 7 days, Later and N…",
+      "summary": "Give an item a due date, and overdue items turn red and show in the Inbox.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail, Items, Inbox",
       "reach": [
@@ -10249,6 +11003,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10302,7 +11063,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "recurring-items",
       "title": "Repeat an item when it is done",
-      "summary": "An item with recurrence daily, weekly, monthly or cron:<expr> creates its next occurrence on the Host when it reaches done: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the previous due date and past today. The rule moves to…",
+      "summary": "Make an item repeat daily, weekly or monthly, so a new copy appears when it is done.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Repeat",
       "reach": [
@@ -10318,6 +11079,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10386,6 +11154,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Water the plants\"",
           "action": "fill",
           "by": "textbox",
@@ -10400,9 +11175,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10435,7 +11217,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "duplicate-merge",
       "title": "Merge duplicate items into one",
-      "summary": "Merge into… on the item menu (for one item or a selection) and on a triage duplicate suggestion, and backlog_merge (an agent must pass confirm: true), move each duplicate's comments (quoted, keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite li…",
+      "summary": "Merge duplicate items into one, keeping their comments, links and files.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item menu › Merge into…, triage duplicate suggestion",
       "reach": [
@@ -10451,6 +11233,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10518,7 +11307,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "gates-and-pull-requests",
       "title": "Wait on a PR, a revision, a check or a date, and see linked PRs live",
-      "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll caden…",
+      "summary": "Hold an item until a pull request merges, a revision lands, a check passes or a date arrives.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Waits on, Pull requests",
       "reach": [
@@ -10534,6 +11323,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10595,6 +11391,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Ship after the PR\"",
           "action": "fill",
           "by": "textbox",
@@ -10609,9 +11412,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10637,7 +11447,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "scheduled-rules",
       "title": "Schedule backlog rules as project automations",
-      "summary": "backlog_schedule_rule and Schedule nightly triage (item menu, project overview) create a project automation through the project-automations contract whose prompt calls backlog tools: triage runs backlog_triage_backfill and reports what still waits on the user; recreate captures…",
+      "summary": "Schedule nightly triage or other backlog rules as project automations.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item menu › Schedule nightly triage; Projects › overview",
       "reach": [
@@ -10653,6 +11463,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -10714,6 +11531,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
           "text": "fill textbox \"Capture\" \"Triage the inbox nightly\"",
           "action": "fill",
           "by": "textbox",
@@ -10728,9 +11552,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "click button \"Items\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Items\"",
+          "action": "click",
+          "by": "option",
           "name": "Items",
           "value": null
         },
@@ -10756,7 +11587,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "project-agent-guidance",
       "title": "Give agents per-project guidance",
-      "summary": "Each project can hold markdown guidance for agents, edited in the project overview or with backlog_set_project_guidance. A thread started from items opens its first message with their projects' guidance; backlog_get returns it with the item and backlog_ready with the queue. A th…",
+      "summary": "Write guidance for agents per project, and threads started from its items begin with it.",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Projects › project overview › Agent guidance",
       "reach": [
@@ -10812,9 +11643,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Projects\"",
+          "text": "click combobox \"Backlog view\"",
           "action": "click",
-          "by": "button",
+          "by": "combobox",
+          "name": "Backlog view",
+          "value": null
+        },
+        {
+          "text": "click option \"Projects\"",
+          "action": "click",
+          "by": "option",
           "name": "Projects",
           "value": null
         },
@@ -10829,11 +11667,73 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "backlog#tag-colors",
+      "plugin": "backlog",
+      "id": "tag-colors",
+      "title": "Choose a tag’s colour",
+      "summary": "Give a backlog tag one of the theme’s six identity colours, or return it to its default.",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › a tag chip on a feed row or in the item panel › Colour of #tag",
+      "reach": [
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Pay the invoice #billing\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Pay the invoice #billing"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"#billing colour\"",
+          "action": "click",
+          "by": "button",
+          "name": "#billing colour",
+          "value": null
+        },
+        {
+          "text": "expect radiogroup \"Colour of #billing\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Colour of #billing",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "backlog#peer-hosts",
       "plugin": "backlog",
       "id": "peer-hosts",
-      "title": "Share one backlog across Hosts",
-      "summary": "Every Host serves its op log read-only to peers (peerInfo, peerOpsSince after a cursor, peerFiles) and pulls each multi-host runtime turned on in Backlog settings › Hosts every peerPullSeconds, or now with Sync now or backlog_peer_sync. A Host serves every op it holds, so A ↔ B…",
+      "title": "Share one backlog across hosts",
+      "summary": "Turn on other hosts in Backlog settings to share and merge one backlog across them.",
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings › Hosts",
       "reach": [
@@ -10859,10 +11759,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -10881,7 +11788,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog-jira",
       "id": "jira-provider",
       "title": "Sync backlog items with a Jira Cloud project",
-      "summary": "Serves the backlog's backlog-provider Host API as the jira kind: a connection (site base URL, account email, API token reference) names the Atlassian account and discovers the projects it can browse; a binding to a project pulls issues changed since an updated checkpoint through…",
+      "summary": "Sync backlog items with a Jira Cloud project, both ways, through a remote sync connection.",
       "destination": "none",
       "currentSurface": "Backlog settings › Remote sync › Add Jira connection (rendered by @dshfiles/backlog)",
       "reach": [
@@ -10900,10 +11807,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -10922,7 +11836,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog-notion",
       "id": "notion-provider",
       "title": "Sync backlog items with a Notion data source",
-      "summary": "Serves the backlog's backlog-provider Host API as the notion kind: a connection names the integration's bot and discovers the data sources it can see; a binding to a data source (or a database with one data source) pulls pages changed since a last_edited_time checkpoint in pages…",
+      "summary": "Sync backlog items with a Notion database, both ways, through a remote sync connection.",
       "destination": "none",
       "currentSurface": "Backlog settings › Remote sync › Add Notion connection (rendered by @dshfiles/backlog)",
       "reach": [
@@ -10941,10 +11855,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog settings\"",
+          "text": "click button \"More backlog actions\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog settings",
+          "name": "More backlog actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
           "value": null
         },
         {
@@ -10962,8 +11883,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "btw#btw-side-chat",
       "plugin": "btw",
       "id": "btw-side-chat",
-      "title": "/btw side chat",
-      "summary": "/btw <question> forks the thread at its latest completed turn with the same model and route, asks the question there, and opens the fork in a right-sidebar tab where follow-ups continue. The fork is hidden from the thread sidebar and archived when its tab closes; the tab header…",
+      "title": "Side chat with /btw",
+      "summary": "Type /btw and a question to ask it in a side chat that forks this thread and opens beside it.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: btw tab",
       "reach": [],
@@ -10980,8 +11901,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "btw#btw-command-chip",
       "plugin": "btw",
       "id": "btw-command-chip",
-      "title": "Persisted /btw command chip",
-      "summary": "A draft whose leading token is /btw persists as a command chip: the composer's restore path resolves the claim through the trigger pipeline's matchClaim (the /btw source answers the same claim matchEnter would), so a reload rebuilds the chip with its hint instead of throwing ins…",
+      "title": "Keep a /btw draft after a reload",
+      "summary": "A draft that starts with /btw keeps its command chip when the page reloads.",
       "destination": "composer",
       "currentSurface": "composer: /btw chip",
       "reach": [],
@@ -10993,7 +11914,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "btw",
       "id": "btw-side-question-entry-points",
       "title": "Open a side question from the palette, a shortcut or the composer",
-      "summary": "Besides /btw, three ways open one “Ask a side question” dialog for the thread, which forks it as /btw does: the command palette action “Ask a side question (btw)” (for the open, unarchived thread); the btw.askSideQuestion shortcut (default Mod+Alt+/, rebindable in Settings › Sho…",
+      "summary": "Ask a side question from the command palette, a keyboard shortcut or a composer button too.",
       "destination": "none",
       "currentSurface": "palette: Ask a side question (btw)",
       "reach": [
@@ -11090,7 +12011,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "capabilities-hub",
       "id": "capabilities-hub",
       "title": "Open the manager for skills, MCP servers or plugins from one page",
-      "summary": "Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skil…",
+      "summary": "One Settings page counts your skills, MCP servers and plugins and opens the page that manages each.",
       "destination": "settings",
       "currentSurface": "rail: Settings › Capabilities hub (already on the rail)",
       "reach": [
@@ -11129,8 +12050,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "chat#resume-interrupted",
       "plugin": "chat",
       "id": "resume-interrupted",
-      "title": "Resume the latest stopped task",
-      "summary": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",
+      "title": "Resume the latest stopped turn",
+      "summary": "Resume a turn that a restart or a failed model request stopped.",
       "destination": "transcript",
       "currentSurface": "transcript: Resume beside a stopped task",
       "reach": [],
@@ -11142,7 +12063,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "retry-failed-turn",
       "title": "Retry a turn that failed before any reply",
-      "summary": "Retry replaces Resume beside the latest turn that stopped before the model replied (a sign-in, quota or transport failure): the same request runs again behind a compact notice instead of a continue prompt.",
+      "summary": "Retry a turn that failed before the model replied, such as a sign-in or usage limit failure.",
       "destination": "transcript",
       "currentSurface": "transcript: Retry beside a failed turn",
       "reach": [],
@@ -11154,7 +12075,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
-      "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
+      "summary": "A thread opens on its latest messages and loads older ones as you scroll up.",
       "destination": "transcript",
       "currentSurface": "transcript: windowed rendering",
       "reach": [
@@ -11181,7 +12102,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "image-links",
       "title": "Open image links in the gallery",
-      "summary": "Opening an image link or read_image path shows it in the shared gallery, with the clicked image selected; the gallery defaults to the current Turn and can be configured to include the entire thread.",
+      "summary": "Image links in a thread open in the gallery, starting on the image you clicked.",
       "destination": "transcript",
       "currentSurface": "transcript: image links",
       "reach": [
@@ -11215,7 +12136,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "focus-from-plugin",
       "title": "Scroll to a turn, step or tool call on request",
-      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the fo…",
+      "summary": "Other features can scroll the thread to a turn, step or tool call and highlight it.",
       "destination": "none",
       "currentSurface": "client: chat focus contract",
       "reach": [
@@ -11277,7 +12198,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "inline-references",
       "title": "Render inline references from other plugins",
-      "summary": "Other plugins add a matcher and a React renderer to the inline-reference registry (@dshfiles/chat/inline-references); Chat applies them to assistant Markdown text runs, inline code and the Referenced-session line while it renders, so `b:12`, `@{luna}`, `memory: n:3` or `jj:main`…",
+      "summary": "References such as b:12 or jj:main in a reply become links.",
       "destination": "none",
       "currentSurface": "client: inline-reference registry",
       "reach": [],
@@ -11289,7 +12210,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "code-fences",
       "title": "Render fenced code blocks from other plugins",
-      "summary": "Other plugins add a component for fence languages to the code-fence registry (@dshfiles/chat/code-fences); while Chat renders Markdown (assistant answers through InlineReferenceMarkdown; reasoning, compaction summaries and other plugins' Markdown through FencedMarkdown, @dshfile…",
+      "summary": "Code blocks in some languages, such as diagrams, render as live views.",
       "destination": "none",
       "currentSurface": "client: code-fence registry",
       "reach": [],
@@ -11301,7 +12222,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "folded-work",
       "title": "A finished turn folds its work under one Worked for row",
-      "summary": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any…",
+      "summary": "A finished turn folds its tool calls under one Worked for row, and failures stay visible.",
       "destination": "transcript",
       "currentSurface": "transcript: turn process row",
       "reach": [
@@ -11335,7 +12256,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "view-mode",
       "title": "Choose Summary, Normal or Verbose for tool work",
-      "summary": "Settings › General › View mode: Summary folds every turn’s tool work under one row, Normal folds finished turns, Verbose keeps every call open. Without a saved choice a touch phone gets Summary and other browsers Normal. The Agent reads it with transcript_view_get and sets or cl…",
+      "summary": "Choose in Settings whether tool work is folded always, only once a turn ends, or never.",
       "destination": "settings",
       "currentSurface": "settings: general › view mode",
       "reach": [
@@ -11369,7 +12290,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "find-in-thread",
       "title": "Find text anywhere in a long thread",
-      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for…",
+      "summary": "Press Cmd+F in a thread to find text anywhere in it, even in turns not loaded yet.",
       "destination": "transcript",
       "currentSurface": "transcript: find bar over the thread",
       "reach": [
@@ -11430,7 +12351,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "turn-map",
       "title": "Typed turn map with filters and Turn keys",
-      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edi…",
+      "summary": "The turn rail marks questions, failures, edits and where you stopped reading, and steps between them with filters or keys.",
       "destination": "transcript",
       "currentSurface": "transcript: turn rail and Turns sheet",
       "reach": [
@@ -11478,7 +12399,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "since-you-left",
       "title": "Since you left: divider and recap above the first unseen Turn",
-      "summary": "When a thread opens with Turns that finished while the user was away (its unread record, read before opening clears it), a divider marks the first unseen Turn and one card above it says what happened: \"3 turns · 7 files +120 −14 · 1 failed · 1 question waiting\", with chips that…",
+      "summary": "A card above the first turn you missed says what happened while you were away.",
       "destination": "transcript",
       "currentSurface": "transcript: divider above the first unseen Turn",
       "reach": [],
@@ -11490,7 +12411,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "run-folds",
       "title": "Runs of background jobs and subagents fold into one summary row",
-      "summary": "Two or more consecutive background-job or subagent rows fold into one row: \"4 background jobs · 1 failed · 2 running · 1 done · longest 4m 10s\", \"3 subagents · 2 working · 1 finished\", or one combined row when both kinds stand together. The row keeps live state (phase-synced spi…",
+      "summary": "Several background jobs or subagents in a row fold into one summary row that expands.",
       "destination": "transcript",
       "currentSurface": "transcript: summary row in place of the first row of the run",
       "reach": [],
@@ -11502,7 +12423,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "route-change-markers",
       "title": "Mark where the model or effort changed",
-      "summary": "A quiet row in the transcript where a request ran on another model, account or reasoning effort than the request before it, read from the Session's own request/header events, so fallbacks and account switches show too; it stays visible when the Turn is folded.",
+      "summary": "A quiet row marks where the model, account or effort changed during a thread.",
       "destination": "transcript",
       "currentSurface": "transcript: route-change row",
       "reach": [
@@ -11564,7 +12485,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "unread-final-answer",
       "title": "Open an unread thread at its final answer",
-      "summary": "A settled thread whose final answer this browser has not reached opens with that answer at the top, under a New divider, instead of at the end of the transcript. Reaching the end marks it read, so the next open lands at the end. Settings › General › Open unread threads at switch…",
+      "summary": "An unread thread opens at its final answer instead of the end, and Settings can change this.",
       "destination": "transcript",
       "currentSurface": "transcript: opening position",
       "reach": [
@@ -11591,7 +12512,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "inline-annotations",
       "title": "See annotations beside the passage they quote, sent or draft",
-      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the…",
+      "summary": "Annotations show beside the passage they quote, as a numbered marker and a comment card, before and after the message is sent.",
       "destination": "transcript",
       "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
       "reach": [],
@@ -11606,7 +12527,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "palette-search",
       "title": "Search threads and workspace files",
-      "summary": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces i…",
+      "summary": "Search threads by title, project or id, and files in the workspace.",
       "destination": "none",
       "currentSurface": "palette: Threads / Files search",
       "reach": [
@@ -11657,7 +12578,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "action-registry",
       "title": "Register and invoke typed palette actions",
-      "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
+      "summary": "Features register actions that the command palette lists and runs.",
       "destination": "none",
       "currentSurface": "palette: action registry",
       "reach": [
@@ -11697,8 +12618,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "command-palette#contributed-commands",
       "plugin": "command-palette",
       "id": "contributed-commands",
-      "title": "List commands other plugins contribute through dshx",
-      "summary": "Show every scoped, visible dshx Command under Commands, grey out disabled ones and follow them as plugins load, reload or withdraw them.",
+      "title": "List commands from every plugin",
+      "summary": "The palette lists every command plugins add, with disabled ones greyed out.",
       "destination": "none",
       "currentSurface": "palette: Commands",
       "reach": [
@@ -11732,7 +12653,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "frecency-ranking",
       "title": "Rank recently used actions and files",
-      "summary": "Persist bounded, per-browser action and file usage counts so recent use improves ranking without overriding a better text match.",
+      "summary": "Actions and files you use often rank higher in this browser.",
       "destination": "none",
       "currentSurface": "palette: ranking",
       "reach": [],
@@ -11744,7 +12665,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "palette-prefix-routing",
       "title": "Route prefixed searches to the right content",
-      "summary": "Use palette prefixes to switch between commands, indexed content, line navigation, and the Backlog capture flow.",
+      "summary": "Type a prefix in the palette to search commands, content, a line number or capture to Backlog.",
       "destination": "none",
       "currentSurface": "palette: prefixes",
       "reach": [
@@ -11785,7 +12706,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "ask-dsh",
       "title": "Ask DSH from an empty palette",
-      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH · <question>, and that thread opens in the main view.",
+      "summary": "Press Tab in an empty palette to ask DSH a question in a new thread.",
       "destination": "none",
       "currentSurface": "palette: Ask DSH",
       "reach": [
@@ -11833,7 +12754,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "performance-budget",
       "title": "Keep palette ranking within the interaction budget",
-      "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",
+      "summary": "The palette stays fast to open and to type in, even with many threads and files.",
       "destination": "none",
       "currentSurface": "palette: ranking budget",
       "reach": [],
@@ -11845,7 +12766,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "command-palette",
       "id": "command-effective-keys",
       "title": "Commands show the keys they answer to",
-      "summary": "Command rows show each command's effective keys from api.commands.keys, so a binding the user changed shows at once, and commands marked suggested appear before anything is typed.",
+      "summary": "Each command shows the keys it answers to, including the ones you changed.",
       "destination": "none",
       "currentSurface": "palette: Commands › keys",
       "reach": [],
@@ -11857,15 +12778,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "component-gallery",
       "id": "component-gallery-page",
       "title": "Browse every shared component on one page",
-      "summary": "A main panel that renders every @dshfiles/plugin-ui component live, animated ones included, in one tab per category, with a filter over titles and import paths, a per-card and page-wide Replay, and a reduced-motion indicator.",
-      "destination": "knowledge",
-      "currentSurface": "left-nav: Component gallery",
+      "summary": "Browse every shared UI component live on one page, filtered by name.",
+      "destination": "settings",
+      "currentSurface": "rail: Settings › Developer › Component gallery",
       "reach": [
         {
-          "text": "click tab \"Knowledge\"",
+          "text": "click tab \"Settings\"",
           "action": "click",
           "by": "tab",
-          "name": "Knowledge",
+          "name": "Settings",
           "value": null
         },
         {
@@ -11885,7 +12806,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Knowledge › Component gallery and pick a tab.",
+        "firstAction": "Open Settings › Developer › Component gallery and pick a tab.",
         "doneWhen": "The shared components render live on the page.",
         "open": {
           "panel": "component-gallery"
@@ -11897,7 +12818,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "bounded-compaction",
       "title": "Bounded compaction summaries",
-      "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits. A request the provider still rejects as too large is retried with older tool outputs and exchanges shortened (the newest exchange intact) before…",
+      "summary": "Long histories are summarized in pieces small enough for the model to accept.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -11909,7 +12830,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "background-summary",
       "title": "Background compaction summaries",
-      "summary": "Opt-in: once a thread nears its compaction threshold, the engine summarizes the span the next compaction would replace beside the running turn, then commits it instantly at the threshold if that span is unchanged. Off by default: a summary the conversation moves past is a billed…",
+      "summary": "Off by default: a thread near its limit prepares its summary in the background so compaction is instant.",
       "destination": "none",
       "currentSurface": "host: agent pre-step listener, no UI",
       "reach": [],
@@ -11921,7 +12842,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "loaded-skills",
       "title": "Loaded skills kept in compaction checkpoints",
-      "summary": "Opt-in: each checkpoint lists the skills the span it replaces loaded (and, in bodies mode, keeps their instructions), so a long thread does not reload a skill only because a compaction dropped it. Off by default: the kept block adds tokens to every later request.",
+      "summary": "Off by default: compaction keeps the skills a thread loaded, so it does not load them again.",
       "destination": "none",
       "currentSurface": "host: appended to the checkpoint summary, no UI",
       "reach": [],
@@ -11933,7 +12854,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "overflow-recognition",
       "title": "Provider context-overflow recognition",
-      "summary": "Recognizes context-overflow failures the core does not code as CONTEXT_WINDOW_EXCEEDED (Anthropic, Gemini, Bedrock, llama.cpp, xAI, Moonshot, Copilot, GLM, Cohere wording, along the cause chain) and gives them the stock recovery: one overflow compaction, then a retry. Also ignor…",
+      "summary": "A context overflow from any provider triggers one compaction and a retry.",
       "destination": "none",
       "currentSurface": "host: agent request-error listener, no UI",
       "reach": [],
@@ -11945,7 +12866,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "idle-compaction",
       "title": "Idle compaction before cache expiry",
-      "summary": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. It only trusts activity this Host observed itself, attempts once per idle stretch and never after expiry. Off by…",
+      "summary": "Off by default: a large idle thread compacts before its prompt cache expires.",
       "destination": "none",
       "currentSurface": "host: timer, no UI",
       "reach": [],
@@ -11957,7 +12878,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "context-compaction",
       "id": "compaction-threshold",
       "title": "Next automatic compaction for a thread",
-      "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. A he…",
+      "summary": "The agent can ask how many tokens remain before a thread compacts.",
       "destination": "none",
       "currentSurface": "host: threshold API and agent tool",
       "reach": [],
@@ -11969,7 +12890,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "conversation-cleanup",
       "id": "conversation-cleanup",
       "title": "Permanently clean up done or archived threads",
-      "summary": "Preview cold local done (settled) OR archived threads, listed by title, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded threads and historical formats needing migration are protected. No automatic cleanup, re…",
+      "summary": "Preview done or archived threads and permanently delete their logs after you confirm.",
       "destination": "settings",
       "currentSurface": "Settings: Thread cleanup",
       "reach": [
@@ -12024,8 +12945,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "cordis-cards#inventory-read-once",
       "plugin": "cordis-cards",
       "id": "inventory-read-once",
-      "title": "Cordis panel and cards read the inventory once per connection",
-      "summary": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being dis…",
+      "title": "Plugin panel loads its list once",
+      "summary": "The dynamic plugin panel and its tool cards load the plugin list once per connection.",
       "destination": "threads",
       "currentSurface": "sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript",
       "reach": [],
@@ -12039,8 +12960,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "cordis-client-runner#inspect-manifest-once",
       "plugin": "cordis-client-runner",
       "id": "inspect-manifest-once",
-      "title": "Publish the Client inspect manifest once per connection",
-      "summary": "The native dynamic-package runner from one owned fork of the stock row. Behaviour is the native one; the page's inspect manifest is no longer sent before the connection is up and then again by the first reset: the first connected generation publishes it once, and every later gen…",
+      "title": "Publish the page's plugin list once",
+      "summary": "The page sends its list of loaded plugins once per connection instead of twice.",
       "destination": "none",
       "currentSurface": "client: dynamic Cordis package runner (no UI)",
       "reach": [],
@@ -12051,8 +12972,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "credential-port#secret-credential-port",
       "plugin": "credential-port",
       "id": "secret-credential-port",
-      "title": "One Host service port for credentials kept in a secrets catalog",
-      "summary": "Name the scopes a catalog can address and the calls a credential consumer makes, with compatible Promise and opt-in Effect APIs.",
+      "title": "One way to read credentials from a secrets catalog",
+      "summary": "Features read credentials from your secrets catalog through one shared service.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -12064,7 +12985,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "deliverables",
       "id": "changed-files-card",
       "title": "Changed-files card and review tab",
-      "summary": "The native \"Edited N files\" card under a turn, its per-file hover comparison, the right-sidebar review tab, delivery cards and closing-prose file mentions, from one owned fork of the stock row.",
+      "summary": "Each turn lists the files it changed, with a comparison on hover and a review tab.",
       "destination": "transcript",
       "currentSurface": "chat transcript: the card under a turn that edited files, and the review tab it opens",
       "reach": [],
@@ -12079,7 +13000,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "deliverables",
       "id": "changed-image-preview",
       "title": "Changed images preview instead of the binary placeholder",
-      "summary": "A changed png, jpg, jpeg, gif, webp, svg or avif file that the card or review tab would answer with \"Binary file\" or \"File too large\" shows the image itself, labelled Current version. The Host route api/changes.image serves the listed file's current bytes: only inside the Sessio…",
+      "summary": "A changed image shows as the image itself instead of a binary file note.",
       "destination": "transcript",
       "currentSurface": "chat transcript: a changed image row's hover preview in the Edited files card, and the review tab",
       "reach": [
@@ -12147,8 +13068,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "dialogs#app-dialogs",
       "plugin": "dialogs",
       "id": "app-dialogs",
-      "title": "App dialogs for every plugin",
-      "summary": "Provide the dshx Dialogs contract: confirm and alert open a plugin-ui alert dialog, prompt a dialog with one field, select a searchable grouped list; one request is open at a time and the rest wait in order.",
+      "title": "Dialogs for every plugin",
+      "summary": "Features open confirm, prompt and pick dialogs that look the same everywhere, one at a time.",
       "destination": "none",
       "currentSurface": "dialog: app confirm, alert and toast primitives",
       "reach": [
@@ -12174,8 +13095,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "dialogs#app-toasts",
       "plugin": "dialogs",
       "id": "app-toasts",
-      "title": "App toasts for every plugin",
-      "summary": "Provide the dshx Toasts contract: a bottom-right stack with tone colors, an optional action, auto-dismiss after the duration (5 s by default, 0 keeps it) and a dismiss function.",
+      "title": "Toasts for every plugin",
+      "summary": "Features show short notices in the corner, one at a time, with an optional action.",
       "destination": "none",
       "currentSurface": "toast: app toast stack",
       "reach": [
@@ -12202,7 +13123,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diff-viewed",
       "id": "review-file-markers",
       "title": "Mark review files as viewed",
-      "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
+      "summary": "Mark a file as viewed in a review and see how many are left.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: native review tab › Viewed",
       "reach": [],
@@ -12216,8 +13137,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "diff-viewed#host-owned-view-state",
       "plugin": "diff-viewed",
       "id": "host-owned-view-state",
-      "title": "Retain viewed marks on the Host",
-      "summary": "Keep the marks in the Host's durable diff_viewed domain, capped at the 2000 most recent, fall back to browser-held marks until the Host serves the API, and adopt those browser marks once.",
+      "title": "Keep viewed marks across browsers",
+      "summary": "Viewed marks are kept by DSH, so they stay across browsers and restarts.",
       "destination": "none",
       "currentSurface": "host: diff_viewed storage",
       "reach": [],
@@ -12229,7 +13150,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diff-viewed",
       "id": "revision-range-marks",
       "title": "One viewed-marks store for turns and revision ranges",
-      "summary": "Keep the thread Changes facet's and the Review page's per-file viewed marks next to the per-turn marks, keyed by workspace, base, head commit and path, with batch writes, per-range reads, a separate 5000-mark bound and the changes_viewed_files / changes_mark_viewed agent tools.",
+      "summary": "Viewed marks also work in the Changes tab and the Review page, per revision range.",
       "destination": "none",
       "currentSurface": "host: diff_viewed storage",
       "reach": [],
@@ -12241,7 +13162,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "thread-review-scopes",
       "title": "Review project and workspace changes by scope",
-      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff (or, in a git-only repository, its git diff from the merge base wit…",
+      "summary": "Review a project's or workspace's changes, grouped into scopes, against a bookmark you choose.",
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review",
       "reach": [
@@ -12302,10 +13223,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"main..@\"",
+          "text": "expect combobox \"Compare against\"",
           "action": "expect",
-          "by": "text",
-          "name": "main..@",
+          "by": "combobox",
+          "name": "Compare against",
           "value": null
         },
         {
@@ -12323,10 +13244,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Docs\"",
+          "text": "expect checkbox \"seeded-work.md*\"",
           "action": "expect",
-          "by": "text",
-          "name": "Docs",
+          "by": "checkbox",
+          "name": "seeded-work.md*",
           "value": null
         },
         {
@@ -12425,7 +13346,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "ai-scope-summaries",
       "title": "Summarize review scopes with the thread's own model",
-      "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
+      "summary": "One model call turns each review scope into a short line of prose.",
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review › Summarize",
       "reach": [
@@ -12480,7 +13401,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "batch-reviewed-marks",
       "title": "Mark a selection of changed files reviewed",
-      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
+      "summary": "Select changed files across every scope and mark them reviewed at once.",
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review › reviewed marks",
       "reach": [
@@ -12499,10 +13420,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect checkbox \"Select all files in this review\"",
+          "text": "expect checkbox \"Reviewed: *\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Select all files in this review",
+          "name": "Reviewed: *",
           "value": null
         }
       ],
@@ -12514,7 +13435,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "changes-facet",
       "title": "Review a thread's changes in its Changes facet",
-      "summary": "A thread panel tab that follows the thread on screen and shows its changes in four scopes (this turn from DSH's own turn snapshot; whole thread from fork_point(bookmark | @); uncommitted @-..@; vs the target bookmark), with a file list, one diff view and per-file viewed marks ke…",
+      "summary": "The Changes tab shows this turn's, this thread's or uncommitted changes, with viewed marks per file.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes",
       "reach": [
@@ -12582,8 +13503,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "diffs-review#changed-image-preview",
       "plugin": "diffs-review",
       "id": "changed-image-preview",
-      "title": "See changed images in a review instead of a dropped binary file",
-      "summary": "The Changes facet, the Review page and the combined revisions review show each changed image: before and after side by side when both are known revisions (a jj or git range's base and head, a revision and its parent), else the one version there is, labelled (Current for the work…",
+      "title": "See changed images in a review",
+      "summary": "Changed images show before and after side by side in Changes and Review.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes, Review page",
       "reach": [
@@ -12624,7 +13545,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "package-json-table",
       "title": "Read package.json dependency changes as a table",
-      "summary": "In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row w…",
+      "summary": "A changed package.json shows its dependency changes as a table instead of a text diff.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes",
       "reach": [
@@ -12665,7 +13586,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "combined-revisions",
       "title": "Review several selected revisions together",
-      "summary": "Revisions selected in the graph open as one combined review: a small revision graph, newest first, with each revision's own files, state chips (working copy, conflict, divergent, empty, bookmarks) and viewed count, one revision's diff on screen with Previous and Next (j and k on…",
+      "summary": "Select several revisions in the graph to review them together, one diff at a time.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › Revisions",
       "reach": [
@@ -12748,7 +13669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "turn-card-opens-changes",
       "title": "A turn's Edited files card opens Changes on that turn",
-      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/…) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the nat…",
+      "summary": "A turn's Edited files card opens the Changes tab on that turn.",
       "destination": "thread-panel",
       "currentSurface": "transcript: Edited N files card",
       "reach": [],
@@ -12760,7 +13681,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "land-card",
       "title": "Land a thread from the top of its Changes facet",
-      "summary": "The Land card shows the target bookmark, how far the workspace is behind it, conflicts, undescribed revisions and the thread's project-check receipts, and offers one primary Land that previews the exact revisions in a confirm dialog and calls jj-integration's land with every Hos…",
+      "summary": "The Land card shows what will land and what blocks it, then lands the thread after one confirm.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › Land",
       "reach": [
@@ -12829,7 +13750,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "diff-line-comments",
       "title": "Comment on diff lines as chips in the next message",
-      "summary": "Selecting line numbers in a Changes diff opens a comment box; Add to next message queues the comment as a line-comment chip in the thread's composer through the public Composer contract (rich-composer serializes it as <comment path lines>).",
+      "summary": "Select lines in a diff to add a comment to your next message.",
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › diff line selection",
       "reach": [],
@@ -12841,7 +13762,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "diffs-review",
       "id": "review-marks-migration",
       "title": "Move the Review page's marks into the one viewed-marks store",
-      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head → paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
+      "summary": "Reviewed marks from the old Review page move into the shared viewed marks.",
       "destination": "none",
       "currentSurface": "host: diffs-review reviewed record",
       "reach": [],
@@ -12853,7 +13774,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "editor",
       "id": "thread-artifacts",
       "title": "Edit thread artifacts",
-      "summary": "Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.",
+      "summary": "Create and edit Markdown and HTML documents that belong to a thread, which the agent can edit too.",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Artifacts",
       "reach": [
@@ -12921,7 +13842,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "editor",
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
-      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host fil…",
+      "summary": "Browse and edit the workspace's files in tabs, with search, go to line and Markdown preview.",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Files",
       "reach": [
@@ -12996,7 +13917,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "editor",
       "id": "file-links",
       "title": "Open file links in the editor",
-      "summary": "A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a N…",
+      "summary": "A file link in a thread opens the file in the editor, reusing its tab when it is already open.",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Workspace files › file row",
       "reach": [
@@ -13051,7 +13972,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "editor",
       "id": "workspace-file-index",
       "title": "Index workspace files with bounded traversal",
-      "summary": "Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.",
+      "summary": "The workspace's file list loads in steps and skips version control and dependency folders.",
       "destination": "none",
       "currentSurface": "host: workspace file index",
       "reach": [],
@@ -13062,8 +13983,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "editor#session-screen-contract",
       "plugin": "editor",
       "id": "session-screen-contract",
-      "title": "Session screen and workspace files for other plugins",
-      "summary": "Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file s…",
+      "title": "Open thread and workspace files for other plugins",
+      "summary": "Other features can read which thread is on screen and list or search its workspace files.",
       "destination": "none",
       "currentSurface": "client: SessionScreen contract",
       "reach": [],
@@ -13074,8 +13995,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "fff-search#resident-grep-glob",
       "plugin": "fff-search",
       "id": "resident-grep-glob",
-      "title": "Answer agent grep and glob from a resident fff index",
-      "summary": "On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.",
+      "title": "Faster grep and glob for agents",
+      "summary": "The agent's grep and glob tools answer from a file index kept in memory.",
       "destination": "none",
       "currentSurface": "agent tool: grep / glob",
       "reach": [],
@@ -13086,8 +14007,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "frame-layout#panel-seats",
       "plugin": "frame-layout",
       "id": "panel-seats",
-      "title": "Hand the frame's regions to plugin surfaces",
-      "summary": "The owned stack always gives shell.main to Workbench tabs, without a user-selectable native layout. The frame supplies its authorized keyed-main renderer, recursion guard and an absent-occupant native fallback. shell.dock owns a fullheight right pane across both grid rows; colla…",
+      "title": "Main area and side panels",
+      "summary": "The main area holds the open tabs, and the right panel spans the full height.",
       "destination": "none",
       "currentSurface": "shell: frame regions",
       "reach": [
@@ -13107,7 +14028,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
-      "summary": "The layout bundle keeps dragged sidebar and right-panel widths in the browser, so a reload restores the sidebar's last open width and the right panel's px preference. Workbench separately owns visibility of its persistent fullheight right-pane tabs; frame geometry does not selec…",
+      "summary": "The sidebar and right panel keep the widths you dragged them to after a reload.",
       "destination": "none",
       "currentSurface": "shell: panel widths",
       "reach": [
@@ -13127,7 +14048,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "collapsed-state-persistence",
       "title": "Persist the collapsed sidebar",
-      "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default. The owned frameSidebar.show presentation port reveals it idempotently from live frame state, so repeated Reset layout calls cann…",
+      "summary": "A closed sidebar stays closed after a reload and reopens at its last width.",
       "destination": "none",
       "currentSurface": "shell: collapsed sidebar",
       "reach": [
@@ -13147,7 +14068,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "phone-navigation-seat",
       "title": "Give the stage the full width on a phone",
-      "summary": "When the left-column occupant marks the document with data-shell-phone-nav, a frame narrower than 640px drops the sidebar and right tracks, hides the sidebar drag handle and shortens itself by --dsh-phone-nav-height so the occupant's bottom tab bar never covers the composer. Wit…",
+      "summary": "On a phone, the thread takes the full width and the bottom tab bar never covers the composer.",
       "destination": "none",
       "currentSurface": "shell: frame columns at phone width",
       "reach": [],
@@ -13159,7 +14080,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "status-strip",
       "title": "One status strip at the bottom of the frame",
-      "summary": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws…",
+      "summary": "One thin status bar along the bottom holds short items, with this thread's on the right.",
       "destination": "none",
       "currentSurface": "shell: status strip",
       "reach": [
@@ -13179,7 +14100,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "status-bar-settings",
       "title": "Show, hide and reorder status bar items",
-      "summary": "Settings › General › Status bar lists every registered status item with a show switch and up/down buttons; right-clicking an item in the strip offers Hide this item and Status bar settings…. The choice is stored in the dshfiles-frame-layout settings namespace as hiddenStatusItem…",
+      "summary": "Show, hide and reorder status bar items in Settings or from an item's right-click menu.",
       "destination": "settings",
       "currentSurface": "Settings › General › Status bar",
       "reach": [
@@ -13191,10 +14112,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Status bar\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Status bar",
+          "name": "Layout",
           "value": null
         },
         {
@@ -13221,7 +14142,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "status-strip-restore",
       "title": "Bring back hidden status items in place",
-      "summary": "When every status item is hidden the strip keeps one small control (Show hidden status items) that offers Show <item> for each hidden item and Status bar settings; each visible item's context menu also lists the hidden ones.",
+      "summary": "When every status item is hidden, one small control brings them back.",
       "destination": "none",
       "currentSurface": "status-strip: Show hidden status items",
       "reach": [
@@ -13233,10 +14154,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Status bar\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Status bar",
+          "name": "Layout",
           "value": null
         },
         {
@@ -13283,7 +14204,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "status-item-open",
       "title": "Click a status item to open its page",
-      "summary": "A status item may declare open: the strip renders it as a button that opens its full page (Working: the thread list on its Working view; Restart: the Plugins page with the HMR updates row) and its context menu offers Open <label>. An item that draws its own buttons (Quota) decla…",
+      "summary": "Click a status item to open its full page.",
       "destination": "none",
       "currentSurface": "shell: status strip",
       "reach": [
@@ -13324,7 +14245,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "frame-layout",
       "id": "zen-mode",
       "title": "Zen mode: only the thread and its composer",
-      "summary": "The Zen mode command (⌘K, or Mod+Shift+. from anywhere) hides the sidebar, the right panel, the status strip and the main tabs, so only the thread and its composer stay; the same command, the chord, Escape outside a text field, menu or dialog, the Leave zen mode button in the to…",
+      "summary": "Zen mode hides everything but the thread and its composer, and Escape brings it all back.",
       "destination": "none",
       "currentSurface": "palette: Zen mode",
       "reach": [
@@ -13435,8 +14356,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "git-cli#git-cli-run",
       "plugin": "git-cli",
       "id": "git-cli-run",
-      "title": "One Effect service that runs the git CLI",
-      "summary": "Run git non-interactively with bounded stdout and stderr, a timeout that kills the process and one git <verb> span; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "title": "Run git safely",
+      "summary": "Git runs without prompts, with a time limit and capped output, and errors hide secrets.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -13447,8 +14368,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "git-worktrees#git-thread-worktrees",
       "plugin": "git-worktrees",
       "id": "git-thread-worktrees",
-      "title": "Isolate threads in git worktrees",
-      "summary": "As a VCS provider for plain git repositories, create a thread worktree on its own dsh/thread-… branch beside the repository when isolation is switched on, register it as a DSH project, list and remove it.",
+      "title": "Give threads a workspace in plain git projects",
+      "summary": "In a git project, each thread can work in its own workspace on its own branch.",
       "destination": "none",
       "currentSurface": "settings: git worktree isolation (opt-in)",
       "reach": [],
@@ -13460,7 +14381,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "git-worktrees",
       "id": "git-file-snapshots",
       "title": "Snapshot and restore a git workspace's files",
-      "summary": "Record every tracked and untracked, non-ignored file as a commit kept under refs/dsh/snapshots/ without moving HEAD or the index, and put the files back to it, returning a snapshot of what they were.",
+      "summary": "Save a snapshot of a git workspace's files and restore it later, without touching its branch.",
       "destination": "none",
       "currentSurface": "host: git file snapshots",
       "reach": [],
@@ -13472,7 +14393,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "goal-stall-guard",
       "id": "pause-stalled-goals",
       "title": "Pause goals after consecutive empty rounds",
-      "summary": "Count only empty assistant goal rounds, reset after any meaningful content, and pause the active goal without blocking it.",
+      "summary": "A goal pauses after several rounds in a row where the agent produced nothing.",
       "destination": "none",
       "currentSurface": "host: goal rounds",
       "reach": [],
@@ -13484,7 +14405,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "goal-stall-guard",
       "id": "bounded-goal-continuation",
       "title": "Extend or close goals within bounded policy",
-      "summary": "Add a narrowly scoped Host tool to extend an active goal on its exact final round and complete a round-limit-blocked goal only with evidence.",
+      "summary": "The agent can extend a goal on its last round, or finish one only with evidence.",
       "destination": "none",
       "currentSurface": "agent tool: extend_goal_budget / complete_blocked_goal",
       "reach": [],
@@ -13495,8 +14416,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "goal-tool#continued-form-goal-authority",
       "plugin": "goal-tool",
       "id": "continued-form-goal-authority",
-      "title": "Accept admitted continued-form answers as direct goal authority",
-      "summary": "The native goal-tool fork recognizes only an answered root-turn reply whose call id the user-question projection settled with a valid answer batch.",
+      "title": "Answers to a timed question count as your request",
+      "summary": "An answer you gave to a timed question counts as your own request for a goal.",
       "destination": "none",
       "currentSurface": "host: goal tool fork",
       "reach": [],
@@ -13507,8 +14428,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "hmr-gate#plugins-row",
       "plugin": "hmr-gate",
       "id": "plugins-row",
-      "title": "Plugin updates waiting for a Host restart",
-      "summary": "A Plugins-page row names every plugin whose browser half rebuilt while its Host half still runs from before the rebuild, so the page keeps the last-good client code instead of running new client code against old Host code.",
+      "title": "Plugin updates waiting for a restart",
+      "summary": "The Plugins page lists plugin updates that wait for a DSH restart, and the page keeps working meanwhile.",
       "destination": "none",
       "currentSurface": "plugins-page: View HMR updates",
       "reach": [
@@ -13549,7 +14470,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "hmr-gate",
       "id": "deferred-update-inbox-item",
       "title": "Plugin updates waiting for a restart in the Inbox",
-      "summary": "While any rebuilt plugin is held back because its new Host code is not loaded, the Inbox shows one Ready item about this DSH naming the waiting packages and how to apply them (restart when no agent is working). It offers no restart verb: restarting stays the user's decision. A c…",
+      "summary": "The Inbox shows one item naming plugin updates that wait for a restart, and when to restart.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › hmr-gate.deferred-update",
       "reach": [
@@ -13575,8 +14496,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "hmr-gate#restart-status-item",
       "plugin": "hmr-gate",
       "id": "restart-status-item",
-      "title": "Held-back bundles join the one restart notice",
-      "summary": "While a rebuilt plugin waits for a Host restart, hmr-gate lists it in thread-sidebar's restart sources, so the status strip's one Restart pending item names it beside the Host files thread-sidebar watches. thread-sidebar owns that item and its Restart DSH / Restart when idle ver…",
+      "title": "Waiting updates join the restart notice",
+      "summary": "Plugin updates that need a restart are named in the one Restart pending item in the status bar.",
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "reach": [
@@ -13598,8 +14519,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "hmr-gate#host-reload",
       "plugin": "hmr-gate",
       "id": "host-reload",
-      "title": "Experimental in-process Host reload for opted-in plugins",
-      "summary": "With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload \"safe\" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is c…",
+      "title": "Reload a plugin without restarting DSH",
+      "summary": "Off by default: a plugin marked safe can reload inside the running DSH without a restart.",
       "destination": "none",
       "currentSurface": "host: hmr-gate deferral",
       "reach": [
@@ -13619,7 +14540,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "hmr-gate",
       "id": "update-timing",
       "title": "Plugin updates wait for a hidden or idle moment",
-      "summary": "The browser half holds graph and rebuilt frames until the Host connection is live again and the page is hidden, or the reader has been idle for 30 s with no focused field; nothing applies in the 10 s after the page comes back. Updates of the thread-drawing packages (chat, workbe…",
+      "summary": "Plugin updates apply only when the page is hidden or you have been idle for a while.",
       "destination": "none",
       "currentSurface": "client: hmr-gate frame handling",
       "reach": [
@@ -13638,8 +14559,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "html-render#html-page-card",
       "plugin": "html-render",
       "id": "html-page-card",
-      "title": "Agent-published HTML page as a sandboxed card",
-      "summary": "The html_render agent tool publishes a self-contained HTML page (chart, mockup, table) that the chat transcript shows as a card: a sandboxed iframe themed with the DSH light/dark tokens, resizable, with Copy HTML, Open in new tab and Expand to full screen. The card stays visible…",
+      "title": "HTML page from the agent as a card",
+      "summary": "The agent can publish an HTML page, such as a chart or mockup, as a card in the thread.",
       "destination": "transcript",
       "currentSurface": "transcript: html_render card",
       "reach": [
@@ -13686,7 +14607,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "html-render",
       "id": "html-preview-card",
       "title": "Workspace HTML file shown as a sandboxed card",
-      "summary": "The html_preview agent tool shows an HTML file from the calling thread's workspace in the same sandboxed, themed card as html_render. The path is relative to the thread working directory and must resolve (symlinks followed) inside the thread workspace. Relative <link rel=\"styles…",
+      "summary": "The agent can show an HTML file from the workspace as a card in the thread.",
       "destination": "transcript",
       "currentSurface": "transcript: html_preview card",
       "reach": [
@@ -13748,7 +14669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "html-render",
       "id": "page-screenshot",
       "title": "Agent screenshot of its own published page",
-      "summary": "The html_render_screenshot agent tool renders a page this thread published with html_render or html_preview (by call id, or the latest) in the @dshfiles/preview Host Chromium and returns a JPEG the model can see. The page gets the card's no-network CSP and fixed light or dark th…",
+      "summary": "The agent can take a screenshot of a page it published to check how it looks.",
       "destination": "none",
       "currentSurface": "agent tool: html_render_screenshot",
       "reach": [
@@ -13809,8 +14730,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "image-preview#image-preview-response",
       "plugin": "image-preview",
       "id": "image-preview-response",
-      "title": "One guarded way to serve and show a changed image",
-      "summary": "Name the previewable image types, answer with their bytes under nosniff and a sandboxing policy within an 8 MB cap, and read them into a blob URL in the browser.",
+      "title": "Show a changed image safely",
+      "summary": "Changed images up to 8 MB are served and shown safely in the browser.",
       "destination": "none",
       "currentSurface": "host and client: library",
       "reach": [],
@@ -13821,8 +14742,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "input-trigger#codex-at-tokens",
       "plugin": "input-trigger",
       "id": "codex-at-tokens",
-      "title": "Codex-style @ token targeting",
-      "summary": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"… phrase still searches titles and paths with spaces. Slash-command behavior is uncha…",
+      "title": "Pick what an @ mention targets",
+      "summary": "Type @ in the composer to mention a file or thread, as in Codex, with quotes for names with spaces.",
       "destination": "composer",
       "currentSurface": "composer: @ menu",
       "reach": [
@@ -13933,7 +14854,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "input-trigger",
       "id": "command-chip-restore",
       "title": "Restore a persisted command chip",
-      "summary": "The controller answers a persisted command chip's claim by polling each source's matchClaim in roster order (skipping sources without the hook and sources bound to another trigger) and aborting with the caller's reason when the restore signal is already aborted. The conversation…",
+      "summary": "A draft that starts with a command keeps its command chip after a reload.",
       "destination": "composer",
       "currentSurface": "composer: command chips",
       "reach": [],
@@ -13944,8 +14865,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "input-trigger#command-slash-entries",
       "plugin": "input-trigger",
       "id": "command-slash-entries",
-      "title": "Slash entries for dshx commands",
-      "summary": "Lists every dshx Command that names a slash entry in the composer's / menu at the start of the draft. Picking one runs it and clears its token; sending a line that is exactly the entry runs it as a command claim.",
+      "title": "Slash entries for commands",
+      "summary": "Commands with a slash name appear in the composer's / menu and run when picked.",
       "destination": "composer",
       "currentSurface": "composer: / menu",
       "reach": [],
@@ -13960,7 +14881,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "input-trigger",
       "id": "entity-registry",
       "title": "One mention and reference-preview registry",
-      "summary": "Every mentionable kind (files and threads, skills, MCP servers, backlog items, agents, memory) adds one EntityKinds item: input-trigger registers its @ source with the composer, publishes the scope prefixes it owns so each @ scope lists one kind, and draws its card in the one sh…",
+      "summary": "Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.",
       "destination": "none",
       "currentSurface": "overlay: shared reference preview card; composer: @ menu groups",
       "reach": [
@@ -14042,8 +14963,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jev#jev-ask",
       "plugin": "jev",
       "id": "jev-ask",
-      "title": "Ask Jev one Noul question and record its usage",
-      "summary": "Send one TypeSafe Jev classification over HttpClient with the shared request and answer schemas, return the probability and provider-reported tokens, and record every call in the usage plugin's Jev ledger.",
+      "title": "Ask Jev a yes or no question",
+      "summary": "Features ask Jev a yes or no question and its usage is recorded.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -14054,8 +14975,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-cli#jj-cli-run",
       "plugin": "jj-cli",
       "id": "jj-cli-run",
-      "title": "One Effect service that runs the Jujutsu CLI",
-      "summary": "Resolve jj once, run it with --color=never --no-pager, bounded stdout and stderr, a timeout and kill-on-interrupt; return a non-zero exit as a value or fail with redacted arguments and stderr.",
+      "title": "Run Jujutsu safely",
+      "summary": "Jujutsu runs without colour or pager, with a time limit and capped output, and errors hide secrets.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -14066,8 +14987,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-cli#jj-cli-view-reads",
       "plugin": "jj-cli",
       "id": "jj-cli-view-reads",
-      "title": "Operation-head cache for jj view reads",
-      "summary": "Answer repeated --ignore-working-copy view reads from the same operation head without spawning jj, share one in-flight read between callers, and miss as soon as an operation lands; a diff over full commit ids is kept across operations.",
+      "title": "Cache repeated Jujutsu reads",
+      "summary": "Repeated Jujutsu reads come from a cache until the repository changes.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -14079,7 +15000,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
-      "summary": "The Workspace segment of a new thread’s run row: its own jj workspace (from a chosen bookmark, or from a remote bookmark such as main@origin that the Host fetches first) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments…",
+      "summary": "Choose whether a new thread works in its own workspace or in the project itself.",
       "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
       "reach": [
@@ -14088,6 +15009,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -14239,7 +15167,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "git-thread-workspaces",
       "title": "Thread workspaces in git-only repositories",
-      "summary": "The same isolate, status, rebase, discard, cleanup, snapshot and review-history flows run in a repository without .jj: a VCS backend port routes each call to the jj adapter when .jj exists (also colocated) and to a git adapter otherwise, which keeps one git worktree per thread o…",
+      "summary": "Thread workspaces, landing and review history work in a git project without Jujutsu too.",
       "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
       "reach": [],
@@ -14251,7 +15179,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "new-thread-project-default",
       "title": "New thread returns to its project",
-      "summary": "With isolation off, a blank thread inherited from a prior thread workspace returns to the owning project checkout; with isolation on, it keeps that folder until its first send and then provisions its own workspace instead of reusing it.",
+      "summary": "A new thread returns to its project instead of reusing the last thread's workspace.",
       "destination": "composer",
       "currentSurface": "composer: new-thread destination bar",
       "reach": [
@@ -14289,6 +15217,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": null,
           "name": null,
           "value": "Enter"
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
+          "value": null
         },
         {
           "text": "expect button \"Workspace: *\"",
@@ -14368,10 +15303,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Workspace: Own workspace*\"",
+          "text": "expect button \"Local · Own workspace*\"",
           "action": "expect",
           "by": "button",
-          "name": "Workspace: Own workspace*",
+          "name": "Local · Own workspace*",
           "value": null
         }
       ],
@@ -14383,7 +15318,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "new-thread-preparation",
       "title": "New thread prepares its destination while the draft is written",
-      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once and claim nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout. Once its draft holds something, the destination is prepared in the background (th…",
+      "summary": "A new thread's workspace is prepared while you write the draft, so the first send is quick.",
       "destination": "composer",
       "currentSurface": "composer: New thread draft",
       "reach": [
@@ -14392,6 +15327,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -14423,8 +15365,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#thread-workspace-menu",
       "plugin": "jj-integration",
       "id": "thread-workspace-menu",
-      "title": "Thread workspace control in the conversation header",
-      "summary": "One header control shows the thread's jj workspace name, a badge with revisions ready to integrate, and a menu holding Integrate, the Thread workspaces side panel, and Download session log. A thread that works in the shared project checkout keeps the control and says so, instead…",
+      "title": "Workspace control in the thread header",
+      "summary": "The thread header names its workspace and holds Land, the workspaces panel and the thread log download.",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Own workspace menu",
       "reach": [
@@ -14485,8 +15427,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#rebase",
       "plugin": "jj-integration",
       "id": "rebase",
-      "title": "Integrate a thread into the bookmark",
-      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to integrate, and whether integration is blocked; its menu holds Integrate, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chi…",
+      "title": "Land a thread on its bookmark",
+      "summary": "Land a thread's revisions on its bookmark from the header, with a preview of what will land.",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Own workspace › Integrate",
       "reach": [
@@ -14547,6 +15489,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
+          "text": "click button \"Land this thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land this thread",
+          "value": null
+        },
+        {
+          "text": "expect alertdialog \"Land 1 revision on main?\"",
+          "action": "expect",
+          "by": "alertdialog",
+          "name": "Land 1 revision on main?",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
           "text": "fill textbox \"Message or run a task, / commands, @ files or threads\" \"/rebase\"",
           "action": "fill",
           "by": "textbox",
@@ -14561,10 +15524,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect text \"Landed 1 revision(s) on main.\"",
+          "text": "expect text \"Landed 1 revision on main.\"",
           "action": "expect",
           "by": "text",
-          "name": "Landed 1 revision(s) on main.",
+          "name": "Landed 1 revision on main.",
           "value": null
         },
         {
@@ -14589,8 +15552,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#turn-end-integrate",
       "plugin": "jj-integration",
       "id": "turn-end-integrate",
-      "title": "Integrate from the end of a turn",
-      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. The row expands in place to list those revisions — change id, description and any confl…",
+      "title": "Land from the end of a turn",
+      "summary": "The last turn of a thread with its own workspace offers Land right below the answer.",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Land on main › revisions",
       "reach": [
@@ -14609,10 +15572,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"1 revision(s) ready to land on main.*\"",
+          "text": "click button \"1 revision ready to land on main.*\"",
           "action": "click",
           "by": "button",
-          "name": "1 revision(s) ready to land on main.*",
+          "name": "1 revision ready to land on main.*",
           "value": null
         },
         {
@@ -14630,8 +15593,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#thread-workspaces-panel",
       "plugin": "jj-integration",
       "id": "thread-workspaces-panel",
-      "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, stale, blocked, conflicts, integrating, integrated, no…",
+      "title": "Workspaces page",
+      "summary": "One page lists every thread workspace by state, and lands every ready one at once.",
       "destination": "land",
       "currentSurface": "left-nav: Land",
       "reach": [
@@ -14664,10 +15627,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14720,10 +15683,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         }
       ],
@@ -14744,8 +15707,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#thread-integration-attention-view",
       "plugin": "jj-integration",
       "id": "thread-integration-attention-view",
-      "title": "Thread integration prioritises what needs attention",
-      "summary": "Opening the panel from the left sidebar lands on the Needs you view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count v…",
+      "title": "Workspaces that need you come first",
+      "summary": "The workspaces page opens on the ones with conflicts, ready work or a block.",
       "destination": "land",
       "currentSurface": "left-nav: Land › Needs you",
       "reach": [
@@ -14764,10 +15727,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14827,8 +15790,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#thread-integration-row-details",
       "plugin": "jj-integration",
       "id": "thread-integration-row-details",
-      "title": "Thread integration row details",
-      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather…",
+      "title": "Workspace row details",
+      "summary": "Expand a workspace row to see what blocks it, its revisions, its threads and its path.",
       "destination": "land",
       "currentSurface": "left-nav: Land › row details",
       "reach": [
@@ -14861,10 +15824,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14889,8 +15852,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jj-integration#thread-integration-empty",
       "plugin": "jj-integration",
       "id": "thread-integration-empty",
-      "title": "Thread integration with no thread workspaces",
-      "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
+      "title": "No thread workspaces yet",
+      "summary": "A project without thread workspaces shows one plain sentence instead of empty groups.",
       "destination": "land",
       "currentSurface": "left-nav: Land › empty state",
       "reach": [
@@ -14909,10 +15872,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14946,10 +15909,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Land\"",
+          "text": "expect heading \"Workspaces\"",
           "action": "expect",
           "by": "heading",
-          "name": "Land",
+          "name": "Workspaces",
           "value": null
         },
         {
@@ -14967,7 +15930,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "new-thread-project-picker",
       "title": "Pick a New-thread project",
-      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces…",
+      "summary": "Pick the project for a new thread, with recent projects first and workspaces listed apart.",
       "destination": "composer",
       "currentSurface": "composer: Choose project",
       "reach": [
@@ -15015,7 +15978,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "land-inbox-items",
       "title": "Blocked and ready-to-land workspaces in the Inbox",
-      "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; a workspace with described revisions not on the bookmark is one Ready item, keyed by the workspace and updated in place: its headline names the thread (“<…",
+      "summary": "A workspace that is ready to land, or blocked, shows in the Inbox with Land or Retry.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land",
       "reach": [
@@ -15057,7 +16020,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "workspace-setup",
       "title": "Prepare a new thread workspace with trusted setup actions",
-      "summary": "A project can flag profile-trusted project-checks actions to prepare a fresh thread workspace (runOnWorkspaceCreate), optionally holding the first turn until one finishes (awaitBeforeFirstTurn), and actions to run when a thread settles (onSettle). jj-integration dispatches them…",
+      "summary": "Run trusted setup steps when a thread's workspace is created, and optional steps when it is done.",
       "destination": "composer",
       "currentSurface": "composer: above the input bar",
       "reach": [
@@ -15091,7 +16054,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "project-main-branch",
       "title": "Choose a project's main branch",
-      "summary": "Settings › Projects › Main branch picks the bookmark a project's thread workspaces start from, Land advances, and the Jujutsu panel, Changes and pull requests compare against. Automatic follows dsh.project.json, then origin's default branch (git origin/HEAD or the trunk() alias…",
+      "summary": "Choose the bookmark a project's threads start from and land on, in Settings › Projects.",
       "destination": "settings",
       "currentSurface": "settings: Projects › Main branch",
       "reach": [
@@ -15153,7 +16116,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "workspace-process-stop",
       "title": "Stop processes left in a thread workspace before removing it",
-      "summary": "Before cleanup (button, jj_thread_cleanup, automatic or settle cleanup) removes a thread workspace, the Host stops its user's processes whose working directory is inside that workspace: SIGTERM, then SIGKILL after 5 seconds for whatever is still inside. The cleanup preview lists…",
+      "summary": "Processes still running in a workspace are stopped before the workspace is removed.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces (row meta)",
       "reach": [],
@@ -15165,7 +16128,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "graph-navigation",
       "title": "Locate landmarks and compare revision ancestry",
-      "summary": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
+      "summary": "Jump to the working copy, main or main@origin in one click, and compare two revisions when you need to.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › landmarks",
       "reach": [
@@ -15375,7 +16338,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "revision-graph",
       "title": "Browse and filter the revision graph",
-      "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed b…",
+      "summary": "Browse the revision graph with bookmarks, workspaces, conflicts and dates, and filter it.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph",
       "reach": [
@@ -15450,24 +16413,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect checkbox \"Hide immutable\"",
-          "action": "expect",
-          "by": "checkbox",
-          "name": "Hide immutable",
-          "value": null
-        },
-        {
-          "text": "click checkbox \"Hide immutable\"",
+          "text": "click button \"Filter\"",
           "action": "click",
-          "by": "checkbox",
+          "by": "button",
+          "name": "Filter",
+          "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"Hide immutable\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
           "name": "Hide immutable",
           "value": null
         },
         {
-          "text": "expect checkbox \"Hide immutable\"",
+          "text": "expect button \"Filter (1 on)\"",
           "action": "expect",
-          "by": "checkbox",
-          "name": "Hide immutable",
+          "by": "button",
+          "name": "Filter (1 on)",
           "value": null
         },
         {
@@ -15524,7 +16487,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "revision-detail-and-diff",
       "title": "Inspect revisions and changed files",
-      "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
+      "summary": "Open a revision's description, files and full diff, and mark files reviewed.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › revision detail",
       "reach": [
@@ -15664,7 +16627,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "review-selection",
       "title": "Select revisions in the graph to review them together",
-      "summary": "Cmd/Ctrl-click toggles a revision, Shift-click extends the visible range and the revision menu offers Select for review for touch and keyboard; a plain click keeps opening the row's details. Review together hands the selection to the Changes contract, so the plugin that owns rev…",
+      "summary": "Cmd-click or Shift-click revisions in the graph, then review them together.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › selection strip",
       "reach": [],
@@ -15675,8 +16638,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jujutsu#composer-context",
       "plugin": "jujutsu",
       "id": "composer-context",
-      "title": "See project and Jujutsu workspace context in the composer",
-      "summary": "The Changes pill in the thread header (and the phone top bar) reads the net file diff since branching from the selected base as +N −M, names the revisions present only on @ or only on that base in its tooltip, and opens the Changes view; the composer itself carries no changes ba…",
+      "title": "See a thread's changes in its header",
+      "summary": "A thread in its own workspace shows its changed lines in the header, and a click opens Changes.",
       "destination": "thread-panel",
       "currentSurface": "thread header: Changes pill",
       "reach": [
@@ -15688,10 +16651,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "rebase-ready-thread"
         },
         {
-          "text": "click button \"Changes since branching from main*\"",
+          "text": "click button \"Review workspace changes: *\"",
           "action": "click",
           "by": "button",
-          "name": "Changes since branching from main*",
+          "name": "Review workspace changes: *",
           "value": null
         },
         {
@@ -15709,8 +16672,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jujutsu#previewed-revision-mutations",
       "plugin": "jujutsu",
       "id": "previewed-revision-mutations",
-      "title": "Preview and confirm repository mutations",
-      "summary": "Create, squash, duplicate, revert, rebase, move workspaces and bookmarks, restore, split, and abandon changes only after a single-use preview bound to the exact state of the revisions, bookmark, remote and workspace it names. Open the overflow chip to drag or use actions on addi…",
+      "title": "Preview and confirm repository changes",
+      "summary": "Squash, rebase, split, abandon and other changes run only after a preview you confirm.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › revision menu",
       "reach": [
@@ -15864,7 +16827,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "workspace-overflow",
       "title": "Move a workspace from a shared revision",
-      "summary": "Open the overflow chip to see, drag, or use actions on additional workspaces that share a revision.",
+      "summary": "When several workspaces share a revision, open the overflow chip to see and move them.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › workspace overflow chip",
       "reach": [
@@ -15940,7 +16903,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here… to name and place an isolated JJ workspace in that row, then preview the setup only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here to create a workspace there.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › New workspace here",
       "reach": [
@@ -16094,7 +17057,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the de…",
+      "summary": "Revision ids and bookmarks in a message become links that preview a small graph around them.",
       "destination": "land",
       "currentSurface": "transcript: jj: reference links",
       "reach": [
@@ -16169,10 +17132,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Open Jujutsu refs from chat\"",
+          "text": "expect text \"Open Jujutsu refs from threads\"",
           "action": "expect",
           "by": "text",
-          "name": "Open Jujutsu refs from chat",
+          "name": "Open Jujutsu refs from threads",
           "value": null
         },
         {
@@ -16239,8 +17202,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jujutsu#workspace-cleanup",
       "plugin": "jujutsu",
       "id": "workspace-cleanup",
-      "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly select…",
+      "title": "Clean up idle workspaces",
+      "summary": "Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work unless you pick Stale work.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "reach": [
@@ -16422,7 +17385,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "workspace-removal",
       "title": "Remove a workspace from the graph",
-      "summary": "Right-click a workspace pill, or a revision that holds one, and choose Remove workspace…: the confirmation expands in that row, so a managed thread workspace is discarded whole after it names its unlanded revisions, while any other workspace is only forgotten and keeps its folde…",
+      "summary": "Right-click a workspace to remove it, and a thread workspace first names its unlanded revisions.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Remove workspace",
       "reach": [
@@ -16512,7 +17475,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "source-control",
       "title": "Describe and review the working copy in Source Control",
-      "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 … @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revisio…",
+      "summary": "Describe the working copy and see its changed files and the revisions below it in Source control.",
       "destination": "land",
       "currentSurface": "left-nav: Source control",
       "reach": [
@@ -16661,8 +17624,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "jujutsu#panel-scopes",
       "plugin": "jujutsu",
       "id": "panel-scopes",
-      "title": "Keep one repository per Jujutsu tab, thread and dock",
-      "summary": "Revision graph and Source control are two separate panels in navigation, the main view and the Workbench; only the narrow per-thread side panel switches between both with tabs. Each Jujutsu surface keeps its own repository, view, filters, selection and expanded rows. The toolbar…",
+      "title": "Keep one repository per Jujutsu tab",
+      "summary": "Each Jujutsu tab, thread and panel keeps its own repository, view, filters and selection.",
       "destination": "none",
       "currentSurface": "left-nav: Revision graph › per-tab repository",
       "reach": [
@@ -16723,10 +17686,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect tab \"Jujutsu · sample*\"",
+          "text": "expect tab \"History · sample*\"",
           "action": "expect",
           "by": "tab",
-          "name": "Jujutsu · sample*",
+          "name": "History · sample*",
           "value": null
         },
         {
@@ -16758,10 +17721,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Jujutsu · sample*\"",
+          "text": "click tab \"History · sample*\"",
           "action": "click",
           "by": "tab",
-          "name": "Jujutsu · sample*",
+          "name": "History · sample*",
           "value": null
         },
         {
@@ -16780,7 +17743,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "loopback-access",
       "id": "localhost-with-lan",
       "title": "Keep localhost available when LAN access is enabled",
-      "summary": "Add loopback-only TCP listeners to the existing concrete LAN-bound Web server without replacing routing, authentication or origin checks. Print the actual localhost launch URL first and the available LAN/advertised addresses after startup settles. Native loopback-only binds rema…",
+      "summary": "DSH stays reachable on localhost when you turn on access from your network.",
       "destination": "none",
       "currentSurface": "host: loopback listeners",
       "reach": [],
@@ -16792,7 +17755,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "loopback-access",
       "id": "network-access-settings",
       "title": "Choose how DSH is reachable",
-      "summary": "Choose LAN access and a concrete interface address, and set an advanced port. Localhost stays enabled independently of LAN access. Save desired preferences without interrupting current connections; a later user-controlled restart loads them. Explicit CLI flags keep priority.",
+      "summary": "Choose whether DSH is reachable from your network, on which address and port, from the next restart.",
       "destination": "settings",
       "currentSurface": "settings: Network access",
       "reach": [
@@ -16840,8 +17803,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "main-tabs#workbench-semantics-provider",
       "plugin": "main-tabs",
       "id": "workbench-semantics-provider",
-      "title": "One tab semantics provider for Workbench and standalone fallback",
-      "summary": "The declared main-tabs/workbench-tabs public module re-exports the canonical workbench/tabs page-global snapshot/subscribe/actions bridge. Workbench adopts the existing actor's current set, computed status/unread/preview/pin/title/availability and scoped targets without opening…",
+      "title": "Tabs shared with the Workbench",
+      "summary": "Tabs keep their status, pins and titles when the Workbench takes over the main view.",
       "destination": "none",
       "currentSurface": "main-tabs: tab semantics",
       "reach": [
@@ -16882,7 +17845,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "main-tabs",
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills and hairline separators), and one profile setting places its close button to the left or right of the title on both the strip and Work…",
+      "summary": "Each thread or panel you open in the main view gets a tab, as in a browser.",
       "destination": "none",
       "currentSurface": "main-tabs: tab strip",
       "reach": [
@@ -16894,10 +17857,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -16943,10 +17906,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -16971,10 +17934,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Escape"
         },
         {
-          "text": "rightclick tab \"*\"",
+          "text": "rightclick tab \"Fake thread title*\"",
           "action": "rightclick",
           "by": "tab",
-          "name": "*",
+          "name": "Fake thread title*",
           "value": null
         },
         {
@@ -17006,45 +17969,52 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
-          "text": "expect radio \"left\"",
+          "text": "expect radio \"Left\"",
           "action": "expect",
           "by": "radio",
-          "name": "left",
+          "name": "Left",
           "value": null
         },
         {
-          "text": "click radio \"right\"",
+          "text": "click radio \"Right\"",
           "action": "click",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         },
         {
-          "text": "expect radio \"right\"",
+          "text": "expect radio \"Right\"",
           "action": "expect",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         }
       ],
@@ -17056,7 +18026,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "main-tabs",
       "id": "new-tab-page",
       "title": "Open a new tab with suggestions of what to show",
-      "summary": "In the standalone fallback (unchanged), \"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a Start tab with a focused command-palette search. Typing filters New thread, the five most recent threads (running ones first), main panels and Settings by titl…",
+      "summary": "The + at the end of the tabs opens a search for a new thread, a recent thread or a panel.",
       "destination": "none",
       "currentSurface": "main-tabs: New tab",
       "reach": [
@@ -17107,7 +18077,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "main-tabs",
       "id": "tab-keyboard",
       "title": "Jump between tabs from the keyboard",
-      "summary": "Close active tab closes the active tab without archiving its thread; it ships without a default because DSH's own page.close owns Mod+W, and is bound in Settings › Shortcuts. Mod+1…8 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browse…",
+      "summary": "Jump between tabs and close them from the keyboard, with keys you can change in Settings.",
       "destination": "none",
       "currentSurface": "keyboard: tab jumps",
       "reach": [
@@ -17183,7 +18153,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "main-tabs",
       "id": "tab-persistence",
       "title": "Keep tabs across reloads, per project or globally",
-      "summary": "The tab set, order, pins, preview flag, active tab, and each scoped panel tab's scope and title survive a reload. Native fallback follows per-project sets unless the persistence setting shares one set; Workbench holds the adopted window scene while selecting conversations across…",
+      "summary": "Your tabs, their order and pins survive a reload, per project or shared.",
       "destination": "none",
       "currentSurface": "main-tabs: tab persistence",
       "reach": [],
@@ -17194,8 +18164,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "main-tabs#backlog-capture-with-thread-tab",
       "plugin": "main-tabs",
       "id": "backlog-capture-with-thread-tab",
-      "title": "Typing in Backlog with a kept thread tab",
-      "summary": "Typing and capturing text in the Backlog panel must not activate a retained thread tab in the main-view strip.",
+      "title": "Typing in Backlog keeps the current tab",
+      "summary": "Typing in the Backlog panel never switches the main view to another thread's tab.",
       "destination": "none",
       "currentSurface": "main-tabs: kept thread tab focus",
       "reach": [
@@ -17299,7 +18269,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-endpoint",
       "id": "mcp-endpoint",
       "title": "Drive DSH threads from an outside agent over MCP",
-      "summary": "Serve an MCP server (streamable HTTP, stateless, JSON responses) at /mcp on the DSH Web server. Claude Code, Codex or any MCP client with the bearer token can list projects and threads, read a thread's recent messages, create a thread with a first prompt and model, queue or stee…",
+      "summary": "Let Claude Code, Codex or any MCP client list, start and follow DSH threads.",
       "destination": "none",
       "currentSurface": "host: /mcp endpoint",
       "reach": [],
@@ -17311,7 +18281,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-endpoint",
       "id": "mcp-endpoint-plugin-tools",
       "title": "Expose plugin tools to MCP clients",
-      "summary": "Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.",
+      "summary": "Off by default: MCP clients can also use agent tools, read-only or read and write.",
       "destination": "none",
       "currentSurface": "host: /mcp endpoint",
       "reach": [],
@@ -17323,7 +18293,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-endpoint",
       "id": "mcp-endpoint-settings",
       "title": "Issue an MCP token and connect a client",
-      "summary": "Settings › MCP endpoint and the MCP endpoint: connect a client palette command open copyable setup instructions for Claude Code, Codex, Cursor, VS Code and generic JSON. The section generates, rotates and revokes a bearer token and controls LAN access; a freshly issued token app…",
+      "summary": "Create an MCP token and copy setup steps for Claude Code, Codex, Cursor or VS Code.",
       "destination": "settings",
       "currentSurface": "settings: MCP endpoint",
       "reach": [
@@ -17372,16 +18342,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"MCP endpoint\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"MCP endpoint\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "MCP endpoint",
           "value": null
         },
@@ -17408,7 +18371,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-servers",
       "id": "server-configuration",
       "title": "Manage local and remote MCP server definitions",
-      "summary": "Create, edit, enable, connect, disconnect, refresh, and remove bounded stdio or Streamable HTTP server definitions while keeping credentials as references; each environment variable or header is a name → reference row whose reference field offers the Secret Catalog picker and ac…",
+      "summary": "Add, edit, connect and remove local or remote MCP servers, with credentials kept as secret references.",
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers",
       "reach": [
@@ -17427,10 +18390,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Global MCP servers\"",
+          "text": "expect heading \"MCP servers\"",
           "action": "expect",
           "by": "heading",
-          "name": "Global MCP servers",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -17454,8 +18424,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "mcp-servers#secret-catalog-credential-bindings",
       "plugin": "mcp-servers",
       "id": "secret-catalog-credential-bindings",
-      "title": "Bind server headers and environment to Secret Catalog references",
-      "summary": "Each environment variable or request header of a server is a name → reference row. The reference input carries data-secret-input=\"reference\", so the Secret Catalog's key button lists global aliases and writes secret:ALIAS[@env]; a DSH credential name still works. The Host resolv…",
+      "title": "Use secrets for MCP server credentials",
+      "summary": "Pick a secret for each MCP server header or environment variable, and its value stays on DSH.",
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers",
       "reach": [
@@ -17478,6 +18448,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -17531,7 +18508,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-servers",
       "id": "mcp-mentions",
       "title": "Reference configured MCP servers and tools in the composer",
-      "summary": "Search enabled MCP server namespaces and the current Session's registered MCP tools from @ autocomplete; selection inserts a structured prompt reference without directly executing tools.",
+      "summary": "Mention an MCP server or tool in the composer with @.",
       "destination": "composer",
       "currentSurface": "composer: @ MCP mentions",
       "reach": [
@@ -17547,6 +18524,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
           "value": null
         },
         {
@@ -17585,10 +18569,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Native client loaded · 1 Host tools registered\"",
+          "text": "expect text \"Native client loaded · 1 DSH tools registered\"",
           "action": "expect",
           "by": "text",
-          "name": "Native client loaded · 1 Host tools registered",
+          "name": "Native client loaded · 1 DSH tools registered",
           "value": null
         },
         {
@@ -17656,7 +18640,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-servers",
       "id": "registry-catalog",
       "title": "Search curated providers and the MCP Registry",
-      "summary": "Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.",
+      "summary": "Find MCP servers in a curated list or the official MCP Registry.",
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › registry",
       "reach": [],
@@ -17668,7 +18652,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-servers",
       "id": "oauth-authorization",
       "title": "Authorize remote OAuth servers",
-      "summary": "Discover OAuth metadata, register a client, run PKCE/state validation, exchange and refresh grants, and clear grant state on sign-out.",
+      "summary": "Sign in to remote MCP servers that use OAuth, and sign out again.",
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › OAuth",
       "reach": [],
@@ -17680,7 +18664,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mcp-servers",
       "id": "batch-server-actions",
       "title": "Batch enable, disable and remove MCP servers",
-      "summary": "Registered servers take checkbox selection with ranges and visible-only select-all; enabled or disabled servers change in one pass, and removing a selection always goes through a count-named confirmation that stops its native clients and drops their grants.",
+      "summary": "Select several MCP servers to turn on, turn off or remove them at once.",
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › batch actions",
       "reach": [
@@ -17713,8 +18697,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "memory#thread-digests",
       "plugin": "memory",
       "id": "thread-digests",
-      "title": "Digest idle threads from DSH's own session logs",
-      "summary": "Once a thread has been idle for idleMs, build its digest from the session log (user requests, verbatim corrections and decisions, todos, goal, jj revision descriptions, final answer) without a model call; only a thread with no trail of its own gets one cheap call. Blank and triv…",
+      "title": "Digest idle threads from their logs",
+      "summary": "An idle thread gets a short digest of its requests, decisions and answer, mostly without a model call.",
       "destination": "none",
       "currentSurface": "host: memory digests",
       "reach": [],
@@ -17726,7 +18710,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "start-block",
       "title": "Start every thread with one frozen memory block",
-      "summary": "At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. Jujutsu workspace paths resolve to their shared…",
+      "summary": "Each thread starts with a short memory block of notes and past threads for its project.",
       "destination": "none",
       "currentSurface": "host: memory start block in the system prompt",
       "reach": [],
@@ -17738,7 +18722,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "memory-tools",
       "title": "Search, read and note memory from any agent",
-      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a…",
+      "summary": "Agents search memory, read a digest or note, and save new notes.",
       "destination": "none",
       "currentSurface": "agent tool: memory_search / memory_read / memory_note",
       "reach": [],
@@ -17750,7 +18734,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "memory-panel",
       "title": "Browse and clean up memory in the Memory panel",
-      "summary": "A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, reversible archive, restore, superseded history, related memories), on-demand Jev relevance suggestions with explicit per-note arch…",
+      "summary": "Browse, edit, archive and forget notes, and read thread digests, on the Memory page.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory",
       "reach": [
@@ -17819,7 +18803,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "memory-reference-preview",
       "title": "Preview cited memory inline",
-      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the…",
+      "summary": "Click a memory citation in a thread to see the note and where it came from.",
       "destination": "knowledge",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), memory kind",
       "reach": [
@@ -17895,7 +18879,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "usage-telemetry",
       "title": "Show what memory costs and whether it holds up",
-      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the use…",
+      "summary": "See what memory costs in tokens and whether answers that cite it hold up.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory › Analytics",
       "reach": [
@@ -17921,10 +18905,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Recall\"",
+          "text": "expect combobox \"Analytics window\"",
           "action": "expect",
-          "by": "text",
-          "name": "Recall",
+          "by": "combobox",
+          "name": "Analytics window",
           "value": null
         }
       ],
@@ -17958,10 +18942,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Recall\"",
+          "text": "expect combobox \"Analytics window\"",
           "action": "expect",
-          "by": "text",
-          "name": "Recall",
+          "by": "combobox",
+          "name": "Analytics window",
           "value": null
         }
       ],
@@ -17972,7 +18956,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "memory",
       "id": "batch-forget-notes",
       "title": "Forget a selection of notes",
-      "summary": "Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.",
+      "summary": "Select several notes and forget them with one confirmation.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory › Select notes",
       "reach": [
@@ -18013,7 +18997,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mentions",
       "id": "ranked-mentions",
       "title": "Ranked @ mentions for files and threads",
-      "summary": "One @ menu that interleaves local files and threads plus this DSH's remote threads by match quality, recency, and workspace or project; @thread: / @t: and @file: / @f: narrow results, and picks insert native reference chips.",
+      "summary": "One @ menu ranks files and threads, here and on other hosts, by how well they match.",
       "destination": "composer",
       "currentSurface": "composer: @ menu files and threads",
       "reach": [
@@ -18128,7 +19112,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mentions",
       "id": "session-mention-links",
       "title": "Referenced threads open on click",
-      "summary": "A thread chip in the composer, the thread chip in a sent message (a higher-priority renderer of the native user-text session node), its \"Referenced session · …\" line (a Chat inline reference) and an Agent-written `@[label](dsh-session:…)` link (a `dsh-session` link handler) open…",
+      "summary": "A thread you mention opens when you click it, in the composer or in a sent message.",
       "destination": "threads",
       "currentSurface": "composer and transcript: thread chips",
       "reach": [
@@ -18175,10 +19159,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect link \"Referenced session*\"",
+          "text": "expect link \"Referenced thread*\"",
           "action": "expect",
           "by": "link",
-          "name": "Referenced session*",
+          "name": "Referenced thread*",
           "value": null
         }
       ],
@@ -18190,7 +19174,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "mermaid-diagrams",
       "id": "chat-diagram",
       "title": "Mermaid diagrams in the conversation",
-      "summary": "A ```mermaid fence renders as a themed diagram card wherever Chat's code-fence registry applies: assistant answers, reasoning, compaction summaries, ask_user_question text, backlog item text and the editor's Markdown preview. A fence becomes a diagram once it is complete (anothe…",
+      "summary": "Mermaid code blocks render as diagrams in threads, backlog items and Markdown previews.",
       "destination": "transcript",
       "currentSurface": "transcript: mermaid code fence",
       "reach": [],
@@ -18208,7 +19192,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "model-effort-picker",
       "id": "model-selection",
       "title": "Search and select account models",
-      "summary": "Search account-and-model routes in a two-pane composer picker: brand marks, the model name with a subtle service label, account tags with each account's colour and remaining quota (the same binding window as the AI Accounts strip), a six-bar reasoning-effort glyph with a hover l…",
+      "summary": "Search models across accounts, with each account's remaining usage and the reasoning effort.",
       "destination": "composer",
       "currentSurface": "composer: model picker",
       "reach": [
@@ -18227,23 +19211,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect list \"Models and accounts\"",
+          "text": "expect listbox \"Models and accounts\"",
           "action": "expect",
-          "by": "list",
+          "by": "listbox",
           "name": "Models and accounts",
           "value": null
         },
         {
-          "text": "hover button \"Reasoning effort: *\"",
-          "action": "hover",
-          "by": "button",
-          "name": "Reasoning effort: *",
+          "text": "expect radiogroup \"Reasoning effort*\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Reasoning effort*",
           "value": null
         },
         {
-          "text": "expect button \"High\"",
+          "text": "expect radio \"High\"",
           "action": "expect",
-          "by": "button",
+          "by": "radio",
           "name": "High",
           "value": null
         }
@@ -18262,7 +19246,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "model-effort-picker",
       "id": "fast-mode",
       "title": "Enable Fast mode on supported Codex models",
-      "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models, as a switch on the inspected route's header and on that row's hover; the row control is mounted with the list so it never waits for a hover to answer. AI Accounts can enable it by default…",
+      "summary": "Turn on Fast mode for Codex models that support it from the model picker.",
       "destination": "composer",
       "currentSurface": "composer: model picker › Fast mode",
       "reach": [],
@@ -18274,7 +19258,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "model-effort-picker",
       "id": "account-swap",
       "title": "Switch the thread to another account offering the same model",
-      "summary": "The model menu's Account section (b:4qjm) names the thread's account and lists every other account offering the selected model id; choosing one moves the Session there, keeping the reasoning effort when the target advertises it. The chip names the account only off the default ac…",
+      "summary": "Move this thread to another account that offers the same model from the model menu.",
       "destination": "composer",
       "currentSurface": "composer: model picker › Account section",
       "reach": [],
@@ -18286,7 +19270,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "model-effort-picker",
       "id": "model-fallbacks",
       "title": "Edit the model fallback chain from the composer picker",
-      "summary": "A Fallback chain section in the picker's details pane adds the inspected selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. Rows carry the model's mark, its servi…",
+      "summary": "Add, reorder and remove the models a thread falls back to, from the model picker.",
       "destination": "composer",
       "currentSurface": "composer: model picker › Fallback chain",
       "reach": [
@@ -18305,17 +19289,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Details for*\"",
-          "action": "click",
-          "by": "button",
-          "name": "Details for*",
-          "value": null
+          "text": "press ArrowRight",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowRight"
         },
         {
           "text": "expect region \"Fallbacks\"",
           "action": "expect",
           "by": "region",
           "name": "Fallbacks",
+          "value": null
+        },
+        {
+          "text": "click button \"Fallbacks*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Fallbacks*",
           "value": null
         },
         {
@@ -18341,7 +19332,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "model-effort-picker",
       "id": "model-fan-out-gesture",
       "title": "Select several models to fan out",
-      "summary": "Turn on Select several below the list (or shift-click, or long-press on touch) so a model row collects it for fan-out instead of switching this thread's model; the bar counts the selection and Fan out… opens thread-sidebar's fan-out dialog with those routes preselected once two…",
+      "summary": "Select several models in the picker to send the same prompt to each in its own thread.",
       "destination": "composer",
       "currentSurface": "composer: model picker fan-out selection",
       "reach": [
@@ -18360,31 +19351,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "shiftclick button \"Use gpt-6-luna*\"",
+          "text": "shiftclick option \"gpt-6-luna, *\"",
           "action": "shiftclick",
-          "by": "button",
-          "name": "Use gpt-6-luna*",
+          "by": "option",
+          "name": "gpt-6-luna, *",
           "value": null
         },
         {
-          "text": "shiftclick button \"Use claude-sonnet-5-5*\"",
+          "text": "shiftclick option \"claude-sonnet-5-5, *\"",
           "action": "shiftclick",
-          "by": "button",
-          "name": "Use claude-sonnet-5-5*",
+          "by": "option",
+          "name": "claude-sonnet-5-5, *",
           "value": null
         },
         {
-          "text": "expect text \"2 selected\"",
+          "text": "expect text \"2 selected · up to 6\"",
           "action": "expect",
           "by": "text",
-          "name": "2 selected",
+          "name": "2 selected · up to 6",
           "value": null
         },
         {
-          "text": "click button \"Fan out…\"",
+          "text": "click button \"Continue…\"",
           "action": "click",
           "by": "button",
-          "name": "Fan out…",
+          "name": "Continue…",
           "value": null
         },
         {
@@ -18402,8 +19393,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "model-selection#draft-model-selection",
       "plugin": "model-selection",
       "id": "draft-model-selection",
-      "title": "Choose a model before typing in a new conversation",
-      "summary": "The full native model directory, reasoning menu and /model popup share one selection owner. Client-only blanks and existing Host blanks stage model choice until first send; nonblank Sessions preflight every route change against validated context pressure before submitting the sh…",
+      "title": "Choose a model before typing in a new thread",
+      "summary": "Pick a model from the composer or with /model before you send a thread's first message.",
       "destination": "composer",
       "currentSurface": "composer: draft model selection",
       "reach": [
@@ -18470,8 +19461,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "multi-host#runtime-directory",
       "plugin": "multi-host",
       "id": "runtime-directory",
-      "title": "Register and identify local DSH runtimes",
-      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, then edit, test, reconnect and remove them on the Hosts page.",
+      "title": "Add and identify hosts",
+      "summary": "Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.",
       "destination": "settings",
       "currentSurface": "composer: Run on Local › Add host",
       "reach": [
@@ -18480,6 +19471,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -18534,6 +19532,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
+          "value": null
+        },
+        {
           "text": "click button \"Run on Local\"",
           "action": "click",
           "by": "button",
@@ -18576,7 +19581,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "host-management",
       "title": "Manage hosts on a dedicated page",
-      "summary": "The Hosts page lists registered machines in destination-picker order, shows live one-minute load and memory use, and lets users open or copy a temporary remote-host link. Users can add existing folders or clone Git repositories with optional individually selected local-file copy…",
+      "summary": "The Hosts page lists your hosts with their load and memory, and adds projects to them.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts",
       "reach": [
@@ -18616,16 +19621,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Open host\"",
+          "text": "expect button \"Diagnose Build box\"",
           "action": "expect",
           "by": "button",
-          "name": "Open host",
+          "name": "Diagnose Build box",
           "value": null
         },
         {
-          "text": "click button \"Clone project\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Clone project\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Clone project",
           "value": null
         },
@@ -18714,7 +19726,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "logical-project-grouping",
       "title": "Group remote threads under matching local projects",
-      "summary": "Read normalized Git origins on local projects and remote workspaces so matching clones share one thread-sidebar project group while remote rows keep their host badge.",
+      "summary": "Threads on another host group under the matching local project, with a host badge.",
       "destination": "threads",
       "currentSurface": "thread-list: remote threads under their local project",
       "reach": [],
@@ -18726,7 +19738,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "fleet-update",
       "title": "Update every host from the Hosts page",
-      "summary": "Update hosts checks every visible SSH host: it fetches the host repository and dry-runs that host's own dshx checkout sync, then lists incoming and unpushed revisions and what would rebuild. Update all syncs each host that has changes (rebase onto main@origin, install, rebuild)…",
+      "summary": "Check every host for updates and update them all from the Hosts page.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Update hosts",
       "reach": [
@@ -18788,7 +19800,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "checkout-sync",
       "title": "Sync a jj checkout on another host",
-      "summary": "Sync checkout on a host row compares one jj checkout with its bookmark on origin: it fetches, simulates the rebase off disk and lists incoming and unpushed revisions, the bookmark state, which workspace this is and the others sharing the repository with the threads running in th…",
+      "summary": "Compare a host's checkout with its bookmark on origin, then sync it after a preview.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Sync checkout",
       "reach": [
@@ -18821,9 +19833,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Sync checkout\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Sync checkout\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Sync checkout",
           "value": null
         },
@@ -18850,7 +19869,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "host-settings",
       "title": "Weight Auto placement and fetch before new threads",
-      "summary": "Edit host sets an Auto weight (x1, x2, x4: Auto divides the host's resource pressure by it) and whether a thread started there first runs jj git fetch in its folder. A failed fetch never blocks the thread; the start result says why. Hiding a host also takes its threads out of th…",
+      "summary": "Weight how often Auto picks a host and whether new threads fetch first.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Edit host",
       "reach": [
@@ -18883,10 +19902,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Edit Build box\"",
+          "text": "click button \"Actions for Build box\"",
           "action": "click",
           "by": "button",
-          "name": "Edit Build box",
+          "name": "Actions for Build box",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Edit\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Edit",
           "value": null
         },
         {
@@ -18918,8 +19944,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "multi-host#remote-delegation",
       "plugin": "multi-host",
       "id": "remote-delegation",
-      "title": "Delegate a task to another machine",
-      "summary": "The multi_host_delegate agent tool runs a task as a thread on a named host, or on the least-loaded visible SSH host through Auto, waits for its turn and returns the final answer, like a subagent on that machine. A pending question on the host, a failed turn and a wait that runs…",
+      "title": "Delegate a task to another host",
+      "summary": "The agent can run a task as a thread on another host and get its answer back.",
       "destination": "none",
       "currentSurface": "agent tool: multi_host_delegate",
       "reach": [],
@@ -18931,7 +19957,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "linked-machines",
       "title": "Link machines without SSH, both ways",
-      "summary": "Linking turns on a gateway in front of this DSH, on its Tailscale address by default. It makes single-use pairing codes (ten minutes) that another machine redeems for its own revocable credential. A paired machine becomes a direct host there: threads, remote views and multi_host…",
+      "summary": "Link another machine with a short pairing code, without SSH, so threads can run on it.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Link this machine, Pair a machine",
       "reach": [
@@ -18964,9 +19990,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Link this machine\"",
+          "text": "click button \"Link this machine\"",
+          "action": "click",
+          "by": "button",
+          "name": "Link this machine",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Link this machine\"",
           "action": "expect",
-          "by": "heading",
+          "by": "dialog",
           "name": "Link this machine",
           "value": null
         },
@@ -18992,8 +20025,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "multi-host#ssh-runtime-connection",
       "plugin": "multi-host",
       "id": "ssh-runtime-connection",
-      "title": "Connect to an SSH-managed runtime",
-      "summary": "Discover a remote DSH through its launch file over SSH, verify pinned identity/capabilities, keep one pooled tunnel per runtime, and never accept unknown host keys or forward the agent.",
+      "title": "Connect to a host over SSH",
+      "summary": "DSH reaches a host over SSH with a verified identity and never accepts an unknown host key.",
       "destination": "none",
       "currentSurface": "host: SSH runtime tunnels",
       "reach": [],
@@ -19005,7 +20038,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "session-routing",
       "title": "Use the native composer for remote threads",
-      "summary": "The one-shot Auto destination selects the least-pressured visible remote host from fresh CPU and memory snapshots, then pins that runtime before folder selection; keep its model catalog, reasoning-effort picker, file attachments, and @ file references bound to the owning runtime…",
+      "summary": "Start a thread on another host from the normal composer, or let Auto pick the least busy one.",
       "destination": "composer",
       "currentSurface": "composer: Run on Local chip",
       "reach": [
@@ -19021,6 +20054,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -19046,7 +20086,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "isolated-runtime-views",
       "title": "Open the host's own DSH UI",
-      "summary": "Lease the pooled tunnel for a stable loopback origin and open the remote runtime's UI in a new tab.",
+      "summary": "Open another host's own DSH in a new tab.",
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Open host UI",
       "reach": [],
@@ -19058,7 +20098,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-thread-references",
       "title": "Mention remote threads safely",
-      "summary": "Remote thread references resolve only from recorded, authorized hosts; the host retrieves a bounded text-only snapshot and inserts it as explicitly untrusted read-only context before the native resolver handles local references.",
+      "summary": "Mention a thread on another host, and its text arrives as read-only context.",
       "destination": "composer",
       "currentSurface": "composer: @t: remote threads",
       "reach": [
@@ -19092,7 +20132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-inventory",
       "title": "Every thread on every host",
-      "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
+      "summary": "One panel lists the threads on every host, grouped by host.",
       "destination": "threads",
       "currentSurface": "thread-list: All remote threads",
       "reach": [
@@ -19119,7 +20159,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-host-fallback",
       "title": "Open a mirrored thread on its host",
-      "summary": "The mirrored-thread header resolves its remote owner and opens that runtime's own DSH on the same thread, for what the mirror does not reach.",
+      "summary": "Open a thread from another host in that host's own DSH.",
       "destination": "threads",
       "currentSurface": "thread-header: Open mirrored thread on its host",
       "reach": [
@@ -19131,9 +20171,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Sidebar settings\"",
+          "text": "click button \"Sidebar settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Sidebar settings",
           "value": null
         },
@@ -19167,7 +20207,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-interactions",
       "title": "Answer a remote agent's questions and approvals in this client",
-      "summary": "While a mirrored thread is followed, this Host opens the owning runtime's forwarded-event stream as an owner client, holds what the runtime waits on, and shows it in the native question card or an approval panel in the same seat. Answers go back to that runtime, which stays the…",
+      "summary": "Answer questions and approvals from a thread on another host right here.",
       "destination": "composer",
       "currentSurface": "conversation composer seat of a mirrored thread",
       "reach": [
@@ -19208,7 +20248,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-thread-jj",
       "title": "Work a remote thread's repository from this client",
-      "summary": "The thread workspace control, the integrate offer, the JJ side panel and the composer's changes bar of a mirrored thread read from the runtime that owns it, and land, queue, undo and prepared jujutsu actions run there. Each call is authorized for that Session and limited to its…",
+      "summary": "Land, undo and other workspace actions on a thread from another host run on that host.",
       "destination": "threads",
       "currentSurface": "thread-header: Current thread workspace",
       "reach": [
@@ -19249,7 +20289,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "multi-host",
       "id": "remote-terminal-handoff",
       "title": "Open a remote thread's terminal on its host",
-      "summary": "A terminal tab on a mirrored thread replaces the native body, which has no agent to run against here, with a button that opens that thread in the host's own DSH. Every route into a terminal lands on it: the start page, the shortcut and a restored tab.",
+      "summary": "A terminal tab on another host's thread opens that thread in the host's own DSH.",
       "destination": "threads",
       "currentSurface": "right sidebar: Terminal tab of a mirrored thread",
       "reach": [
@@ -19290,7 +20330,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "getting-started",
       "title": "See what this setup can do and what it still needs on one page",
-      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub C…",
+      "summary": "A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started; palette: Getting started",
       "reach": [
@@ -19359,7 +20399,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "pack-change",
       "title": "Enable or disable a plugin pack after an exact preview",
-      "summary": "Each non-core pack on Getting started has Enable pack and Disable pack. Either opens one dialog that names exactly which packages would install, which rows would be enabled or disabled, which are already fine, which another pack keeps on, the pack's prerequisites and whether a r…",
+      "summary": "Turn a plugin pack on or off after a preview of exactly what changes.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › Packs › Enable pack / Disable pack",
       "reach": [
@@ -19442,7 +20482,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "setup-wizard",
       "title": "Get set up in three steps: account, project, first task",
-      "summary": "While an AI account or a project is still missing (the live checklist) and no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the com…",
+      "summary": "Three steps get you set up: add an account, add a project, start a first task.",
       "destination": "threads",
       "currentSurface": "empty thread view (first run); palette: Show the setup wizard",
       "reach": [
@@ -19493,7 +20533,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "starter-tasks",
       "title": "First tasks for your project on the new-thread screen",
-      "summary": "Until the first thread has a message, the new-thread screen says one sentence and offers three first tasks for the project on screen (explain it, find a rough edge, add a missing test) beside the other suggestion cards. A task puts its prompt in the composer and never sends it.…",
+      "summary": "The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.",
       "destination": "composer",
       "currentSurface": "new-thread screen: suggestion cards",
       "reach": [
@@ -19513,7 +20553,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "show-me-where",
       "title": "Show me where a feature lives, one step at a time",
-      "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the firs…",
+      "summary": "Show me where highlights each control on the way to a feature, one step at a time.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › Features › Show me where",
       "reach": [
@@ -19610,7 +20650,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "whats-new",
       "title": "See what changed in your plugins since your last visit",
-      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin as a sentence (the type and scope dropped, the first letter capitalized, a Fix or Breaking change badge, no plugin name), newest first, at most 50, each with its date. It is read…",
+      "summary": "What's new lists the latest changes to your plugins, newest first.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › What's new",
       "reach": [
@@ -19650,7 +20690,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "usage-suggestions",
       "title": "Get features suggested from what you already do",
-      "summary": "Getting started's Suggestions, off by default, maps the last 30 days of local tool use to catalogued features you have not used yet whose pattern implies value: many jj shell commands and no thread workspace suggest thread workspaces, long threads that never compacted suggest th…",
+      "summary": "Off by default: suggests features you have not tried, based on what you did in the last 30 days.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › Suggestions",
       "reach": [
@@ -19695,7 +20735,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "feature-reach",
       "title": "Ask how to get to a feature",
-      "summary": "The read-only onboarding_reach agent tool (onboarding/reach) returns one catalogued feature's reach steps as the dshx grammar parses them: each action, its locator (ARIA role, text, label or title) and accessible name, the fill value or key, which steps this app cannot replay (s…",
+      "summary": "The agent can ask how to get to a feature, step by step.",
       "destination": "none",
       "currentSurface": "agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started",
       "reach": [],
@@ -19707,7 +20747,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "try-it",
       "title": "Try a feature with the agent in a new thread",
-      "summary": "Off by default because each demo spends tokens. With Settings › Onboarding › tryIt on, every feature row and every pack card with an enabled plugin on Getting started has Try it. It opens a dialog that says it starts a new thread and sends a demo prompt at once, which runs on yo…",
+      "summary": "Off by default: Try it starts a new thread where the agent demonstrates a feature, using tokens.",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › Features / Packs › Try it",
       "reach": [
@@ -19752,7 +20792,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "opencode-compat",
       "id": "plugin-loader",
       "title": "Load OpenCode server plugins",
-      "summary": "Loads configured OpenCode v2 server plugins in the Host and records unsupported APIs.",
+      "summary": "Load OpenCode server plugins in DSH and see which of their features are not supported.",
       "destination": "settings",
       "currentSurface": "settings: dshfiles-opencode-compat",
       "reach": [],
@@ -19764,7 +20804,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "opencode-compat",
       "id": "plugin-tools",
       "title": "Run OpenCode plugin tools and tool hooks",
-      "summary": "Tools an OpenCode plugin adds through ctx.tool.transform become DSH agent tools; its execute.before and execute.after hooks run on every DSH tool call, denying calls or replacing result content.",
+      "summary": "Tools from OpenCode plugins become agent tools, and their hooks run around every tool call.",
       "destination": "none",
       "currentSurface": "agent tools contributed by configured plugins",
       "reach": [],
@@ -19776,7 +20816,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "opencode-compat",
       "id": "skills-context-storage",
       "title": "OpenCode skills, context hooks and storage",
-      "summary": "Maps plugin-owned skills, prompt assembly hooks and durable JSON storage into DSH.",
+      "summary": "OpenCode plugins' skills, prompt hooks and stored data work in DSH.",
       "destination": "none",
       "currentSurface": "settings: dshfiles-opencode-compat",
       "reach": [],
@@ -19788,7 +20828,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "optmem-core",
       "id": "credential-redaction",
       "title": "Redact credentials before data reaches persistence",
-      "summary": "Remove common credential shapes and caller-supplied secret literals while leaving ordinary code intact.",
+      "summary": "Credentials are removed from text before it is stored, and ordinary code stays intact.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -19800,7 +20840,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "optmem-core",
       "id": "bounded-utf8-text",
       "title": "Count, clip, and paginate UTF-8 text by bytes",
-      "summary": "Measure and bound UTF-8 payloads without splitting a code point and with an explicit truncation marker.",
+      "summary": "Long text is cut to a byte limit with a clear marker, never in the middle of a character.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -19812,7 +20852,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "optmem-core",
       "id": "memory-tree-addressing",
       "title": "Address complete nodes in a hierarchical memory tree",
-      "summary": "Map level/index addresses to ranges, navigate relatives, identify complete nodes, and find the covering view node deterministically.",
+      "summary": "Memory finds any part of a long history by its place in a tree of summaries.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -19824,7 +20864,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "optmem-core",
       "id": "deterministic-view-and-summary",
       "title": "Build deterministic views",
-      "summary": "Merge the most due node pairs first, preserve recent detail, and report compatibility capabilities accurately.",
+      "summary": "Memory builds the same summary view from the same history, keeping recent detail.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -19836,7 +20876,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "phone-access",
       "id": "phone-sign-in-qr",
       "title": "Print a phone sign-in QR for a trusted HTTPS origin",
-      "summary": "At startup the Host runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve) can reach the native listener without a trustedHosts setting, detects the tailnet hostname, points Serve at that proxy, and prints one scannable sign-in QR. Configured https origins s…",
+      "summary": "At startup DSH prints a QR code that signs a phone in over your tailnet's HTTPS address.",
       "destination": "none",
       "currentSurface": "host: startup terminal output",
       "reach": [],
@@ -19847,8 +20887,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "phone-access#phone-edge-routes",
       "plugin": "phone-access",
       "id": "phone-edge-routes",
-      "title": "Share the phone origin with other Host plugins",
-      "summary": "The edge API (`@dshfiles/phone-access/edge-api`) reports whether the proxy listens and which public origins reach it, and lets a Host plugin claim paths and a cookie on that origin. Claimed requests go to the claimer's loopback port unchanged; the rest still reach the native lis…",
+      "title": "Share the phone address with other plugins",
+      "summary": "Other features can serve their own paths on the phone's HTTPS address.",
       "destination": "none",
       "currentSurface": "host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes)",
       "reach": [],
@@ -19860,7 +20900,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "phone-pairing",
       "id": "phone-pairing",
       "title": "Pair a phone over a self-provisioned HTTPS tunnel",
-      "summary": "Opt-in public phone access with agent tools: the persisted setting decides whether DSH exposes the gateway, the tools enable, disable, print a fresh code and revoke devices, and the chosen provider provisions the tunnel (Tailscale first, public tunnel fallback). Redemption issue…",
+      "summary": "Off by default: pair a phone over a secure tunnel with a one-time code, and revoke it any time.",
       "destination": "none",
       "currentSurface": "host: loopback gateway, terminal QR and the rail's Pair a phone dialog",
       "reach": [
@@ -19894,9 +20934,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "plugin-guide",
       "id": "plugin-guide",
       "title": "Browse where a plugin can extend DSH",
-      "summary": "Settings › Plugin guide is a developer page over a static catalog generated at build time from public declarations: dshx SDK entry points (each checked against the dshx index it is imported from), the native Client slots of create-dshx's offline slot reference, every owned plugi…",
+      "summary": "A developer page in Settings that lists every place a plugin can extend DSH.",
       "destination": "settings",
-      "currentSurface": "rail: Settings › Plugin guide (already on the rail)",
+      "currentSurface": "rail: Settings › Developer › Plugin guide",
       "reach": [
         {
           "text": "click tab \"Settings\"",
@@ -19933,8 +20973,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "plugin-ui#query-client-binding",
       "plugin": "plugin-ui",
       "id": "query-client-binding",
-      "title": "Provide host-backed client queries",
-      "summary": "Expose one query client per bundle and deliver typed query state to decorated children while preserving readable failures.",
+      "title": "Load data from DSH in plugin views",
+      "summary": "Plugin views load data from DSH with shared caching and readable errors.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -19945,8 +20985,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "plugin-ui#schema-validated-persistent-values",
       "plugin": "plugin-ui",
       "id": "schema-validated-persistent-values",
-      "title": "Persist schema-validated client values",
-      "summary": "Read fallback values for missing, malformed, or invalid storage, persist only schema-valid writes, react to other-tab changes, and report unavailable writes without losing in-memory state.",
+      "title": "Remember checked values in the browser",
+      "summary": "Plugin views remember checked values in the browser and follow changes from other tabs.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -19958,7 +20998,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "plugin-ui",
       "id": "typed-forms-and-accessible-tables",
       "title": "Compose validated forms and accessible data tables",
-      "summary": "Show schema errors on submit, submit valid form state, sort tables from accessible header buttons, and render empty states across columns.",
+      "summary": "Forms show errors on submit, and tables sort from their headers and show an empty state.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -19970,7 +21010,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "plugin-ui",
       "id": "debounced-client-values",
       "title": "Debounce fast-changing client input",
-      "summary": "Publish only the final value after the configured delay so search and preference consumers avoid redundant work.",
+      "summary": "Search fields wait until you stop typing before they search.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -19981,8 +21021,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "plugin-ui#touch-targets",
       "plugin": "plugin-ui",
       "id": "touch-targets",
-      "title": "Give kit controls a 44px touch target",
-      "summary": "On a coarse pointer every kit button, toggle and toggle-group item gets a hit area of at least 44px centred on it through an absolutely positioned ::after (page tabs through ::before, since ::after draws their underline), and menu, select and command rows get a 44px row. The dra…",
+      "title": "Touch-sized controls",
+      "summary": "On a touch screen every button, toggle and menu row is at least 44 pixels tall to tap.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -19994,7 +21034,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "plugin-ui",
       "id": "shared-motion",
       "title": "Animate components with one shared motion layer",
-      "summary": "Expose Motion's framework-free core with shared spring, duration, easing and enter presets, reduced-motion handling, FLIP lists, count-ups and rolling digits, so every animated plugin component moves the same way.",
+      "summary": "Animated parts of every plugin move the same way and respect reduced motion.",
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
@@ -20006,7 +21046,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "policies",
       "id": "deny-policies",
       "title": "Deny tool calls outright, after permissions",
-      "summary": "A global tool guard refuses any call whose tool name matches a rule's glob and whose JSON arguments match its pattern, whatever the approval policy or sandbox mode allowed; the agent can list and dry-run the rules but never change them.",
+      "summary": "Block matching tool calls whatever the approval settings allow, and the agent cannot change the rules.",
       "destination": "settings",
       "currentSurface": "agent tool: policies_list (no UI)",
       "reach": [],
@@ -20018,7 +21058,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "preview",
       "id": "preview-browser",
       "title": "Agent preview browser",
-      "summary": "Agent tools drive a headless Chromium on the DSH Host, one isolated browser context per thread: preview_open, preview_navigate, preview_snapshot (bounded accessibility text with element refs), preview_screenshot (image), preview_click, preview_type, preview_evaluate (off until t…",
+      "summary": "The agent drives its own browser for each thread to open, click, type and take screenshots.",
       "destination": "thread-panel",
       "currentSurface": "agent tool: preview_open / preview_screenshot",
       "reach": [],
@@ -20030,7 +21070,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "preview",
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a…",
+      "summary": "The thread header lists the ports its processes serve, to open each one or stop it.",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Dev servers and previews",
       "reach": [
@@ -20063,8 +21103,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "preview#render-html",
       "plugin": "preview",
       "id": "render-html",
-      "title": "Offline HTML screenshots for other Host plugins",
-      "summary": "The preview-render dshx contract (@dshfiles/preview/render-api) lets another Host plugin screenshot an untrusted HTML document in the preview Chromium: a fresh offline browser context per call with every request aborted, the document in an allow-scripts, opaque-origin srcdoc fra…",
+      "title": "Offline HTML screenshots for other plugins",
+      "summary": "Other features can take a screenshot of an HTML page in an offline browser.",
       "destination": "none",
       "currentSurface": "host: preview-render contract",
       "reach": [],
@@ -20076,7 +21116,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "preview",
       "id": "agent-browser",
       "title": "Agent browser",
-      "summary": "The thread panel's Agent browser tab mirrors the headless page the thread's agent drives: the dev-server chip's Watch on a preview page (or the panel guide, for the thread on screen) opens it. Frames poll about twice a second only while the tab and the window are visible, an unc…",
+      "summary": "The Agent browser tab shows the page the agent is driving, and you can click and type in it.",
       "destination": "thread-panel",
       "currentSurface": "thread panel: Agent browser",
       "reach": [],
@@ -20088,7 +21128,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "project-automations",
       "id": "project-automations",
       "title": "Start threads in a project on a schedule",
-      "summary": "Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model throug…",
+      "summary": "Start a thread in a project on a schedule, with its own prompt, agent and model.",
       "destination": "work",
       "currentSurface": "rail: Work › Automations (already on the rail)",
       "reach": [
@@ -20161,7 +21201,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "project-automations",
       "id": "project-automation-webhooks",
       "title": "Start threads from signed webhooks",
-      "summary": "A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request carries either x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, \"<timestamp>.<raw body>\"), or GitHub's x-hub-signature-256 over the raw body with x-github…",
+      "summary": "Start a thread in a project when a signed webhook, such as one from GitHub, arrives.",
       "destination": "none",
       "currentSurface": "host: /automations/webhook/<id> route",
       "reach": [
@@ -20195,7 +21235,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "project-checks",
       "id": "trusted-actions",
       "title": "Run trusted project checks",
-      "summary": "Run configured fixed-argv actions inside canonical trusted roots, including trusted actions flagged to prepare a new thread workspace (optionally holding its first turn) or to run when a thread settles, retain receipts, and expose an opt-in durable local task lifecycle without e…",
+      "summary": "Run trusted project checks, including setup steps for a new workspace, and keep their results.",
       "destination": "composer",
       "currentSurface": "composer: Project checks",
       "reach": [
@@ -20248,8 +21288,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "project-checks#native-hook-receipts",
       "plugin": "project-checks",
       "id": "native-hook-receipts",
-      "title": "Show native hook invocation records",
-      "summary": "Display actual hook invoked/result events and avoid inventing skipped-hook records that DSH does not provide.",
+      "title": "Show hook runs",
+      "summary": "See which hooks ran and what they returned.",
       "destination": "thread-panel",
       "currentSurface": "composer: Project checks › hook events",
       "reach": [],
@@ -20261,7 +21301,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "project-checks",
       "id": "activity-projection",
       "title": "Project check receipts appear safely in the Activity Timeline",
-      "summary": "Persist authoritative verification receipts before emitting a strict v2 safe summary with the verification stage, replay a bounded recent window when Activity Timeline starts, and keep Project Checks useful when Timeline is absent.",
+      "summary": "Check results appear in the activity feed, and checks keep working without it.",
       "destination": "none",
       "currentSurface": "host: receipts into left-nav: Activity Timeline: Activity",
       "reach": [],
@@ -20273,7 +21313,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "prompt-stash",
       "id": "prompt-library",
       "title": "Manage reusable prompt snippets",
-      "summary": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
+      "summary": "Save, edit and search prompt snippets that every browser shares, and insert one into the composer.",
       "destination": "composer",
       "currentSurface": "composer: Prompts",
       "reach": [
@@ -20303,7 +21343,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "prompt-stash",
       "id": "guarded-composer-insertion",
       "title": "Insert prompt text without submitting",
-      "summary": "Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.",
+      "summary": "Inserting a prompt adds its text at the cursor, keeps your attachments and never sends.",
       "destination": "composer",
       "currentSurface": "composer: Prompts › insert",
       "reach": [],
@@ -20315,7 +21355,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "prompt-stash",
       "id": "recent-user-prompts",
       "title": "Browse recent text-only user messages",
-      "summary": "Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.",
+      "summary": "Pick from the messages you recently sent in this thread.",
       "destination": "composer",
       "currentSurface": "composer: Prompts › recent",
       "reach": [],
@@ -20327,7 +21367,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "prompt-stash",
       "id": "prompt-history",
       "title": "Search every prompt sent across threads",
-      "summary": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_histor…",
+      "summary": "Search every prompt you sent in any thread with Ctrl+R, and insert one without sending.",
       "destination": "composer",
       "currentSurface": "composer: Prompts › All threads; Ctrl+R; palette: Search prompt history",
       "reach": [
@@ -20388,7 +21428,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "prompt-stash",
       "id": "draft-attachment-retention",
       "title": "Keep draft attachments across thread navigation",
-      "summary": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",
+      "summary": "Files and images in a draft stay with it when you switch threads and come back.",
       "destination": "composer",
       "currentSurface": "composer: draft attachments",
       "reach": [
@@ -20506,7 +21546,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "pull-requests",
       "id": "github-pull-request-links",
       "title": "Link and watch GitHub pull requests from DSH threads",
-      "summary": "Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transition…",
+      "summary": "Pull requests linked to a thread are watched, and their state changes are reported in the thread.",
       "destination": "none",
       "currentSurface": "agent tools: pull_request_link, pull_request_watch, pull_request_list",
       "reach": [],
@@ -20518,7 +21558,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "pull-requests",
       "id": "github-pull-request-create",
       "title": "Create a GitHub pull request from a thread",
-      "summary": "Previews the thread's jj workspace (repository, base, bookmark, commits above the base, an open pull request for the bookmark) with a title and body drafted from the thread by its model, then on explicit confirm sets the bookmark, pushes it with jj git push, runs gh pr create an…",
+      "summary": "Create a GitHub pull request from a thread after a preview with a drafted title and body.",
       "destination": "none",
       "currentSurface": "palette: Create pull request from this thread (dialog)",
       "reach": [
@@ -20588,7 +21628,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "pwa",
       "id": "installable-app",
       "title": "Install the Web UI as an app on the phone",
-      "summary": "The Host serves its own manifest with PNG icons (any and maskable) and a splash color, and injects the head tags Safari on iOS needs for a standalone home-screen launch with its own icon instead of a page screenshot. Registered on the Host Web server, so the Tailscale tunnel, th…",
+      "summary": "Add DSH to a phone's Home Screen to open it as an app with its own icon.",
       "destination": "none",
       "currentSurface": "host: served manifest, icon routes and index head",
       "reach": [],
@@ -20600,7 +21640,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "queue-ordering",
       "title": "Reorder pending messages",
-      "summary": "Move a queued item up, down, or by drag while preserving its durable identity and respecting next-turn and next-step boundaries.",
+      "summary": "Move queued messages up, down or by drag.",
       "destination": "composer",
       "currentSurface": "composer: queued messages",
       "reach": [],
@@ -20615,7 +21655,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "composer-message-editing",
       "title": "Edit queued messages in the composer",
-      "summary": "Move a queued message's text and attachments into the main composer, show an editing placeholder in its place, and put the edited (Submit) or original (Cancel/Escape) message back at the same position.",
+      "summary": "Edit a queued message in the composer, and it goes back to the same place in the queue.",
       "destination": "composer",
       "currentSurface": "composer: queued messages › edit",
       "reach": [],
@@ -20627,7 +21667,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "queued-message-preview",
       "title": "Preview queued message text",
-      "summary": "Show a normalized one-line text preview, hide attachment payloads, and honor the configured character limit without splitting Unicode code points.",
+      "summary": "Each queued message shows a one-line preview of its text.",
       "destination": "composer",
       "currentSurface": "composer: queued messages › preview",
       "reach": [],
@@ -20639,7 +21679,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "queue-message-transfer",
       "title": "Move a queued message to another thread",
-      "summary": "Move to thread… opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
+      "summary": "Move a queued message, with its files, to another thread.",
       "destination": "composer",
       "currentSurface": "composer: queued messages › Move to thread",
       "reach": [
@@ -20736,7 +21776,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "queued-attachment-previews",
       "title": "Preview queued attachments",
-      "summary": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
+      "summary": "Queued messages show a thumbnail for each image and a name for each file.",
       "destination": "composer",
       "currentSurface": "composer: queued messages › attachment previews",
       "reach": [
@@ -20777,7 +21817,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "queue-reorder",
       "id": "send-later",
       "title": "Send a message later",
-      "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through t…",
+      "summary": "Schedule a message to send later, and edit, send now or cancel it until then.",
       "destination": "composer",
       "currentSurface": "composer ⋯: Send later…; dock: Scheduled messages",
       "reach": [
@@ -20824,8 +21864,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "references#session-references",
       "plugin": "references",
       "id": "session-references",
-      "title": "Attach named outside directories and git repositories to a thread",
-      "summary": "Save a reference (a directory read in place, or a git URL shallow-cloned under $DSH_HOME/references), attach it to a Session with /reference or the reference_* tools, and name every attached reference with its absolute path in that Session's runtime context.",
+      "title": "Attach outside folders and repositories to a thread",
+      "summary": "Attach a folder or git repository to a thread with /reference so the agent can read it.",
       "destination": "knowledge",
       "currentSurface": "agent tool: reference_* and /reference (no UI)",
       "reach": [],
@@ -20836,8 +21876,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "request-messages#dispatch-request-messages",
       "plugin": "request-messages",
       "id": "dispatch-request-messages",
-      "title": "Dispatch agent/request-messages on stock DSH",
-      "summary": "Wrap the llm runtime's innermost adapter call so every agent-loop request runs the agent/request-messages waterfall and sends the messages its listeners return, with config, tools and tool history unchanged.",
+      "title": "Let plugins adjust each model request",
+      "summary": "Features can adjust the messages of each model request before it is sent.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -20849,7 +21889,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "resource-packs",
       "id": "local-properties",
       "title": "Typed packs on referenced resources",
-      "summary": "Register resources and attach reusable typed property packs, without modifying native content or running agents.",
+      "summary": "Attach reusable sets of typed properties to resources without changing them.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Resource Packs: Resources (not mounted)",
       "reach": [
@@ -20888,8 +21928,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "rich-composer#phone-thread-menu",
       "plugin": "rich-composer",
       "id": "phone-thread-menu",
-      "title": "Open a scoped phone thread menu",
-      "summary": "The phone top bar offers a menu only for its mounted Conversation reader. The typed PhoneThreadMenu dshx contract lists this occurrence's views, header controls and composer tools by stable id. Blank selected threads keep Composer tools; missing launchers never hide mounted cont…",
+      "title": "Thread menu on a phone",
+      "summary": "On a phone, the top bar's menu holds this thread's views, header controls and composer tools.",
       "destination": "composer",
       "currentSurface": "phone top bar: Thread menu",
       "reach": [],
@@ -20900,8 +21940,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "rich-composer#workbench-conversation-views",
       "plugin": "rich-composer",
       "id": "workbench-conversation-views",
-      "title": "Dock an independently bound Conversation view",
-      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Fac…",
+      "title": "Dock a thread view",
+      "summary": "Saved layouts restore their docked thread views without an extra composer.",
       "destination": "none",
       "currentSurface": "workbench: docked Conversation views",
       "reach": [],
@@ -20912,8 +21952,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "rich-composer#paste-session-mentions",
       "plugin": "rich-composer",
       "id": "paste-session-mentions",
-      "title": "Paste session mentions as reference chips",
-      "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
+      "title": "Paste thread mentions as chips",
+      "summary": "A thread mention you paste into the composer becomes a reference chip.",
       "destination": "composer",
       "currentSurface": "composer: pasted thread mentions",
       "reach": [
@@ -20962,7 +22002,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "image-attachment-reference",
       "title": "Add inline references for image attachments",
-      "summary": "When an image enters the composer, it gets an ordered inline reference in the draft so users can point to specific screenshots in their message.",
+      "summary": "Each image you attach gets a numbered reference in the draft, so you can point to it.",
       "destination": "composer",
       "currentSurface": "composer: image references",
       "reach": [
@@ -21039,7 +22079,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "image-reference-mentions",
       "title": "Reuse image references and open the selected image",
-      "summary": "Attached images remain reusable @ candidates; repeated picks create distinct chips, and activating a chip opens that exact image in the attachment gallery.",
+      "summary": "Mention an attached image again with @, and click its chip to open that image.",
       "destination": "composer",
       "currentSurface": "composer: image reference chips",
       "reach": [
@@ -21116,7 +22156,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "rename-thread-title",
       "title": "Rename a thread from its header title",
-      "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The hea…",
+      "summary": "Click the thread title in the header to rename it.",
       "destination": "threads",
       "currentSurface": "thread-header: click title to rename",
       "reach": [
@@ -21164,7 +22204,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "composer-contract",
       "title": "Composer contract for other plugins",
-      "summary": "Provides dshx's Composer contract: the composer on screen and whether it holds focus, the draft text to read, replace or insert at the caret, file, quote, note and line-comment chips, the next message's model and variant, and focus. Those chips keep their content in the chip, so…",
+      "summary": "Other features can read and change the draft, add chips and pick the next message's model.",
       "destination": "none",
       "currentSurface": "client: Composer contract",
       "reach": [],
@@ -21176,7 +22216,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "prompt-recall",
       "title": "Recall earlier prompts with ArrowUp",
-      "summary": "ArrowUp in an empty composer shows this thread's previous prompts from its loaded history, newest first; repeated ArrowUp goes older, ArrowDown goes newer and back to the empty draft, Escape restores the draft, and editing the recalled text ends recall.",
+      "summary": "Press the Up arrow in an empty composer to bring back this thread's earlier prompts.",
       "destination": "composer",
       "currentSurface": "composer: ArrowUp recall",
       "reach": [
@@ -21228,7 +22268,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "large-paste-file",
       "title": "Attach a large paste as a text file",
-      "summary": "A text paste of 32 KiB or more becomes a pasted-<date>-<time>.txt file attachment through the composer's existing upload path, and a notice offers Paste as text to remove the file and insert the text instead.",
+      "summary": "Pasting a lot of text attaches it as a file, with an option to paste it as text instead.",
       "destination": "composer",
       "currentSurface": "composer: large paste as file",
       "reach": [
@@ -21277,7 +22317,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "held-send",
       "title": "Send once the attachments finish uploading",
-      "summary": "Send or Enter while a file or image still uploads holds the message instead of refusing it: Send shows a filling ring, a status line above the composer reads 'Sending when uploads finish (40%)' with Cancel, and the message goes out by itself, in the queue or steer mode it was pr…",
+      "summary": "Press Send while a file still uploads and the message goes out by itself once every upload is ready.",
       "destination": "composer",
       "currentSurface": "composer: held Send and its status line",
       "reach": [],
@@ -21289,7 +22329,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "composer-run-row",
       "title": "Run row, send states and meter line",
-      "summary": "A new thread carries its pre-send choices inside the composer card as quiet ghost pickers in the bottom bar: project · host · workspace · agent mode · file access after the + control, model and account beside Send. Each segment is the owner plugin’s own control placed through th…",
+      "summary": "A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.",
       "destination": "composer",
       "currentSurface": "composer: pickers in the card’s bottom bar of a new thread; summary chip on the meter line",
       "reach": [
@@ -21312,6 +22352,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Choose project",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: Local*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: Local*",
           "value": null
         },
         {
@@ -21344,7 +22391,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "draft-reference-restore",
       "title": "Restore draft reference chips from plain text",
-      "summary": "A queued message comes back into the composer as plain text; every trigger source's own restore grammar turns the serialized references it still names back into the chips the composer sent, without changing the draft text.",
+      "summary": "A queued message brought back into the composer gets its reference chips back.",
       "destination": "composer",
       "currentSurface": "composer: restored draft references",
       "reach": [],
@@ -21356,7 +22403,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "rich-composer",
       "id": "sent-annotations",
       "title": "Keep sent annotations across browsers",
-      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations t…",
+      "summary": "DSH keeps sent annotations in a review history per thread, so their markers and comments come back in any browser.",
       "destination": "none",
       "currentSurface": "host: plugin storage per Session · client: Composer annotations",
       "reach": [],
@@ -21367,8 +22414,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "schedule#catalog-read-reuse",
       "plugin": "schedule",
       "id": "catalog-read-reuse",
-      "title": "Tasks and reminder catalogs keep their read until a schedule change",
-      "summary": "The native Tasks page, task tabs and the Session header's reminders from one owned fork of the stock row. Behaviour is the native one; a reminder catalog subscribed again keeps its last read while no schedule/changed event or connection reset happened since, so reopening a threa…",
+      "title": "Tasks and reminders load once",
+      "summary": "The Tasks page and thread reminders reload only when a schedule changes.",
       "destination": "work",
       "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
       "reach": [],
@@ -21382,8 +22429,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "secret-catalog#scoped-alias-catalog",
       "plugin": "secret-catalog",
       "id": "scoped-alias-catalog",
-      "title": "Browse aliases by scope and environment",
-      "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker, which opens on Projects and offers confirmed secondary JJ workspaces in a separate scope, and identify the current host-local scope.",
+      "title": "Browse secrets by scope and environment",
+      "summary": "Search your secrets across project, global and local scopes, without seeing their values.",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets",
       "reach": [
@@ -21465,7 +22512,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "bounded-secret-reveal",
       "title": "Reveal on click and copy without revealing",
-      "summary": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
+      "summary": "Click a masked secret to reveal it for a short time, or copy it without revealing it.",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › reveal",
       "reach": [
@@ -21513,7 +22560,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "inline-quick-add",
       "title": "Add a secret inline under the list",
-      "summary": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the s…",
+      "summary": "Add a secret in a new row under the list with a name and a value, or generate one.",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add secret",
       "reach": [
@@ -21567,10 +22614,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Generate on this Host\"",
+          "text": "expect menuitem \"Generate on this host\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Generate on this Host",
+          "name": "Generate on this host",
           "value": null
         }
       ],
@@ -21581,8 +22628,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "secret-catalog#alias-mutations",
       "plugin": "secret-catalog",
       "id": "alias-mutations",
-      "title": "Create, edit, rename, and remove aliases safely",
-      "summary": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the va…",
+      "title": "Create, edit, rename and remove secrets",
+      "summary": "Add, edit, rename or remove a secret, and delete its stored value only when you ask.",
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add with details",
       "reach": [
@@ -21651,7 +22698,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "inline-reference-setup",
       "title": "Create and bind from a secret-reference field",
-      "summary": "A marked controlled input opens a compact masked create-and-bind form. The Secret Catalog Host stores the value, the consumer receives only a reference, and a duplicate alias can bind the existing record instead of failing creation.",
+      "summary": "A secret field can create a new secret in place and keep only a reference to it.",
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › Bind",
       "reach": [
@@ -21727,7 +22774,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "reference-repair",
       "title": "Repair a secret reference that does not resolve",
-      "summary": "A configured secret:ALIAS[@env] that the Host cannot resolve names the reference and the typed reason (alias missing from every scope or only in a project, environment missing, several scopes, unreadable or empty vault value, secret CLI missing, locked or failing) and offers Set…",
+      "summary": "A secret reference that does not work says why and offers the fix, such as setting its value.",
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › repair",
       "reach": [
@@ -21789,7 +22836,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only, run a command with the workspace's aliases injected through `secret mcp` (output scrubbed by the Host), and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve…",
+      "summary": "Agents list your secrets without their values, run commands with them injected, and read one value only when asked by name.",
       "destination": "none",
       "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
       "reach": [
@@ -21823,7 +22870,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "agent-secret-request",
       "title": "Let an agent ask the user to store a secret",
-      "summary": "request_secret shows a card on the thread's latest turn with the alias, environment, scope and the agent's stated purpose. The user types the value into the Catalog's masked form (stored by the secret CLI on the Host) or declines; the waiting tool call receives only the secret:A…",
+      "summary": "The agent can ask you to store a secret, and only gets a reference to it back.",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Secret request",
       "reach": [
@@ -21885,7 +22932,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "backlog-jev-setup",
       "title": "Add a Jev key from the Backlog setting",
-      "summary": "Open a masked setup popover on the Backlog Jev setting, store the key as a global Secret Catalog alias, and bind only its reference.",
+      "summary": "Add a Jev key from the Backlog setting, stored as a secret.",
       "destination": "settings",
       "currentSurface": "plugins-page: View @dshfiles/backlog › Jev secret",
       "reach": [
@@ -21947,7 +22994,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "backlog-jev-chat-setup",
       "title": "Set up a Jev key from chat",
-      "summary": "The latest completed chat turn offers the compact masked setup form only when Jev is enabled, no key resolves, and no reference is already configured. A bound but unresolvable reference gets a repair warning instead of a duplicate-create form.",
+      "summary": "When Jev has no key, the latest turn offers a short form to add one.",
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Set up missing secrets",
       "reach": [
@@ -22002,7 +23049,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-controller",
       "id": "live-model-catalog",
       "title": "The model picker follows connected account changes",
-      "summary": "Session model catalogs share a bounded Host cache, invalidated immediately by adapter, settings and credential changes instead of retaining a pre-account snapshot.",
+      "summary": "The model picker updates as soon as you connect or change an account.",
       "destination": "none",
       "currentSurface": "host: model catalog cache",
       "reach": [],
@@ -22014,7 +23061,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-controller",
       "id": "thread-local-model",
       "title": "Guarded thread-local model selection",
-      "summary": "Expose one supported Host/client/Agent contract for reading and changing local model intent without saving global defaults or enqueuing input. Validate the target, recheck the native selection revision and queued work at commit, and synchronously persist selection plus provider-…",
+      "summary": "Change the model for this thread only, without changing your defaults.",
       "destination": "none",
       "currentSurface": "agent tool: thread_local_model_state / thread_select_local_model",
       "reach": [],
@@ -22026,7 +23073,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-controller",
       "id": "lean-session-follow",
       "title": "Send the browser only what a thread renders",
-      "summary": "Opening and following a thread sends its events without provider replay state, which only the Host needs to continue a conversation.",
+      "summary": "Opening a thread sends the browser only what it shows, so threads open faster.",
       "destination": "none",
       "currentSurface": "host: session event stream",
       "reach": [
@@ -22053,7 +23100,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-controller",
       "id": "drive-threads",
       "title": "Drive threads from another plugin",
-      "summary": "The sessions API lets a plugin or a browser list threads, read a thread's recent messages, create a thread, prompt it, run its commands, add a message on its behalf, compact, interrupt, wait for it, switch its model or agent preset, keep keyed instructions in its system prompt,…",
+      "summary": "Other features can list, start, prompt, stop and wait for threads.",
       "destination": "none",
       "currentSurface": "host: sessions API",
       "reach": [],
@@ -22065,7 +23112,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-controller",
       "id": "turn-admission",
       "title": "Limit how many threads run at once",
-      "summary": "Settings › General › Running threads limit caps how many threads run a turn at once (0, the default, is no limit; Subagents take a slot decides whether running subagents count). Once the cap is reached, a new turn for an idle thread waits in its inbox and its composer shows Wait…",
+      "summary": "Limit how many threads run at once in Settings, and the rest wait for a free slot.",
       "destination": "composer",
       "currentSurface": "composer dock: Waiting for a free slot; Settings › General: Running threads limit",
       "reach": [
@@ -22094,8 +23141,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "session-log-window#bounded-session-log-window",
       "plugin": "session-log-window",
       "id": "bounded-session-log-window",
-      "title": "Read a stored Session log by its window, not its whole event list",
-      "summary": "Serve the newest events, the first events and the events a predicate selects from one bounded byte window of the JSONL zstd log, so a reader that needs a few events never decodes 86 MB of a large Session; the tail also folds the projection cache's checkpoint over the window.",
+      "title": "Read part of a thread log without loading all of it",
+      "summary": "Readers that need a few events from a large thread log read only that part, so big threads open faster.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -22106,8 +23153,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "session-persistence-jsonl#tool-catalog-dedupe",
       "plugin": "session-persistence-jsonl",
       "id": "tool-catalog-dedupe",
-      "title": "Store a Session's request-header tool catalog once",
-      "summary": "Owned fork of the native JSONL session-persistence backend. Every request that begins a new message series appends a request/header event carrying the full assembled tool catalog — 455 tools, ~270 KB in one measured Session, byte-identical on 31 of 34 headers. This fork writes t…",
+      "title": "Store a thread's tool list once",
+      "summary": "A thread log stores its tool list once instead of with every request, so logs stay much smaller.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -22118,8 +23165,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "session-search#worker-session-search",
       "plugin": "session-search",
       "id": "worker-session-search",
-      "title": "Serve session search from a worker-owned index",
-      "summary": "Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.",
+      "title": "Search threads in the background",
+      "summary": "Thread search runs from a background index, so searching never slows DSH down.",
       "destination": "none",
       "currentSurface": "host: session search index",
       "reach": [],
@@ -22131,7 +23178,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-search",
       "id": "find-in-thread",
       "title": "Find every match in one thread",
-      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.",
+      "summary": "Find every match for your words in one thread, in order, with a short snippet.",
       "destination": "none",
       "currentSurface": "host: session-search findInThread API and session_find_in_thread tool",
       "reach": [],
@@ -22143,7 +23190,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-search",
       "id": "prompt-history",
       "title": "Search the prompts sent across threads",
-      "summary": "Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…",
+      "summary": "Find the prompts you sent across threads, newest first, each one once.",
       "destination": "none",
       "currentSurface": "host: session-search promptHistory API (read by @dshfiles/prompt-stash)",
       "reach": [],
@@ -22154,8 +23201,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "session-source-port#session-source-registry",
       "plugin": "session-source-port",
       "id": "session-source-registry",
-      "title": "One Host port for Sessions that live on another runtime",
-      "summary": "A registry the Session controller provides and remote sources register into; ownership is claimed from list answers and re-checked through owns() only when a Session id is not cached.",
+      "title": "Threads that live on another host",
+      "summary": "Threads that live on another host can appear and open here like local ones.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -22167,7 +23214,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-undo",
       "id": "turn-undo-redo",
       "title": "Undo and redo a turn: conversation and files together",
-      "summary": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the orig…",
+      "summary": "Undo a turn to roll back its conversation and file changes together, and redo it again.",
       "destination": "composer",
       "currentSurface": "composer: Undo last turn",
       "reach": [
@@ -22215,7 +23262,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-undo",
       "id": "turn-rewind",
       "title": "Rewind to before any recorded turn, files included",
-      "summary": "The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound tur…",
+      "summary": "Rewind to before any turn, files included, from the composer's Rewind menu.",
       "destination": "composer",
       "currentSurface": "composer: Rewind to an earlier turn",
       "reach": [
@@ -22270,7 +23317,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "session-undo",
       "id": "turn-checkpoint",
       "title": "Each turn names the jj revision its edits left, with Restore to here",
-      "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The reply's More actions menu shows it as a muted change name (a jj: refere…",
+      "summary": "Each turn names the revision its edits left, with Restore to here in its menu.",
       "destination": "transcript",
       "currentSurface": "transcript: reply More actions menu",
       "reach": [
@@ -22325,7 +23372,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-models",
       "id": "models-settings",
       "title": "Models settings and provider onboarding",
-      "summary": "The native Models settings page, the official DeepSeek credential onboarding step and the welcome notice, from one owned fork of the stock row. Behaviour is the native one; the Host reads behind the page follow Host change events in one refresh per burst and only while a surface…",
+      "summary": "The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.",
       "destination": "settings",
       "currentSurface": "settings: Models section",
       "reach": [
@@ -22373,23 +23420,30 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#settings-shell-port",
       "plugin": "settings-shell",
       "id": "settings-shell-port",
-      "title": "Native Settings shell, ported",
-      "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
+      "title": "Settings shell",
+      "summary": "The Settings button, its sections, the General page and the Cmd+, shortcut.",
       "destination": "settings",
-      "currentSurface": "sidebar: Account menu › Settings",
+      "currentSurface": "rail: Settings; palette: Settings: General",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -22416,10 +23470,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect combobox \"Sections\"",
+          "text": "expect button \"Appearance\"",
           "action": "expect",
-          "by": "combobox",
-          "name": "Sections",
+          "by": "button",
+          "name": "Appearance",
           "value": null
         }
       ],
@@ -22429,24 +23483,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#settings-workbench-panels",
       "plugin": "settings-shell",
       "id": "settings-workbench-panels",
-      "title": "One dockable Settings hub with real navigation and forms",
-      "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owner…",
+      "title": "Dock Settings as one panel",
+      "summary": "Open all of Settings as one dockable panel with its sections, search and forms.",
       "destination": "settings",
       "currentSurface": "main-tabs: New tab › Settings",
       "reach": [
         {
-          "text": "click button \"Collapse sidebar\"",
+          "text": "click button \"New tab\"",
           "action": "click",
           "by": "button",
-          "name": "Collapse sidebar",
+          "name": "New tab",
           "value": null
-        },
-        {
-          "text": "press ControlOrMeta+Alt+KeyT",
-          "action": "press",
-          "by": null,
-          "name": null,
-          "value": "ControlOrMeta+Alt+KeyT"
         },
         {
           "text": "click button \"Settings\"",
@@ -22470,23 +23517,30 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#dsh-release-notice",
       "plugin": "settings-shell",
       "id": "dsh-release-notice",
-      "title": "DSH release notice and TL;DR",
-      "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer relea…",
+      "title": "DSH release notice and summary",
+      "summary": "Settings marks a new DSH release and sums up what changed since your version.",
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -22527,7 +23581,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-tab",
       "title": "One Settings page in the stage",
-      "summary": "Settings has one place: a page in the stage (docs/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With…",
+      "summary": "Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.",
       "destination": "settings",
       "currentSurface": "settings: the Settings page in the stage",
       "reach": [
@@ -22568,7 +23622,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-task-groups",
       "title": "Settings grouped by task, with deep links",
-      "summary": "Every native section and plugin settings page sits in one task group (General, Models & accounts, Agents, Tools & MCP, Projects & workspaces, Hosts & network, Security, Notifications, Plugins, About; unknown ones under Other) under a person's name, never a package id. AI account…",
+      "summary": "Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.",
       "destination": "settings",
       "currentSurface": "settings: task groups in the Settings navigation",
       "reach": [
@@ -22617,13 +23671,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
-          "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
           "text": "expect group \"Models & accounts\"",
           "action": "expect",
           "by": "group",
@@ -22638,7 +23685,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-search",
       "title": "Search Settings inline",
-      "summary": "One search field at the top: matching settings replace the section as a flat list grouped by page, highlighted and editable in place, with a count; the tree shows matches per entry. Titles, descriptions, key paths, page and group names match, and key bindings by command name or…",
+      "summary": "Search all settings from one field and change matches in place.",
       "destination": "settings",
       "currentSurface": "settings: Search settings",
       "reach": [
@@ -22671,10 +23718,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "max tabs"
         },
         {
-          "text": "expect text \"1 Setting Found\"",
+          "text": "expect text \"1 setting found\"",
           "action": "expect",
           "by": "text",
-          "name": "1 Setting Found",
+          "name": "1 setting found",
           "value": null
         }
       ],
@@ -22701,10 +23748,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "max tabs"
         },
         {
-          "text": "expect text \"1 matching settings\"",
+          "text": "expect text \"1 matching setting\"",
           "action": "expect",
           "by": "text",
-          "name": "1 matching settings",
+          "name": "1 matching setting",
           "value": null
         },
         {
@@ -22730,7 +23777,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-search-entries",
       "title": "Search section controls and open them at the control",
-      "summary": "Controls that live Settings sections publish as search entries (dshx settings.section metadata.searchEntries) are found while their sections stay unmounted, listed under their section; picking one opens that section with target set to the entry id, and the section scrolls to and…",
+      "summary": "Search finds controls inside Settings sections and opens the section at that control.",
       "destination": "settings",
       "currentSurface": "settings: Search settings › section controls",
       "reach": [
@@ -22763,10 +23810,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "coding view"
         },
         {
-          "text": "expect text \"1 Setting Found\"",
+          "text": "expect text \"1 setting found\"",
           "action": "expect",
           "by": "text",
-          "name": "1 Setting Found",
+          "name": "1 setting found",
           "value": null
         },
         {
@@ -22792,7 +23839,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "plugin-settings-controls",
       "title": "Plugin settings with real controls",
-      "summary": "Every plugin's settings render from its schema with titles, descriptions, grouping and a control per type (switch, segments or select, bounded number with unit, list and key/value editors, JSON only as a fallback), in Settings and on its Plugins page.",
+      "summary": "Each plugin's settings show real controls such as switches, menus and number fields.",
       "destination": "settings",
       "currentSurface": "settings: plugin pages",
       "reach": [
@@ -22818,10 +23865,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22848,17 +23895,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Main tabs\"",
-          "action": "click",
-          "by": "option",
-          "name": "Main tabs",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22876,7 +23916,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "modified-settings",
       "title": "Modified settings and reset to default",
-      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. Every row names where its value comes from (Override, Profile composition, Default or Source unknown)…",
+      "summary": "Settings you changed are marked, and Reset to default puts them back.",
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "reach": [
@@ -22902,10 +23942,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22946,17 +23986,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Main tabs\"",
-          "action": "click",
-          "by": "option",
-          "name": "Main tabs",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
@@ -22988,29 +24021,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-json-editor",
       "title": "Edit plugin settings as JSON",
-      "summary": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by…",
+      "summary": "Edit a plugin's settings as JSON with completion and checks before you save.",
       "destination": "settings",
       "currentSurface": "settings: plugin page › JSON",
       "reach": [
         {
-          "text": "click text \"More\"",
-          "action": "click",
-          "by": "text",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Settings*\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
-          "value": null
-        },
-        {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Layout\"",
+          "action": "click",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
@@ -23032,6 +24072,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Reset to default",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
           "value": null
         },
         {
@@ -23065,17 +24112,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Main tabs\"",
-          "action": "click",
-          "by": "option",
-          "name": "Main tabs",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
@@ -23100,6 +24140,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
+          "value": null
+        },
+        {
           "text": "click radio \"JSON\"",
           "action": "click",
           "by": "radio",
@@ -23121,7 +24168,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-inspect-tool",
       "title": "Inspect a setting's default, override and source",
-      "summary": "The read-only settings_inspect Agent tool reports each visible field of a namespace with its schema default, user override (also when it equals the default), inherited value, effective value and source, the same model the Settings rows draw.",
+      "summary": "The agent can read a setting's default, your change and where its value comes from.",
       "destination": "none",
       "currentSurface": "agent tool: settings_inspect",
       "reach": [
@@ -23169,29 +24216,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "plugin-enablement-tools",
       "title": "List and switch plugin entries, from Settings or an Agent",
-      "summary": "Each plugin settings page shows its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for eve…",
+      "summary": "Turn a plugin on or off from its settings page, and the agent can do the same when you ask.",
       "destination": "settings",
       "currentSurface": "settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled",
       "reach": [
         {
-          "text": "click text \"More\"",
-          "action": "click",
-          "by": "text",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Settings*\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
-          "value": null
-        },
-        {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Layout\"",
+          "action": "click",
+          "by": "button",
+          "name": "Layout",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugin details: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugin details: Main tabs",
           "value": null
         },
         {
@@ -23218,17 +24286,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
+          "by": "button",
+          "name": "Layout",
           "value": null
         },
         {
-          "text": "click option \"Main tabs\"",
+          "text": "click button \"Advanced: Main tabs\"",
           "action": "click",
-          "by": "option",
-          "name": "Main tabs",
+          "by": "button",
+          "name": "Advanced: Main tabs",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugin details: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugin details: Main tabs",
           "value": null
         },
         {
@@ -23246,7 +24321,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "open-config-menu",
       "title": "Open the configuration file elsewhere",
-      "summary": "The primary action opens an existing configuration file with the Session Remote's configured default app; the menu offers associated apps, the Editor plugin, copy and reveal actions.",
+      "summary": "Open a configuration file in your default app or the editor, or copy or reveal its path.",
       "destination": "settings",
       "currentSurface": "settings: Open configuration file",
       "reach": [
@@ -23323,22 +24398,29 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "shared-jev-key",
       "title": "Set the Jev key once",
-      "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copie…",
+      "summary": "Set one Jev key in Settings for Backlog and Memory to share.",
       "destination": "settings",
       "currentSurface": "settings: Tools & MCP › Jev › Key",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -23392,23 +24474,30 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#settings-origin-distinction",
       "plugin": "settings-shell",
       "id": "settings-origin-distinction",
-      "title": "Distinguish default DSH categories from plugin categories",
-      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in…",
+      "title": "Tell DSH defaults from plugin categories",
+      "summary": "An All / DSH / Plugins filter at the head of the Settings category list narrows the categories and the search results by who ships them.",
       "destination": "settings",
-      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "currentSurface": "settings: source filter heading the category list, origin badge in the page header",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -23448,23 +24537,30 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "settings-shell#dshfiles-plugins-page",
       "plugin": "settings-shell",
       "id": "dshfiles-plugins-page",
-      "title": "Plugins by category: a second plugin view in Settings and as a panel",
-      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bu…",
+      "title": "Plugins by category",
+      "summary": "Turn installed plugins on or off grouped by area, with search, source and status filters and a Settings link for each plugin.",
       "destination": "settings",
       "currentSurface": "settings: Plugins › Plugins by category",
       "reach": [
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
@@ -23498,16 +24594,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Plugins by category\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Plugins by category\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Plugins by category",
           "value": null
         },
@@ -23526,7 +24615,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-subagent",
       "id": "subagent-settings",
       "title": "Subagent settings",
-      "summary": "The native Subagent plugin page (recursion depth, concurrent count and subagent model selection) from one owned fork of the stock row. Behaviour is the native one; the model catalog read waits for the page's first connected generation instead of being repeated by its first reset…",
+      "summary": "Set how deep subagents can nest, how many run at once and which model they use.",
       "destination": "settings",
       "currentSurface": "settings: Plugins › Subagent",
       "reach": [],
@@ -23541,7 +24630,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-web-search",
       "id": "web-search-settings",
       "title": "Web search settings",
-      "summary": "The native Web search plugin page (provider switch, endpoint, limits and API key) from one owned fork of the stock row. Behaviour is the native one; the credential state behind the key field is read while the page shows, once per burst of settings changes.",
+      "summary": "Choose the web search provider, its limits and its key.",
       "destination": "settings",
       "currentSurface": "settings: Plugins › Web search",
       "reach": [],
@@ -23555,8 +24644,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "shared-runtime#shared-client-runtime",
       "plugin": "shared-runtime",
       "id": "shared-client-runtime",
-      "title": "Share the client UI runtime",
-      "summary": "Load one shared copy of the Client UI modules and stylesheet before dependent UI plugins mount.",
+      "title": "Share one copy of the UI code",
+      "summary": "Plugin views share one copy of the UI code and styles, so the page loads less.",
       "destination": "none",
       "currentSurface": "client: shared runtime",
       "reach": [],
@@ -23567,8 +24656,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "shared-streams#shared-event-sources",
       "plugin": "shared-streams",
       "id": "shared-event-sources",
-      "title": "One EventSource per URL across tabs",
-      "summary": "A shim injected before the app entry routes every tab's EventSource through one SharedWorker per URL, so the browser's six-socket-per-origin limit cannot starve new tabs.",
+      "title": "One live connection per address across tabs",
+      "summary": "All tabs share one live connection per address, so opening many tabs never stalls new ones.",
       "destination": "none",
       "currentSurface": "client: shared EventSource",
       "reach": [],
@@ -23580,7 +24669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "shortcuts",
       "id": "sidebar-toggle-chord",
       "title": "Toggle the sidebar with the platform primary chord",
-      "summary": "Capture primary+B in the browser capture phase, prevent competing shell handling, and choose Meta on Mac or Control elsewhere.",
+      "summary": "Press Cmd+B on a Mac, or Ctrl+B elsewhere, to show or hide the sidebar.",
       "destination": "none",
       "currentSurface": "keyboard: Mod+B",
       "reach": [],
@@ -23594,10 +24683,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "shortcuts#panel-selection-chords",
       "plugin": "shortcuts",
       "id": "panel-selection-chords",
-      "title": "Select native panels with keyboard shortcuts",
-      "summary": "Use primary+N and primary+comma to select the declared panel target while respecting editable fields, IME composition, repeat, terminal ownership, and prior event claims. A chord the shell reads inside xterm opts out of the terminal.",
+      "title": "Shortcuts that leave text fields and the terminal alone",
+      "summary": "Shortcuts never take keys from a text field or the terminal unless they are meant to.",
       "destination": "none",
-      "currentSurface": "keyboard: Mod+N / Mod+,",
+      "currentSurface": "keyboard: every bound chord",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -23607,7 +24696,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "shortcuts",
       "id": "editable-command-keys",
       "title": "Rebindable command keys",
-      "summary": "Binds every dshx Command on the keys it answers to now: its default keys, or the binding the user chose in the Host's Keyboard shortcuts dialog for an editable command. Editable commands are listed there without a default binding, and page-scoped commands keep their keys off ins…",
+      "summary": "Change the keys of any command in Keyboard shortcuts, and the new keys work at once.",
       "destination": "settings",
       "currentSurface": "settings: Keyboard shortcuts",
       "reach": [],
@@ -23619,7 +24708,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "shortcuts",
       "id": "scoped-key-layers",
       "title": "Single keys, sequences and scoped keys",
-      "summary": "Binds every dshx Command key by scope (global, not-typing, list, triage, changes, composer): chords, single keys (J, Shift+J, ?), ⌥ letters and two-step sequences (G then I within 1.2 s), matched by physical key. A list, triage or changes key fires only inside its region (or the…",
+      "summary": "Single keys and two-key sequences such as G then I work where they apply, never while you type.",
       "destination": "none",
       "currentSurface": "keyboard: J / K / E / ? / G then I",
       "reach": [],
@@ -23631,7 +24720,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "shortcuts",
       "id": "shortcut-cheat-sheet",
       "title": "Keyboard shortcut sheet",
-      "summary": "? or ⌘/ opens a sheet of every bound key grouped by where it works (Global, Go to, Lists, Triage, Changes, Composer, App), generated from the dshx Command registry and the Host shortcut catalog, with the Single-key shortcuts switch beside the keys it turns off.",
+      "summary": "Press ? or Cmd+/ to see every shortcut, grouped by where it works.",
       "destination": "none",
       "currentSurface": "keyboard: ? / Mod+/",
       "reach": [
@@ -23664,8 +24753,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "sidebar-right#addressable-resources",
       "plugin": "sidebar-right",
       "id": "addressable-resources",
-      "title": "Dock genuine session resources as workbench panels",
-      "summary": "In the owned stack Workbench tabs own all pane chrome with no native opt-out. The original sidebar declaring entry renders committed file, diff, terminal or contributed pages into addressable targets, preserving genuine Session bindings, title/menu slots, navigation and cleanup.…",
+      "title": "Dock files, diffs and terminals as panels",
+      "summary": "Files, diffs, terminals and other pages open as panels in the Workbench, tied to their thread.",
       "destination": "none",
       "currentSurface": "right-pane: native resources as workbench panels",
       "reach": [
@@ -23720,7 +24809,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "sidebar-terminal",
       "id": "terminal-excerpts",
       "title": "Add terminal selection to chat",
-      "summary": "Attach the selected terminal output to its originating thread as an inspectable draft chip.",
+      "summary": "Add selected terminal output to the thread's draft as a chip.",
       "destination": "none",
       "currentSurface": "terminal and composer",
       "reach": [
@@ -23774,8 +24863,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "sqlite-store#sqlite-store-open",
       "plugin": "sqlite-store",
       "id": "sqlite-store-open",
-      "title": "One SqlClient layer for a plugin-owned SQLite file",
-      "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only. `deferred` moves that open to the…",
+      "title": "Open a plugin's own database safely",
+      "summary": "Each plugin's database opens in a private folder and its updates run once.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -23787,7 +24876,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "sqlite-store",
       "id": "sqlite-store-space",
       "title": "Free pages go back to the disk",
-      "summary": "A new file is created with auto_vacuum = INCREMENTAL, a bounded incremental_vacuum pass returns at most 32 free pages every 5 minutes, and `reclaim` gives every free page back on the store's own connection: incremental_vacuum on an incremental file, or one converting VACUUM on a…",
+      "summary": "Plugin databases give free space back to the disk over time.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -23799,7 +24888,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "sqlite-store",
       "id": "sqlite-store-lock-wait",
       "title": "Lock-wait spans",
-      "summary": "A top-level transaction that waited at least 50 ms before its body started (for the store's one connection, or in BEGIN IMMEDIATE for another connection's write lock) records a `sqlite lock wait` span with the file name and the wait; one that gave up with SQLITE_BUSY after waiti…",
+      "summary": "A database write that waited for a lock records how long, so slow writes show in traces.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -23810,8 +24899,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "storage-domain#lazy-domain-hydration",
       "plugin": "storage-domain",
       "id": "lazy-domain-hydration",
-      "title": "Hydrate a per-record domain one record at a time",
-      "summary": "Owned fork of the native storage domain form: a per-record domain whose records are disposable derived data indexes document keys at open and reads one record per table read behind a 64-row LRU, instead of materializing the whole unit into JS heap at open. The measured owner is…",
+      "title": "Load stored records one at a time",
+      "summary": "Stored records load one at a time when read, instead of all at once at startup.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -23823,7 +24912,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "storage-json",
       "id": "lazy-per-record-reads",
       "title": "Read one stored JSON record without loading the whole unit",
-      "summary": "Owned fork of the native JSON storage backend: the per-record unit additionally answers synchronous per-record reads (listKeysSync, getRecordSync, getGlobalSync) so the owned storage-domain fork can hydrate one record on first read instead of materializing every record at open,…",
+      "summary": "One stored record can be read without loading the rest, so DSH uses less memory.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -23834,8 +24923,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "subprocess-local#group-exit-backoff",
       "plugin": "subprocess-local",
       "id": "group-exit-backoff",
-      "title": "Wait for detached process groups without probing every 15 ms",
-      "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once, and the terminal readiness probe no longer forks the whole pr…",
+      "title": "Wait for background processes cheaply",
+      "summary": "Waiting for background processes to exit costs far less CPU.",
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
@@ -23846,8 +24935,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "test-runs#test-run-card",
       "plugin": "test-runs",
       "id": "test-run-card",
-      "title": "Vitest runs as a test-results card",
-      "summary": "A bash call whose output carries a Vitest summary renders as a test-results card instead of a terminal block: a pass/fail/skip bar, All/Failed/Skipped/Slow filters, one row per test file, and for each failing test its assertion diff, source location, code frame, Ask to fix, Reru…",
+      "title": "Vitest runs as a test results card",
+      "summary": "A Vitest run shows as a results card with filters, and each failure offers Ask to fix and Rerun.",
       "destination": "transcript",
       "currentSurface": "transcript: Vitest results card",
       "reach": [
@@ -23881,7 +24970,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "test-runs",
       "id": "bash-stack-trace",
       "title": "Stack traces under failed commands",
-      "summary": "A bash call that is not a Vitest run but printed an error with a stack trace (Node, Deno, Bun, JVM or Python) keeps its native card and gains a Stack trace card under it: the error headline, your frames innermost first with library frames one toggle away, and each frame opening…",
+      "summary": "A failed command with a stack trace gets a card that opens each frame at its line.",
       "destination": "transcript",
       "currentSurface": "transcript: Stack trace card under a bash call",
       "reach": [
@@ -23908,7 +24997,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-share",
       "id": "thread-share-link",
       "title": "Share a thread as a read-only link",
-      "summary": "Settings › Thread sharing creates a read-only share link for one thread: live (re-read and redacted on every view) or a snapshot frozen at creation; anyone with the unguessable link, or link plus a passphrase kept only as a salted scrypt hash; expiring in 1 hour, 1 day, 7 days o…",
+      "summary": "Share a thread as a read-only link, live or frozen, with an optional passphrase and expiry.",
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
@@ -23957,7 +25046,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-share",
       "id": "thread-share-snapshot-export",
       "title": "Freeze a snapshot or download a self-contained HTML export",
-      "summary": "A snapshot share stores the redacted transcript at creation (chunked under the 256 KiB storage value limit) and keeps showing it after the thread changes; revoking deletes it. Download HTML (and the thread_share_export tool) renders the same redacted page as one self-contained f…",
+      "summary": "Freeze a shared thread as a snapshot, or download it as one HTML file.",
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
@@ -23998,7 +25087,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-share",
       "id": "thread-share-publish",
       "title": "Publish share pages through a time-bounded tunnel",
-      "summary": "Settings › Thread sharing detects tailscale and cloudflared and, only after the user confirms, runs one foreground `cloudflared tunnel --url` quick tunnel or `tailscale funnel --https=8443` for 15 minutes, 1 hour or 4 hours. The tunnel targets a separate loopback listener that a…",
+      "summary": "Publish share pages outside your network through a tunnel that closes after a set time.",
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
@@ -24039,7 +25128,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "notification-history",
       "title": "Review retained thread notifications",
-      "summary": "Review the last 500 thread events in Host-owned storage, independently of toast delivery and thread attention. Mark entries read or unread, dismiss or restore them, clear captured entries with confirmation, and open an existing thread.",
+      "summary": "Review the last 500 thread notifications, mark them read or unread, dismiss them and open their thread.",
       "destination": "observe",
       "currentSurface": "Observe › Notifications",
       "reach": [
@@ -24080,15 +25169,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "no-folder-promotion",
       "title": "Turn a No folder thread into a project",
-      "summary": "A thread started in No folder runs in its own dated scratch folder. Its row menu offers Turn into project, which registers that folder as a project with a title no other project holds and moves the thread under its own project group; the folder and its revisions stay where they…",
+      "summary": "A thread started without a folder can become a project of its own from its row menu.",
       "destination": "threads",
       "currentSurface": "thread-list: No folder row › Turn into project",
       "reach": [
         {
-          "text": "click button \"New session\"",
+          "text": "click button \"New thread\"",
           "action": "click",
           "by": "button",
-          "name": "New session",
+          "name": "New thread",
           "value": null
         },
         {
@@ -24120,6 +25209,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Turn into project\"",
           "action": "click",
           "by": "menuitem",
@@ -24142,7 +25238,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "multi-model-fan-out",
       "title": "Send one prompt to several models",
-      "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
+      "summary": "Send one prompt to two to six models at once, each in its own thread.",
       "destination": "none",
       "currentSurface": "palette: Send to several models…",
       "reach": [
@@ -24175,8 +25271,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#workbench-sidebar-assemblies",
       "plugin": "thread-sidebar",
       "id": "workbench-sidebar-assemblies",
-      "title": "Dock the actual sidebar content assemblies",
-      "summary": "The owned stack always uses Workbench tabs with no native-layout opt-out. The actual New tab chooser tab offers Threads, Navigation, Quota and Controls alongside the Settings hub (names without their plugin; a short name two views share keeps its qualified name), without a separ…",
+      "title": "Dock sidebar views as tabs",
+      "summary": "The New tab chooser offers the thread list, navigation, quota and controls as tabs of their own.",
       "destination": "none",
       "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "reach": [
@@ -24259,7 +25355,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Browse threads in the sidebar list, or open the thread board as a page that shows only columns (recovery, attention and remote threads sit in their column; drafts stay in the sidebar) and keeps its own grouping, status/source filters and project scope; park and settle through si…",
+      "summary": "Browse threads in the sidebar list, or open the thread board with its own grouping and filters.",
       "destination": "threads",
       "currentSurface": "left-nav: Thread Sidebar: Board",
       "reach": [
@@ -24285,16 +25381,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Group: Status\"",
+          "text": "expect radio \"Status\"",
           "action": "expect",
-          "by": "menuitem",
-          "name": "Group: Status",
+          "by": "radio",
+          "name": "Status",
           "value": null
         },
         {
-          "text": "click menuitem \"Board\"",
+          "text": "click button \"Board\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Board",
           "value": null
         },
@@ -24334,7 +25430,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "status-grouped-thread-list",
       "title": "See every thread grouped by what it needs from you",
-      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the i…",
+      "summary": "Threads are grouped by what they need from you: Pinned, Needs you, Working, Ready, Idle and Done.",
       "destination": "threads",
       "currentSurface": "thread-list: All threads › Group: Status",
       "reach": [
@@ -24353,17 +25449,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Group: *\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
-          "value": null
-        },
-        {
-          "text": "expect text \"Arrange manually\"",
+          "text": "expect radio \"Custom, arrange manually\"",
           "action": "expect",
-          "by": "text",
-          "name": "Arrange manually",
+          "by": "radio",
+          "name": "Custom, arrange manually",
           "value": null
         },
         {
@@ -24392,7 +25481,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "working-status-item",
       "title": "See how many threads are working in the status strip",
-      "summary": "The status strip shows \"N working\" for top-level threads with a running turn, colourless, and hides it while nothing runs. On a phone it is one line in the Status chip's list.",
+      "summary": "The status bar shows how many threads are working, and hides when none are.",
       "destination": "none",
       "currentSurface": "status-strip: N working",
       "reach": [
@@ -24412,7 +25501,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "live-working-activity",
       "title": "See what a working thread is doing right now",
-      "summary": "A working thread's row trades its static meta line for a live one: its current step (\"Running pnpm test\", \"Editing 3 files\", \"Thinking\", or the subagent rollup) in the working shimmer, then the elapsed time (\"· 1m 12s\"); without a known step it reads \"Working · 1m 12s\". The thre…",
+      "summary": "A working thread's row shows its current step and how long the turn has run.",
       "destination": "threads",
       "currentSurface": "thread-list: working row second line; session header utilities; document title",
       "reach": [
@@ -24431,8 +25520,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#project-header-chat",
       "plugin": "thread-sidebar",
       "id": "project-header-chat",
-      "title": "Start a chat from a project group header",
-      "summary": "Open a fresh local New chat from a project header. All threads shows the selected blank immediately; typing saves a distinct unsent draft before sending. Reopen any of several project drafts from their rows, without creating saved empty conversations.",
+      "title": "Start a thread from a project header",
+      "summary": "Start a new thread from a project header, and each unsent draft stays in its own row.",
       "destination": "threads",
       "currentSurface": "thread-list: project header › New chat",
       "reach": [
@@ -24500,45 +25589,38 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
         },
         {
-          "text": "click button \"Filter: *\"",
+          "text": "click radio \"Project\"",
           "action": "click",
-          "by": "button",
-          "name": "Filter: *",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Group: *\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
-          "value": null
-        },
-        {
-          "text": "click menuitemradio \"Project\"",
-          "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "Project",
           "value": null
         },
         {
-          "text": "expect button \"New chat in sample\"",
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"New thread in sample\"",
           "action": "expect",
           "by": "button",
-          "name": "New chat in sample",
+          "name": "New thread in sample",
           "value": null
         },
         {
-          "text": "click button \"New chat in sample\"",
+          "text": "click button \"New thread in sample\"",
           "action": "click",
           "by": "button",
-          "name": "New chat in sample",
+          "name": "New thread in sample",
           "value": null
         },
         {
@@ -24592,7 +25674,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
-      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, and open an archived thread by restoring it: DSH drops an archived Session from the main view, so one click restores and opens it instead of retrying a v…",
+      "summary": "Undo an archive from the notice that follows it, and open an archived thread to restore it.",
       "destination": "threads",
       "currentSurface": "thread-list: Archive › Undo",
       "reach": [
@@ -24660,6 +25742,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Archive\"",
           "action": "click",
           "by": "menuitem",
@@ -24696,7 +25785,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-list-views",
       "title": "Configure saved thread views",
-      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; include durable Inactive and explicitly selected interrupted child rows in saved views, allow views to overlap, show attention dots only for matching statuses, and independently show or…",
+      "summary": "Save thread list views that group and filter by status, source or attention.",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Manage views",
       "reach": [
@@ -24708,30 +25797,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitemradio \"Done*\"",
+          "text": "expect radio \"Done*\"",
           "action": "expect",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "Done*",
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
         },
         {
-          "text": "click button \"Filter: *\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
           "by": "button",
-          "name": "Filter: *",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Thread list settings\"",
-          "action": "click",
-          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -24793,9 +25875,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "filter-presets",
       "title": "Save and switch thread list filter presets",
-      "summary": "The thread list's Filter menu opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save current filters as preset…, Save changes and Discard changes once a filter was changed after applying one, and Preset options (Rena…",
+      "summary": "Save the thread list's filters as a preset and switch presets in one click.",
       "destination": "threads",
-      "currentSurface": "thread-list: Filter menu › Presets",
+      "currentSurface": "thread-list: Filter panel › Presets",
       "reach": [
         {
           "text": "expect region \"Threads\"",
@@ -24812,24 +25894,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect group \"Presets\"",
+          "text": "expect radiogroup \"Presets\"",
           "action": "expect",
-          "by": "group",
+          "by": "radiogroup",
           "name": "Presets",
           "value": null
         },
         {
-          "text": "expect menuitemradio \"All threads*\"",
+          "text": "expect radio \"All threads*\"",
           "action": "expect",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
         },
         {
-          "text": "click menuitem \"Save current filters as preset…\"",
+          "text": "click button \"Preset options: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preset options: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Save as new preset…\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Save current filters as preset…",
+          "name": "Save as new preset…",
           "value": null
         },
         {
@@ -24863,17 +25952,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect group \"Presets\"",
+          "text": "expect radiogroup \"Presets\"",
           "action": "expect",
-          "by": "group",
+          "by": "radiogroup",
           "name": "Presets",
           "value": null
         },
         {
-          "text": "click menuitem \"Save current filters as preset…\"",
+          "text": "click button \"Preset options: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preset options: *",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Save as new preset…\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Save current filters as preset…",
+          "name": "Save as new preset…",
           "value": null
         },
         {
@@ -24885,7 +25981,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "onboarding": {
-        "firstAction": "Set the thread list's filters, then choose Filter › Save current filters as preset… and name it.",
+        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save as new preset… and name it.",
         "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
       }
     },
@@ -24893,8 +25989,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#idle-archive-policy",
       "plugin": "thread-sidebar",
       "id": "idle-archive-policy",
-      "title": "Automatically settle eligible idle threads",
-      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Subagent threads idle for `subagentSettleHours` (24 by default) settle on their own and their running background jobs ar…",
+      "title": "Mark idle threads done",
+      "summary": "Off by default: idle threads are marked done after a while, except pinned or excluded ones.",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › idle policy",
       "reach": [
@@ -24906,11 +26002,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -24948,17 +26051,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Auto-settle behavior\"",
+          "text": "click menuitem \"More\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Auto-settle behavior",
+          "name": "More",
           "value": null
         },
         {
-          "text": "expect menuitemradio \"Settle after idle threshold\"",
+          "text": "click menuitem \"Mark done when idle\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Mark done when idle",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Mark done after the idle threshold\"",
           "action": "expect",
           "by": "menuitemradio",
-          "name": "Settle after idle threshold",
+          "name": "Mark done after the idle threshold",
           "value": null
         },
         {
@@ -24983,17 +26093,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
         {
-          "text": "expect checkbox \"Settle inactive threads\"",
+          "text": "expect checkbox \"Mark idle threads done\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Settle inactive threads",
+          "name": "Mark idle threads done",
           "value": null
         }
       ],
@@ -25004,8 +26114,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#reminder-wake",
       "plugin": "thread-sidebar",
       "id": "reminder-wake",
-      "title": "Wake a settled or archived thread for its reminder",
-      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its…",
+      "title": "Wake a done or archived thread for its reminder",
+      "summary": "A done or archived thread with an active reminder wakes before the reminder is due, so the reminder is never dropped.",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › Reminder wake",
       "reach": [],
@@ -25017,7 +26127,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloa…",
+      "summary": "Threads from other hosts join your current groups, or sit in their own Remote group.",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [
@@ -25029,11 +26139,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect button \"Filter: *\"",
@@ -25057,9 +26174,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -25087,11 +26204,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect button \"Filter: *\"",
@@ -25115,9 +26239,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -25135,8 +26259,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#settled-auto-archive",
       "plugin": "thread-sidebar",
       "id": "settled-auto-archive",
-      "title": "Archive a settled thread once its delay passes",
-      "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner withholds its settle age while that age is only \"now\", titles the thread with it once the age says more, shows when the delay will archive it, and offers Arch…",
+      "title": "Archive a done thread once its delay passes",
+      "summary": "A done thread is archived once the delay you set has passed.",
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › settled archive delay",
       "reach": [
@@ -25148,11 +26272,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -25162,11 +26293,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Settled archive target\"",
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Done archive target\"",
           "action": "fill",
           "by": "textbox",
           "name": "Describe what you want to build, / commands, @ files or threads",
-          "value": "Settled archive target"
+          "value": "Done archive target"
         },
         {
           "text": "click button \"Send message\"",
@@ -25190,17 +26321,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Settle\"",
+          "text": "click menuitem \"Done\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         },
         {
-          "text": "expect status \"This thread is settled.\"",
+          "text": "expect status \"This thread is done.\"",
           "action": "expect",
           "by": "status",
-          "name": "This thread is settled.",
+          "name": "This thread is done.",
           "value": null
         },
         {
@@ -25211,17 +26342,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
         {
-          "text": "expect group \"Archive settled threads\"",
+          "text": "expect group \"Archive done threads\"",
           "action": "expect",
           "by": "group",
-          "name": "Archive settled threads",
+          "name": "Archive done threads",
           "value": null
         }
       ],
@@ -25233,7 +26364,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-mute",
       "title": "Mute or snooze a thread",
-      "summary": "Mute a thread for 1 h, 8 h, 24 h, until tomorrow morning (09:00), a week, or until unmuted, from its row, its context menu or the session header. A muted thread raises no desktop alert, attention group, label or unread dot and keeps its place instead of rising on new activity; a…",
+      "summary": "Mute a thread for a while or until you unmute it, so it stops alerting you.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mute",
       "reach": [
@@ -25245,11 +26376,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -25287,6 +26425,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Mute thread\"",
           "action": "click",
           "by": "menuitem",
@@ -25316,7 +26461,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
-      "summary": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened. The row dot and its Inbox item are one record: Done in the Inbox clears the dot at once (the attention API publishes a changed event every page re-reads on), and reading the t…",
+      "summary": "Mark a thread unread, and opening it in any browser clears the mark.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mark unread",
       "reach": [
@@ -25328,11 +26473,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -25398,6 +26550,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"Mark unread\"",
           "action": "click",
           "by": "menuitem",
@@ -25419,8 +26578,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#finished-turn-attention",
       "plugin": "thread-sidebar",
       "id": "finished-turn-attention",
-      "title": "See finished turns on the Host until they are acknowledged",
-      "summary": "The Host records every finished turn as an unacknowledged thread; the sidebar, other plugins and CLIs read that one record, and opening the thread acknowledges it everywhere.",
+      "title": "See finished turns until you open them",
+      "summary": "A finished turn stays marked until you open its thread, in every browser.",
       "destination": "inbox",
       "currentSurface": "thread-list: finished-turn unread marks",
       "reach": [
@@ -25461,7 +26620,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, agent-message, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence an…",
+      "summary": "Choose in-app, system or both notifications for each kind of thread event, with sounds.",
       "destination": "settings",
       "currentSurface": "settings: Notifications › Thread notifications",
       "reach": [
@@ -25572,7 +26731,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
-      "summary": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left…",
+      "summary": "Customize the sidebar's sections from the gear in the Threads panel.",
       "destination": "settings",
       "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
       "reach": [
@@ -25584,9 +26743,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Sidebar settings\"",
+          "text": "click button \"Sidebar settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Sidebar settings",
           "value": null
         },
@@ -25598,17 +26757,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Move up: Settle\"",
+          "text": "click button \"Move up: Done\"",
           "action": "click",
           "by": "button",
-          "name": "Move up: Settle",
+          "name": "Move up: Done",
           "value": null
         },
         {
-          "text": "expect checkbox \"Settle\"",
+          "text": "expect checkbox \"Done\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         }
       ],
@@ -25620,7 +26779,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "footer-more-menu",
       "title": "Reach Settings, sidebar pages, and hidden footer actions from both More menus",
-      "summary": "The wide sidebar foot always seats a More control; it opens Settings, hidden or overflowed footer actions, and every sidebar page in one flat list, so Plugins stays one click away however narrow the sidebar is. The header More menu, and the Workbench Navigation view's, offers th…",
+      "summary": "The More menu at the foot of the sidebar always reaches Settings, hidden actions and every page.",
       "destination": "none",
       "currentSurface": "sidebar: More in the row under the list (Sidebar settings › Show the row under the list) and the Workbench Navigation view's More menu",
       "reach": [
@@ -25660,8 +26819,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#rail-actions",
       "plugin": "thread-sidebar",
       "id": "rail-actions",
-      "title": "Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings",
-      "summary": "The DSH actions sit in a small group at the bottom of the rail, directly above Settings and below the folders and + New folder, expanded and collapsed alike: Restart DSH (only while the supervisor offers a restart; amber with a slow pulse while updates or a restart wait), a pend…",
+      "title": "Copy the DSH address and pair a phone from the rail",
+      "summary": "Copy the DSH address, pair a phone or reload the page from a small group above Settings.",
       "destination": "none",
       "currentSurface": "rail: DSH actions above Settings; phone: More › DSH",
       "reach": [
@@ -25688,7 +26847,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "client-reload-banner",
       "title": "Offer a page reload when the running client bundles are behind",
-      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Restart the page to apply updates banner at the sidebar foot, naming the plugins a…",
+      "summary": "When the page runs older code than DSH serves, a banner offers to reload it.",
       "destination": "none",
       "currentSurface": "sidebar-footer: client reload banner",
       "reach": [],
@@ -25700,7 +26859,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "palette-search-history",
       "title": "Search threads, files, and recent navigation",
-      "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",
+      "summary": "Search threads and files, and go back or forward through what you opened.",
       "destination": "none",
       "currentSurface": "thread-list: Search threads",
       "reach": [
@@ -25761,8 +26920,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#thread-children-and-links",
       "plugin": "thread-sidebar",
       "id": "thread-children-and-links",
-      "title": "Browse child sessions and share thread URLs",
-      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instea…",
+      "title": "Browse subagent threads and share thread links",
+      "summary": "A thread lists its subagents while they work, and its link can be copied and shared.",
       "destination": "threads",
       "currentSurface": "thread-list: child threads",
       "reach": [
@@ -25774,9 +26933,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -25811,9 +26970,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -25838,8 +26997,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#session-header-actions",
       "plugin": "thread-sidebar",
       "id": "session-header-actions",
-      "title": "Manage threads from the session header",
-      "summary": "Keep Pin as an icon button in the conversation header and put park, settle or unsettle, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "title": "Manage a thread from its header",
+      "summary": "The thread header's More menu holds find, pin, done, mute, archive, copy and export actions.",
       "destination": "threads",
       "currentSurface": "thread-header: Pin / More menu",
       "reach": [
@@ -25907,17 +27066,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "expect menuitem \"Done\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "expect menuitem \"Archive\"",
           "action": "expect",
           "by": "menuitem",
           "name": "Archive",
-          "value": null
-        },
-        {
-          "text": "expect menuitem \"Settle\"",
-          "action": "expect",
-          "by": "menuitem",
-          "name": "Settle",
           "value": null
         }
       ],
@@ -25928,8 +27094,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#pending-host-restart",
       "plugin": "thread-sidebar",
       "id": "pending-host-restart",
-      "title": "Warn when a host restart is required",
-      "summary": "Detect pending host-side plugin updates and show them, with the bundles hmr-gate held back, as one Restart pending item in the status strip whose Restart DSH and Restart when idle verbs open the same confirmation; ask for explicit confirmation before handing off a restart when t…",
+      "title": "Warn when DSH needs a restart",
+      "summary": "The status bar says when updates wait for a DSH restart, with Restart DSH and Restart when idle.",
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "reach": [
@@ -25955,10 +27121,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Restart DSH yourself to load them.\"",
+          "text": "expect text \"To load them, stop DSH in the terminal*\"",
           "action": "expect",
           "by": "text",
-          "name": "Restart DSH yourself to load them.",
+          "name": "To load them, stop DSH in the terminal*",
           "value": null
         }
       ],
@@ -25970,7 +27136,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "auto-restart-when-idle",
       "title": "Restart by itself to apply updates when idle",
-      "summary": "With autoRestartWhenIdle (off by default in this fork; it acts on its own), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no tur…",
+      "summary": "Off by default: DSH restarts by itself to apply updates once nothing is running.",
       "destination": "none",
       "currentSurface": "status-strip: Restarting to apply updates",
       "reach": [],
@@ -25982,7 +27148,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "interrupted-turn-threads",
       "title": "See threads a crash interrupted",
-      "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, a…",
+      "summary": "Threads whose turn a crash or restart cut off are listed so you can resume them.",
       "destination": "inbox",
       "currentSurface": "thread-list: interrupted threads",
       "reach": [],
@@ -25994,7 +27160,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "auto-resume-after-restart",
       "title": "Resume threads a managed restart cut off",
-      "summary": "Opt-in, off by default. After a managed restart (Restart DSH, Restart when idle), the new Host waits resumeAfterRestartDelaySeconds and for the Session controller, then sends each thread the restart cut off one continuation prompt, newest first, at most resumeAfterRestartMaxThre…",
+      "summary": "Off by default: after a restart you asked for, cut-off threads resume on their own.",
       "destination": "inbox",
       "currentSurface": "activity: Resumed automatically after the restart",
       "reach": [],
@@ -26006,7 +27172,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-reference-mention",
       "title": "Mention another thread from its row, its tab, or a drag into the composer",
-      "summary": "Resolve a target Host session and insert its native reference chip at the active composer's caret, from the sidebar row menu, from a main-view tab's menu, or by dragging a thread row or thread tab and dropping it on a composer. A drag carries only the plugin's own thread-mention…",
+      "summary": "Mention a thread in the composer from its row or tab menu, or by dragging it in.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mention",
       "reach": [
@@ -26018,11 +27184,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26088,6 +27261,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
+          "value": null
+        },
+        {
           "text": "click menuitem \"@Mention thread\"",
           "action": "click",
           "by": "menuitem",
@@ -26106,6 +27286,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "button",
           "name": "Mention source*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"More\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "More",
           "value": null
         },
         {
@@ -26131,7 +27318,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "skill-mentions",
       "title": "Find human-invocable skills from @ autocomplete",
-      "summary": "List the current Session's user-invocable skills in the @ menu and route selection through the existing /skill invocation.",
+      "summary": "Find skills you can run in the @ menu.",
       "destination": "composer",
       "currentSurface": "composer: @ skills",
       "reach": [
@@ -26143,11 +27330,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26214,7 +27408,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "usage-limit-group",
       "title": "Group provider-blocked threads under Usage limit",
-      "summary": "Threads whose last turn the provider refused for quota or a rate limit appear together with their reset countdown, a resume action, Resume all, snooze choices and the auto-retry switch, reading the durable recoveries @dshfiles/ai-accounts owns.",
+      "summary": "Threads stopped by a usage limit are grouped with their reset time and a Resume button.",
       "destination": "inbox",
       "currentSurface": "thread-list: Usage limit group",
       "reach": [
@@ -26247,18 +27441,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Group: *\"",
+          "text": "click radio \"Custom, arrange manually\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
+          "by": "radio",
+          "name": "Custom, arrange manually",
           "value": null
         },
         {
-          "text": "click menuitemradio \"Arrange manually\"",
-          "action": "click",
-          "by": "menuitemradio",
-          "name": "Arrange manually",
-          "value": null
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect region \"Usage limit\"",
@@ -26283,7 +27477,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "open-thread-in-side-panel",
       "title": "Open a thread in the right side panel",
-      "summary": "A thread's row context menu, its hover action, the Open in side panel command palette action and a `@dshfiles/main-tabs` thread tab's own context menu open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right contro…",
+      "summary": "Open a thread in the right side panel instead of the main view.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Open in side panel",
       "reach": [
@@ -26323,10 +27517,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Settle\"",
+          "text": "expect button \"Done\"",
           "action": "expect",
           "by": "button",
-          "name": "Settle",
+          "name": "Done",
           "value": null
         }
       ],
@@ -26338,7 +27532,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-referenced-by",
       "title": "See which threads reference one thread",
-      "summary": "Both thread menus open a Referenced by submenu listing the threads that point back at one thread: its forked and subagent children from the Host session headers, plus the threads whose messages pulled it in as referenced context, found by one bounded session-content lookup for t…",
+      "summary": "A thread's menu lists the threads that point back to it.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Referenced by",
       "reach": [],
@@ -26349,8 +27543,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#thread-inventory-reads",
       "plugin": "thread-sidebar",
       "id": "thread-inventory-reads",
-      "title": "Read the thread inventory only while it is on screen",
-      "summary": "The sidebar reads the JJ repository inventory when its thread region is visible and stops while the sidebar is collapsed, so a hidden sidebar buys no jj scan; the schedule is sixty seconds, in step with the sixty-second repository view the Host keeps.",
+      "title": "Read workspaces only while the list is visible",
+      "summary": "The sidebar checks workspaces only while the thread list is visible.",
       "destination": "none",
       "currentSurface": "thread-list: inventory reads",
       "reach": [],
@@ -26362,7 +27556,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-keyboard-navigation",
       "title": "Navigate and multi-select threads from the keyboard",
-      "summary": "ArrowUp/Down from a view preset enters its first/last visible row; row arrows switch to the focused thread immediately by default, or move row focus only when configured. Left and Right walk the section and child-thread tree, Shift+ArrowUp/Down selects a range from the last sele…",
+      "summary": "Move through threads with the arrow keys and select several with Shift.",
       "destination": "threads",
       "currentSurface": "thread-list: keyboard navigation",
       "reach": [],
@@ -26374,9 +27568,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "rename-thread-title",
       "title": "Edit a thread title from its row menu",
-      "summary": "The thread row context menu has Edit title: it replaces the row title with a focused input, commits the trimmed title on Enter or blur through the Session rename API, and cancels on Escape without a Host call.",
+      "summary": "Rename a thread from its row menu with Edit title.",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu › Edit title",
+      "currentSurface": "thread-list: row menu › Rename",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -26393,17 +27587,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Edit title\"",
+          "text": "click menuitem \"Rename\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Edit title",
+          "name": "Rename",
           "value": null
         },
         {
-          "text": "fill textbox \"Edit title\" \"Sidebar rename\"",
+          "text": "fill textbox \"Rename\" \"Sidebar rename\"",
           "action": "fill",
           "by": "textbox",
-          "name": "Edit title",
+          "name": "Rename",
           "value": "Sidebar rename"
         },
         {
@@ -26429,7 +27623,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "continue-in-project",
       "title": "Continue a thread in another project",
-      "summary": "A thread started in the wrong folder, or whose work moved to another repository, continues in a registered project: the row menu and the thread header menu open a Continue in project submenu listing the projects, and the agent tool thread_continue_in does the same. The conversat…",
+      "summary": "Move a thread to another project when it started in the wrong one.",
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Continue in project",
       "reach": [
@@ -26445,6 +27639,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "text",
           "name": "sample",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open in\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open in",
           "value": null
         },
         {
@@ -26469,8 +27670,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-sidebar#queued-message-tools",
       "plugin": "thread-sidebar",
       "id": "queued-message-tools",
-      "title": "Remove, steer or edit a queued message as an Agent",
-      "summary": "thread_queue_remove, thread_queue_steer and thread_queue_edit act on one queued message through the Session controller updateQueue verb the queue dock uses; an edit replaces the text in place, keeping the message id and position, and the Host refuses messages with images or file…",
+      "title": "Remove, steer or edit a queued message as an agent",
+      "summary": "The agent can remove, steer or edit a queued message when you ask.",
       "destination": "none",
       "currentSurface": "agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit",
       "reach": [],
@@ -26482,7 +27683,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "prompt-links",
       "title": "Open a prefilled new thread from a prompt link",
-      "summary": "Opening the GUI with ?prompt=<text>, optionally &project=<id or path> and &model=<provider>/<model>, creates a new thread in that project, selects the model, fills its composer without sending, and removes the three parameters from the address.",
+      "summary": "A link with a prompt opens a new thread with the composer filled in, without sending.",
       "destination": "none",
       "currentSurface": "url: ?prompt= link",
       "reach": [],
@@ -26494,7 +27695,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "finished-turn-inbox",
       "title": "Finished turns in the Inbox",
-      "summary": "Each unacknowledged finished turn becomes an Inbox item: Ready for a completed, stopped or blocked turn, Failed for an error or the output token limit, plus one Ready item for a thread marked unread by hand. Opening the thread acknowledges it and resolves the item. Done on the i…",
+      "summary": "Each finished turn you have not seen becomes an Inbox item, cleared when you open the thread.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Turn finished",
       "reach": [
@@ -26520,17 +27721,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Turn failed.\"",
+          "text": "expect text \"Turn failed\"",
           "action": "expect",
           "by": "text",
-          "name": "Turn failed.",
+          "name": "Turn failed",
           "value": null
         },
         {
-          "text": "click button \"Open\"",
+          "text": "click button \"Review thread\"",
           "action": "click",
           "by": "button",
-          "name": "Open",
+          "name": "Review thread",
           "value": null
         },
         {
@@ -26563,7 +27764,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "destination-rail",
       "title": "Switch destinations from the rail",
-      "summary": "In the fixed layout the left column is a labelled rail of eight destinations (Threads, Inbox, Land, Work, Agents, Observe, Knowledge, Settings) beside one list. Threads shows the thread list; every other destination lists its sections, and choosing one opens that page in the sta…",
+      "summary": "The left rail switches between Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings.",
       "destination": "threads",
       "currentSurface": "rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout",
       "reach": [
@@ -26610,9 +27811,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Board\"",
+          "text": "expect button \"Board\"",
           "action": "expect",
-          "by": "menuitem",
+          "by": "button",
           "name": "Board",
           "value": null
         }
@@ -26625,7 +27826,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from…",
+      "summary": "On a phone, screens stack and Back returns to the list you came from.",
       "destination": "threads",
       "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
       "reach": [],
@@ -26637,7 +27838,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "phone-drawer-navigation",
       "title": "Open the thread list as a drawer on a phone",
-      "summary": "With phoneNavigation set to drawer, a phone (below 640px) keeps the thread on screen instead of pushing it over a full-screen list, as stock DSH and the ChatGPT and Claude apps do. The top bar's leading control is Show threads and there is no bottom tab bar; only a thread opened…",
+      "summary": "On a phone, the thread list can open as a drawer over the open thread.",
       "destination": "threads",
       "currentSurface": "shell: phone stack only (tab bar, full-screen list, Back)",
       "reach": [],
@@ -26649,7 +27850,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "touch-row-menu",
       "title": "Open a thread's actions by touch",
-      "summary": "On a coarse pointer each thread row shows a ⋯ button that opens the row's own actions menu (the right-click menu, which holds every hover action: pin, mute, move, settle, open in side panel…), anchored under the button. Touch has no hover and iOS WebKit fires no contextmenu on a…",
+      "summary": "On a touch screen each thread row has a ⋯ button with its actions.",
       "destination": "threads",
       "currentSurface": "thread-list: hover action strip and right-click menu only",
       "reach": [],
@@ -26661,7 +27862,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "layout-mode",
       "title": "One sidebar layout: the rail and list as a movable pane",
-      "summary": "The Fixed and Free docking left columns are one docking region (b:952m). Its default is the rail of destinations and the selected destination's list, as one Sidebar pane whose tab row is hidden; that pane moves, splits and floats like any Workbench pane, and Reset layout (⌘K) br…",
+      "summary": "The rail and its list form one sidebar pane you can move, split or float.",
       "destination": "settings",
       "currentSurface": "sidebar: the rail and list (Workbench Sidebar pane)",
       "reach": [
@@ -26695,7 +27896,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "sidebar-folders",
       "title": "Folders of plugin panels on the rail",
-      "summary": "The rail is a list of folders (b:952m): the eight destinations are built-in folders (hidden, never deleted) and a person adds folders of their own and files any addable panel (a page, a thread facet, a plugin view) in any folder. Only their changes are stored (sidebarTree in the…",
+      "summary": "Add your own folders to the rail and put any panel in them.",
       "destination": "none",
       "currentSurface": "sidebar: the rail's folders (agent tools sidebar_*)",
       "reach": [
@@ -26778,7 +27979,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "moved-to-map",
       "title": "Find where a former sidebar page went",
-      "summary": "Where did a page go? (a palette command; the sidebar keeps no link to it since b:hbtt) lists each former left-nav entry with the destination and section that holds it now and an Open button. The list is generated from the catalogs' migration map, and a test fails when an entry h…",
+      "summary": "Find where a former sidebar page went, and open it from there.",
       "destination": "none",
       "currentSurface": "palette: Where did a page go?",
       "reach": [
@@ -26833,7 +28034,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "navigation-counter",
       "title": "Count destination and section opens",
-      "summary": "Every rail, phone tab bar, list, palette and moved-to open adds one to a private counter on this Host: destination and section ids with counts and the last time, never a thread or its content. The shell_navigation_counts agent tool reads it to inform later rail decisions; shell_…",
+      "summary": "DSH counts which destinations you open, never their content, to guide later changes.",
       "destination": "none",
       "currentSurface": "agent tool: shell_navigation_counts / shell_navigation_reset",
       "reach": [],
@@ -26845,7 +28046,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "phone-tab-bar",
       "title": "Navigate from a bottom tab bar on a phone",
-      "summary": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations. The frame then gives t…",
+      "summary": "On a phone, a bottom tab bar holds Threads, Inbox, New and More.",
       "destination": "threads",
       "currentSurface": "shell: collapsed icon rail at phone width",
       "reach": [],
@@ -26857,22 +28058,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "waiting-threads-page",
       "title": "See the threads waiting on you in one page",
-      "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
+      "summary": "One page lists every thread waiting on you, with Open, its action and Done.",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › Waiting threads",
+      "currentSurface": "command palette and New tab page: Waiting threads (not a second row of the Inbox list)",
       "reach": [
         {
-          "text": "click tab \"Inbox\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
-          "by": "tab",
-          "name": "Inbox",
+          "by": "button",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click button \"Waiting threads\"",
+          "text": "click option \"*Waiting threads*\"",
           "action": "click",
-          "by": "button",
-          "name": "Waiting threads",
+          "by": "option",
+          "name": "*Waiting threads*",
           "value": null
         },
         {
@@ -26885,7 +28086,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Inbox › Waiting threads.",
+        "firstAction": "Open the command palette and choose Waiting threads.",
         "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
         "open": {
           "panel": "thread-sidebar-waiting"
@@ -26897,7 +28098,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working chi…",
+      "summary": "A subagent's row shows its current step and latest answer, and opens its thread or stops it.",
       "destination": "transcript",
       "currentSurface": "transcript: subagent tool row; composer dock while the child works",
       "reach": [
@@ -26937,10 +28138,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"In bash*\"",
+          "text": "expect text \"Running a command*\"",
           "action": "expect",
           "by": "text",
-          "name": "In bash*",
+          "name": "Running a command*",
           "value": null
         }
       ],
@@ -26952,9 +28153,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "thread-subscriptions",
       "title": "Opt-in completion notices between threads",
-      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that…",
+      "summary": "A thread can follow another thread and get one short notice each time its turn ends.",
       "destination": "threads",
-      "currentSurface": "threads: row context menu → Notify…",
+      "currentSurface": "threads: row context menu → Notify when finished",
       "reach": [
         {
           "text": "click button \"All threads\"",
@@ -27062,10 +28263,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Notify…\"",
+          "text": "click menuitem \"More\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Notify…",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Notify when finished\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Notify when finished",
           "value": null
         },
         {
@@ -27084,7 +28292,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "agent-user-notification",
       "title": "Agent sends the user a notification",
-      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through its own Agent messages category (on by default, independent of Input needed) for delivery and sound, the global snooze and the thread mute, and skips…",
+      "summary": "The agent can send you a notification that links to its thread.",
       "destination": "none",
       "currentSurface": "agent tool notify_user; in-app toast and system notification",
       "reach": [],
@@ -27096,7 +28304,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "hero-suggestions",
       "title": "Resume, Review and Inbox cards on the new-thread screen",
-      "summary": "The new-thread screen offers up to three flat cards under the composer (above it on a phone): Resume the most recent quiet thread (or one stopped and waiting to be resumed), Review a thread whose work is ready to land (it opens the thread and its Changes view), and the Inbox cou…",
+      "summary": "The new-thread screen offers cards to resume a quiet thread, review ready work or open the Inbox.",
       "destination": "composer",
       "currentSurface": "new-thread screen: suggestion cards",
       "reach": [
@@ -27108,10 +28316,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "tool-call-thread"
         },
         {
-          "text": "click button \"New session\"",
+          "text": "click button \"New thread\"",
           "action": "click",
           "by": "button",
-          "name": "New session",
+          "name": "New thread",
           "value": null
         },
         {
@@ -27129,8 +28337,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-transfer#thread-export",
       "plugin": "thread-transfer",
       "id": "thread-export",
-      "title": "Export a thread to a portable .dshthread bundle",
-      "summary": "A thread's row menu (Export…) and the command palette (Export this thread…) build one gzip file holding the thread's whole Session log — messages, tool calls and results, title, model — and every attachment it cites, stored once by sha256. The browser downloads it in chunks; the…",
+      "title": "Export a thread to a file",
+      "summary": "Export a thread with its messages, tool calls and attachments to one file you can import elsewhere.",
       "destination": "threads",
       "currentSurface": "thread row menu: Export… (also command palette: Export this thread…)",
       "reach": [
@@ -27180,8 +28388,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "thread-transfer#thread-import",
       "plugin": "thread-transfer",
       "id": "thread-import",
-      "title": "Import a .dshthread bundle as a new thread",
-      "summary": "Import thread… in the command palette uploads a bundle, previews its title, message, event and attachment counts and model, and refuses one this DSH cannot replay (another bundle version or Session log format, a damaged log, an attachment failing its checksum). On import the att…",
+      "title": "Import a thread from a file",
+      "summary": "Import an exported thread file as a new thread after a preview of what it holds.",
       "destination": "none",
       "currentSurface": "command palette: Import thread…",
       "reach": [
@@ -27221,8 +28429,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-ask-user#markdown-question-guidance",
       "plugin": "tool-ask-user",
       "id": "markdown-question-guidance",
-      "title": "ask_user_question tells the model that questions are markdown",
-      "summary": "The forked ask_user_question tool keeps the upstream schema and answer encoding and only rewrites its description text: question text and option descriptions are Markdown, the first paragraph is the heading, and a ```html preview fence becomes a sandboxed HTML view with no netwo…",
+      "title": "The agent knows questions can use Markdown",
+      "summary": "The agent is told that its questions can use Markdown and HTML previews.",
       "destination": "none",
       "currentSurface": "agent tool: ask_user_question",
       "reach": [],
@@ -27233,8 +28441,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-bash#bash-tool",
       "plugin": "tool-bash",
       "id": "bash-tool",
-      "title": "bash tool",
-      "summary": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off, and renders a result the model can act on: an exit code on every completed run, a timeout that names its wait and suggests a larger timeoutMs, and a truncated tail that counts whole…",
+      "title": "Shell commands for the agent",
+      "summary": "The agent's shell tool always reports the exit code and says how to retry a command that timed out.",
       "destination": "none",
       "currentSurface": "agent tool: bash",
       "reach": [],
@@ -27245,8 +28453,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-fs#file-tools",
       "plugin": "tool-fs",
       "id": "file-tools",
-      "title": "read, write, edit and read_image tools",
-      "summary": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts; read also reads from the end with a negative offset, answers an offset past the end with the last lines and the line count, suggests close names for a missing file, and never splits a…",
+      "title": "Read, write and edit files",
+      "summary": "The agent's file tools read from the end of a file and suggest close names for a missing one.",
       "destination": "none",
       "currentSurface": "agent tools: read, write, edit, read_image",
       "reach": [],
@@ -27257,8 +28465,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-meta#tool-call-timing",
       "plugin": "tool-meta",
       "id": "tool-call-timing",
-      "title": "Start time and duration on every tool call",
-      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can i…",
+      "title": "How long each tool call took",
+      "summary": "Each tool call that takes a second or more shows how long it took.",
       "destination": "transcript",
       "currentSurface": "transcript: tool call timing",
       "reach": [
@@ -27277,13 +28485,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"Ran commands\"",
-          "action": "click",
-          "by": "text",
-          "name": "Ran commands",
-          "value": null
-        },
-        {
           "text": "expect note \"Took*\"",
           "action": "expect",
           "by": "note",
@@ -27297,7 +28498,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "account"
         ],
         "firstAction": "Ask the agent for a task that runs a tool.",
-        "doneWhen": "Each tool card shows when it started and how long it took."
+        "doneWhen": "A tool call that took a second or more shows its duration at the right of its row."
       }
     },
     {
@@ -27305,7 +28506,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-meta",
       "id": "read-code-card",
       "title": "File reads as a syntax-highlighted code card",
-      "summary": "A settled `read` renders as the shared CodeBlock instead of the native preview: the header names the file and how much of it this window holds (\"Showing 40 of 210 lines\"), the gutter counts from the offset the call asked for, the grammar follows the file extension, and wrap, cop…",
+      "summary": "A file the agent read shows as highlighted code with its line numbers.",
       "destination": "transcript",
       "currentSurface": "transcript: file read as a code card",
       "reach": [],
@@ -27317,7 +28518,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-meta",
       "id": "file-diff-card",
       "title": "File edits as collapsible diffs",
-      "summary": "A settled `edit` or `write` and every stage of an `apply_patch` render as one card with the added/removed totals and one collapsible unified diff per hunk, through the shared PatchView. A failed apply_patch shows its rejection text. Calls with no applied hunks (a running edit, a…",
+      "summary": "A file the agent edited shows as a diff that folds per change.",
       "destination": "transcript",
       "currentSurface": "transcript: file edit as a collapsible diff",
       "reach": [],
@@ -27328,8 +28529,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-meta#approval-card",
       "plugin": "tool-meta",
       "id": "approval-card",
-      "title": "The native approval request as a risk card",
-      "summary": "A native approval request renders in the composer as one card: a risk badge (Destructive for a command that deletes, overwrites or publishes, Read-only for a tool that only reads, Review otherwise), the tool name, the request's reason, the command the call runs, and Reject / All…",
+      "title": "Approval requests as a risk card",
+      "summary": "An approval request shows its risk, the tool and the command it would run before you decide.",
       "destination": "composer",
       "currentSurface": "composer: pending approval request",
       "reach": [],
@@ -27341,7 +28542,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-search",
       "id": "progressive-tool-disclosure",
       "title": "Search and disclose tools per agent",
-      "summary": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
+      "summary": "The agent starts with a small set of tools and finds others by searching for them.",
       "destination": "none",
       "currentSurface": "host: tool search (not mounted)",
       "reach": [],
@@ -27353,7 +28554,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-search",
       "id": "agent-tool-access",
       "title": "Tools per agent: enabled and pinned",
-      "summary": "The thread's agent decides which tools reach it. tool-search declares the @dshfiles/tool-search/access contract (the dshfilesToolAccess Cordis service, provided by @dshfiles/agents): every tool is on by default, a disabled tool or group is never declared, searched, proxied or ca…",
+      "summary": "Tools an agent turns off never reach its threads, and the tools it pins are there from the first request.",
       "destination": "none",
       "currentSurface": "host: agent tool tool_search_access; contract module @dshfiles/tool-search/access",
       "reach": [],
@@ -27364,8 +28565,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "tool-subagent#live-model-selection-policy",
       "plugin": "tool-subagent",
       "id": "live-model-selection-policy",
-      "title": "Subagent model routes follow the saved setting in running threads",
-      "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/m…",
+      "title": "Subagent models follow your setting",
+      "summary": "Running threads use the subagent models you allowed in Settings without a restart.",
       "destination": "none",
       "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models",
       "reach": [],
@@ -27377,9 +28578,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-subagent",
       "id": "subagent-agent-argument",
       "title": "subagent starts a child as a configured agent",
-      "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's…",
+      "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#child-turn-guard",
+      "plugin": "tool-subagent",
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A subagent that hands its task back before doing real work is asked to keep working, a bounded number of times.",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -27388,8 +28601,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "traces#otlp-receiver",
       "plugin": "traces",
       "id": "otlp-receiver",
-      "title": "Local OTLP/HTTP receiver",
-      "summary": "The Host listens on a loopback OTLP/HTTP port (4318 by default) and accepts POST /v1/traces in JSON and protobuf, gzip or deflate, from any OpenTelemetry exporter; spans are validated, bounded and stored with whole-trace retention. Plugin, external and both modes decide whether…",
+      "title": "Built-in trace receiver",
+      "summary": "DSH receives traces from any OpenTelemetry exporter on this machine and keeps them.",
       "destination": "none",
       "currentSurface": "host: OTLP receiver (read in left-nav: Traces: Explorer)",
       "reach": [
@@ -27423,7 +28636,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "trace-explorer",
       "title": "Trace list and span waterfall",
-      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in r…",
+      "summary": "List traces with filters, and open one as a timeline of its spans.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Traces",
       "reach": [
@@ -27497,8 +28710,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "traces#thread-traces-tab",
       "plugin": "traces",
       "id": "thread-traces-tab",
-      "title": "Per-thread Traces facet",
-      "summary": "A Traces facet of the thread panel (opened from the thread header's More thread actions, a turn's Trace button or Choose a view; productivity pass Q5 moved it out of the header tabs) shows only the open thread's telemetry: traces with a span carrying its dsh.session.id (agent tu…",
+      "title": "Traces tab in the thread panel",
+      "summary": "The thread panel's Traces tab shows only this thread's traces.",
       "destination": "thread-panel",
       "currentSurface": "thread-panel: Traces / Requests facets",
       "reach": [
@@ -27524,10 +28737,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -27545,10 +28765,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Requests\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Requests",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Requests\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Requests",
           "value": null
         },
         {
@@ -27567,7 +28794,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "log-explorer",
       "title": "Log search with trace correlation",
-      "summary": "The receiver also accepts POST /v1/logs (JSON or protobuf); the Logs tab searches stored records newest first by text, service, minimum severity and one attribute value, a record with a trace id opens its trace, and a span or trace opens only its own logs. GenAI content events k…",
+      "summary": "Search stored logs and open the trace each one belongs to.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Logs",
       "reach": [
@@ -27615,7 +28842,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "trace-insights",
       "title": "Service and operation overview, error groups",
-      "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trac…",
+      "summary": "See volume, errors and latency per service and operation, and group errors by kind.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Operations / Errors",
       "reach": [
@@ -27634,9 +28861,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Operations\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Operations\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Operations",
           "value": null
         },
@@ -27671,9 +28905,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Operations\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Operations\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Operations",
           "value": null
         },
@@ -27692,7 +28933,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "service-map",
       "title": "Service dependency map",
-      "summary": "A Service map tab draws every service seen in the window as a box with span count, error rate and p95, and every cross-service parent/child call as an arrow with call count and p50, red when a call failed; picking a service filters the trace list by it.",
+      "summary": "A map of services and the calls between them, with failing calls in red.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Service map",
       "reach": [
@@ -27718,9 +28959,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Service map\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Service map\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Service map",
           "value": null
         },
@@ -27740,7 +28988,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "metric-charts",
       "title": "Metric list with one chart per metric",
-      "summary": "The receiver stores POST /v1/metrics (JSON or protobuf): gauges, sums, histograms, exponential histograms and summaries. The Metrics tab lists every metric per service with type, series count and last value, and charts the selected one per attribute set: gauges and sums as their…",
+      "summary": "List every metric per service and chart the one you pick.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Metrics",
       "reach": [
@@ -27766,9 +29014,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Metrics\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Metrics\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Metrics",
           "value": null
         },
@@ -27788,7 +29043,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "alert-rules",
       "title": "Alert rules over stored telemetry",
-      "summary": "Rules evaluated on the Host every minute over the stored spans: error rate, latency percentile, throughput, span count and span duration over a threshold, each with a service, span-name (exact or prefix*) and attribute filter, window, threshold, comparator and severity. A rule i…",
+      "summary": "Set alert rules on error rate, latency or volume, checked every minute.",
       "destination": "inbox",
       "currentSurface": "left-nav: Traces: Explorer › Alerts",
       "reach": [
@@ -27878,7 +29133,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "boards-and-saved-views",
       "title": "Boards and saved views",
-      "summary": "A Boards tab breaks the window's spans down with built-in boards: slow tools (execute_tool by gen_ai.tool.name), failing plugins (dshx API dispatch by dshx.plugin.package), model latency by provider (chat spans with time to first token), jobs (by dsh.job.kind) and jj commands, e…",
+      "summary": "Built-in boards show slow tools, failing plugins and model latency, and you can save your own views.",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Boards",
       "reach": [
@@ -27904,9 +29159,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Boards\"",
+          "text": "click button \"More views\"",
           "action": "click",
-          "by": "tab",
+          "by": "button",
+          "name": "More views",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Boards\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Boards",
           "value": null
         },
@@ -27933,7 +29195,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "browser-interaction-traces",
       "title": "Browser interaction traces",
-      "summary": "Slow GUI interactions (thread switch, New thread, panel open, composer send) arrive as dshfiles-web root spans, forwarded by the Host instead of posted from the page, with the dshx API calls they made as client children and the Host dispatch spans those calls caused nested under…",
+      "summary": "Slow clicks in the page, such as switching threads, record traces down to the work they caused.",
       "destination": "none",
       "currentSurface": "host: browser interaction spans",
       "reach": [
@@ -28030,7 +29292,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "trace-transcript-links",
       "title": "Span ↔ transcript links",
-      "summary": "A span's Open in thread (Traces panel) or Show in chat (thread Traces tab) opens its thread's Chat scrolled to and highlighting the turn, step or tool call it belongs to — the nearest span carrying dsh.turn, dsh.step and gen_ai.tool.call.id, so a plugin span lands on its tool ca…",
+      "summary": "Open a span in its thread, scrolled to the turn or tool call it belongs to.",
       "destination": "transcript",
       "currentSurface": "transcript: Open the trace of turn",
       "reach": [
@@ -28078,7 +29340,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "span-cost",
       "title": "List-price cost on traces",
-      "summary": "Sums the dshx.cost.usd agent telemetry puts on model-call spans (never the turn span that repeats them): the thread Traces tab shows the thread's total and each turn's cost, the span panel a call's own cost, the Operations tab model calls per service and model with tokens and co…",
+      "summary": "Traces show what each thread, turn and model call cost at list price.",
       "destination": "thread-panel",
       "currentSurface": "conversation-view: Traces tab › cost",
       "reach": [
@@ -28104,10 +29366,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Traces\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Traces",
           "value": null
         },
         {
@@ -28126,7 +29395,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "alert-inbox-items",
       "title": "Firing alerts in the Inbox",
-      "summary": "Every enabled alert rule that is firing and not muted is a Failed Inbox item with its last value, threshold and window. Each incident is its own item, so a rule that fires again shows again after the user marked the last one done. Muting the rule, disabling it or the rule resolv…",
+      "summary": "A firing alert shows in the Inbox with its value, threshold and window.",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › traces.alert-firing",
       "reach": [
@@ -28167,8 +29436,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "traces#event-loop-stalls",
       "plugin": "traces",
       "id": "event-loop-stalls",
-      "title": "Host event-loop stalls",
-      "summary": "A 100 ms timer-drift probe records a `host event-loop stall` root span whenever the DSH Host event loop was blocked past `eventLoopStallMs` (100 ms), at most 30 a minute. traces_stalls lists them with the spans that were open while each lasted, the work the stall fills most firs…",
+      "title": "DSH stalls",
+      "summary": "Each time DSH froze for more than 100 ms is recorded with the work that was running.",
       "destination": "none",
       "currentSurface": "host: probe; agent tool traces_stalls",
       "reach": [],
@@ -28180,7 +29449,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "traces",
       "id": "store-space",
       "title": "Span store space and Reclaim",
-      "summary": "traces_store_space reports the span store's pages, free pages and auto_vacuum mode; traces_reclaim_space (confirm: true, only on a user's request) gives the free pages back and reports the bytes freed. A store created before incremental auto_vacuum is converted by that one VACUU…",
+      "summary": "See how much space the trace store uses and give free space back to the disk.",
       "destination": "none",
       "currentSurface": "agent tools traces_store_space, traces_reclaim_space",
       "reach": [],
@@ -28192,7 +29461,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "turn-summary",
       "id": "turn-summary-line",
       "title": "A summary footer under each finished turn",
-      "summary": "Under each finished turn, one line says what the agent did with tools: files edited with lines added and removed, commands run, tests passed out of total from the last test-runner summary, files read and searches, and how long the turn took — \"Edited 3 files +42 −7 · ran 6 comma…",
+      "summary": "One line under each finished turn says what the agent did: files edited, commands run, tests and time.",
       "destination": "transcript",
       "currentSurface": "transcript: turn summary footer",
       "reach": [
@@ -28225,7 +29494,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "turn-summary",
       "id": "turn-walkthrough",
       "title": "A walkthrough under a turn that changed code",
-      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\"), and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review…",
+      "summary": "A turn that changed code offers a walkthrough of its files by folder.",
       "destination": "transcript",
       "currentSurface": "transcript: turn walkthrough row",
       "reach": [
@@ -28244,11 +29513,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+          "text": "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]] [[call write {\\\"file_path\\\":\\\"src/second.ts\\\",\\\"content\\\":\\\"export const second = 2\\\"}]]\"",
           "action": "fill",
           "by": "textbox",
           "name": "Message or run a task*",
-          "value": "[[call write {\"file_path\":\"notes/walkthrough.md\",\"content\":\"one two\"}]]"
+          "value": "[[call write {\"file_path\":\"notes/walkthrough.md\",\"content\":\"one two\"}]] [[call write {\"file_path\":\"src/second.ts\",\"content\":\"export const second = 2\"}]]"
         },
         {
           "text": "press Enter",
@@ -28258,9 +29527,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
-          "text": "expect text \"Walkthrough\"",
+          "text": "expect button \"Walkthrough\"",
           "action": "expect",
-          "by": "text",
+          "by": "button",
           "name": "Walkthrough",
           "value": null
         },
@@ -28272,24 +29541,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"walkthrough.md\"",
+          "text": "expect button \"Open walkthrough.md\"",
           "action": "expect",
-          "by": "text",
-          "name": "walkthrough.md",
-          "value": null
-        },
-        {
-          "text": "click button \"Open walkthrough.md\"",
-          "action": "click",
           "by": "button",
           "name": "Open walkthrough.md",
-          "value": null
-        },
-        {
-          "text": "expect tab \"walkthrough.md\"",
-          "action": "expect",
-          "by": "tab",
-          "name": "walkthrough.md",
           "value": null
         }
       ],
@@ -28300,8 +29555,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "turn-summary#turn-marks-projection",
       "plugin": "turn-summary",
       "id": "turn-marks-projection",
-      "title": "Per-Turn facts for the turn map and Since you left",
-      "summary": "A whole-log session projection (dshfilesTurnMarks, contract @dshfiles/chat/turn-marks): for every Turn, whether it asked a question (and whether one is still open), whether it failed, and the files its accepted edits wrote with lines added and removed, counted like the turn foot…",
+      "title": "Turn facts for the turn map and Since you left",
+      "summary": "Each turn records whether it asked, failed or edited files, for the turn map and Since you left.",
       "destination": "none",
       "currentSurface": "host: session projection",
       "reach": [],
@@ -28313,7 +29568,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tweet-context",
       "id": "public-post-context",
       "title": "Fetch public X post, photos, video samples, and thread posts",
-      "summary": "Fetch a public post, quote, multiple photos, same-author thread follow-ups, and content-aware video samples with bounded frame and media budgets.",
+      "summary": "The agent can read a public X post with its photos, video frames and thread replies.",
       "destination": "none",
       "currentSurface": "agent tool: tweet_context",
       "reach": [],
@@ -28325,7 +29580,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ui-styles",
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. The same sheet carries the generated default visual-refresh theme block (th…",
+      "summary": "All plugins share one stylesheet loaded once per page.",
       "destination": "none",
       "currentSurface": "client: shared stylesheet",
       "reach": [],
@@ -28337,7 +29592,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ui-styles",
       "id": "appearance-theme",
       "title": "Appearance theme: presets, palette and fonts",
-      "summary": "Settings › General › Appearance picks a colour preset (Warm stone default, Neutral, High contrast, Slate blue, Moss, Dracula), optional hue, tint, accent and contrast overrides, and the UI and code fonts. The client regenerates the palette with the plugin-ui generator and inject…",
+      "summary": "Pick a colour preset, adjust hue, accent and contrast, and choose fonts in Settings.",
       "destination": "settings",
       "currentSurface": "Settings › General › Appearance; agent tools theme_get / theme_set",
       "reach": [
@@ -28346,13 +29601,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Settings",
-          "value": null
-        },
-        {
-          "text": "click text \"All settings\"",
-          "action": "click",
-          "by": "text",
-          "name": "All settings",
           "value": null
         },
         {
@@ -28380,8 +29628,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "ui-styles#saved-themes",
       "plugin": "ui-styles",
       "id": "saved-themes",
-      "title": "Saved and gallery themes: any theme on request, Claude Code scenes, and Dracula",
-      "summary": "A theme is data: exact colours per scheme (eleven neutral steps, accent and status colours), optional syntax colours and an optional animated backdrop behind the conversation. The agent saves any theme the user asks for with theme_define and it applies live, no restart; theme_se…",
+      "title": "Saved and gallery themes",
+      "summary": "Save any theme you ask the agent for, or pick one from the gallery such as Dracula.",
       "destination": "settings",
       "currentSurface": "Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset)",
       "reach": [],
@@ -28396,7 +29644,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ui-styles",
       "id": "touch-platform-baseline",
       "title": "Touch platform baseline",
-      "summary": "Page-global element rules in the shared sheet's base layer: no tap highlight or landscape text inflation, touch-action manipulation on native controls, no long-press selection on control labels under a coarse pointer, and a field floor of max(16px, inherited size) under a coarse…",
+      "summary": "On touch screens, controls skip the tap flash and fields never zoom the page.",
       "destination": "none",
       "currentSurface": "client: shared stylesheet",
       "reach": [],
@@ -28407,8 +29655,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "usage#usage-index",
       "plugin": "usage",
       "id": "usage-index",
-      "title": "Incremental request and tool index from session logs",
-      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, plus privacy-reduced tool execution durations, outcomes and returned-text sizes. Read…",
+      "title": "Usage index from thread logs",
+      "summary": "Every model request and tool call in your threads is counted for the Usage page.",
       "destination": "none",
       "currentSurface": "host: usage ledger",
       "reach": [],
@@ -28420,7 +29668,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "usage",
       "id": "usage-request-log",
       "title": "Request log",
-      "summary": "The Requests tab of Observe › Usage, with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose fil…",
+      "summary": "The Requests tab lists every model request with its tokens, cost, time and status.",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Requests",
       "reach": [
@@ -28460,9 +29708,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Re-index thread logs\"",
+          "text": "click button \"More actions\"",
           "action": "click",
           "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Re-index thread logs\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Re-index thread logs",
           "value": null
         },
@@ -28498,10 +29753,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "usage",
       "id": "usage-charts",
       "title": "Usage charts",
-      "summary": "The Cost tab of Observe › Usage (formerly Charts): Headline tiles with a previous-period comparison (cost, per day, requests, failures, tokens, cache hit, estimated cache savings and cost per turn), usage over time switchable between cost, tokens and requests and grouped by mode…",
+      "summary": "The Overview tab charts cost, tokens and requests over time, against the previous period.",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts",
       "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
         {
           "text": "click tab \"Observe\"",
           "action": "click",
@@ -28517,17 +29779,31 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Cost\"",
+          "text": "click button \"More actions\"",
           "action": "click",
-          "by": "tab",
-          "name": "Cost",
+          "by": "button",
+          "name": "More actions",
           "value": null
         },
         {
-          "text": "expect text \"Cost over time\"",
+          "text": "click menuitem \"Re-index thread logs\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Re-index thread logs",
+          "value": null
+        },
+        {
+          "text": "click tab \"Overview\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Overview",
+          "value": null
+        },
+        {
+          "text": "expect text \"Usage over time\"",
           "action": "expect",
           "by": "text",
-          "name": "Cost over time",
+          "name": "Usage over time",
           "value": null
         },
         {
@@ -28552,6 +29828,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"More numbers\"",
+          "action": "click",
+          "by": "button",
+          "name": "More numbers",
+          "value": null
+        },
+        {
           "text": "expect text \"Cache savings (estimate)\"",
           "action": "expect",
           "by": "text",
@@ -28560,6 +29843,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
         {
           "text": "click button \"More\"",
           "action": "click",
@@ -28582,17 +29872,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Cost\"",
+          "text": "click tab \"Overview\"",
           "action": "click",
           "by": "tab",
-          "name": "Cost",
+          "name": "Overview",
           "value": null
         },
         {
-          "text": "expect text \"Cost over time\"",
+          "text": "expect text \"Usage over time\"",
           "action": "expect",
           "by": "text",
-          "name": "Cost over time",
+          "name": "Usage over time",
           "value": null
         },
         {
@@ -28614,6 +29904,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "text",
           "name": "Daily calendar",
+          "value": null
+        },
+        {
+          "text": "click button \"More numbers\"",
+          "action": "click",
+          "by": "button",
+          "name": "More numbers",
           "value": null
         },
         {
@@ -28631,90 +29928,11 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "usage",
       "id": "usage-jev-card",
       "title": "Jev API usage card",
-      "summary": "The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Ba…",
+      "summary": "See how many Jev calls Backlog and Memory made and what they cost this month.",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts › Jev",
-      "reach": [
-        {
-          "text": "click tab \"Observe\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Observe",
-          "value": null
-        },
-        {
-          "text": "click button \"Usage\"",
-          "action": "click",
-          "by": "button",
-          "name": "Usage",
-          "value": null
-        },
-        {
-          "text": "click tab \"Cost\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Cost",
-          "value": null
-        },
-        {
-          "text": "expect text \"Jev API usage\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Jev API usage",
-          "value": null
-        },
-        {
-          "text": "expect text \"Usage by API key · calendar month to date\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Usage by API key · calendar month to date",
-          "value": null
-        }
-      ],
-      "reachNarrow": [
-        {
-          "text": "click button \"More\"",
-          "action": "click",
-          "by": "button",
-          "name": "More",
-          "value": null
-        },
-        {
-          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
-          "action": "click",
-          "by": "button",
-          "name": "Observe Usage, activity, traces, jobs and hosts.",
-          "value": null
-        },
-        {
-          "text": "click button \"Usage\"",
-          "action": "click",
-          "by": "button",
-          "name": "Usage",
-          "value": null
-        },
-        {
-          "text": "click tab \"Cost\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Cost",
-          "value": null
-        },
-        {
-          "text": "expect text \"Jev API usage\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Jev API usage",
-          "value": null
-        },
-        {
-          "text": "expect text \"Usage by API key · calendar month to date\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Usage by API key · calendar month to date",
-          "value": null
-        }
-      ],
+      "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -28722,7 +29940,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "usage",
       "id": "usage-activity-report",
       "title": "Tool and skill analytics",
-      "summary": "The Tools tab of Observe › Usage (formerly Tools & Jev): Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles f…",
+      "summary": "The Tools tab charts how often each tool and skill runs and how long it takes.",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Tools & Jev",
       "reach": [
@@ -28840,8 +30058,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "usage#usage-otel-export",
       "plugin": "usage",
       "id": "usage-otel-export",
-      "title": "OTLP metrics export",
-      "summary": "The read-only usage_otel_metrics Agent tool returns an OTLP/HTTP JSON metrics request from the local SQLite usage ledger. It includes model requests and token use, tool category/source counts and Jev requests per calling plugin with token counters and duration histograms. It nev…",
+      "title": "Export usage as metrics",
+      "summary": "The agent can export your usage as OpenTelemetry metrics.",
       "destination": "none",
       "currentSurface": "agent tool: usage_otel_metrics",
       "reach": [],
@@ -28852,8 +30070,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "usage#usage-quota-tab",
       "plugin": "usage",
       "id": "usage-quota-tab",
-      "title": "Usage › Quota: account quota, history and forecast in the Usage page",
-      "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, b…",
+      "title": "Quota in the Usage page",
+      "summary": "The Quota tab of Usage shows each account's limits, their history and a forecast.",
       "destination": "observe",
       "currentSurface": "observe: Usage › Quota",
       "reach": [
@@ -28943,8 +30161,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "usage#thread-cost-facet",
       "plugin": "usage",
       "id": "thread-cost-facet",
-      "title": "Thread panel Cost facet",
-      "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread),…",
+      "title": "Cost tab in the thread panel",
+      "summary": "The thread panel's Cost tab shows what each turn of this thread cost.",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Cost",
       "reach": [
@@ -28985,7 +30203,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "user-questions",
       "id": "answered-question-stays-closed",
       "title": "An answered question form stays closed while its reply waits for admission",
-      "summary": "Answering a continued ask_user_question form queues a user-question-reply in the Inbox. The step boundary claims that reply, emptying the Inbox several awaits before the admitted user message settles the question, and the native client republished the form for that gap, so the p…",
+      "summary": "A question you answered stays closed while your reply waits to reach the agent.",
       "destination": "transcript",
       "currentSurface": "transcript: question form",
       "reach": [
@@ -29026,7 +30244,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "user-questions",
       "id": "markdown-question",
       "title": "Markdown questions with sandboxed HTML previews",
-      "summary": "ask_user_question text and option descriptions render as markdown in the question form. The first paragraph is the heading (inline links, code and emphasis render in an ARIA heading; plain text keeps the native h2); the rest renders through the native MarkdownText (GFM tables, l…",
+      "summary": "Questions show Markdown, and their HTML previews run safely sandboxed.",
       "destination": "transcript",
       "currentSurface": "transcript: question form",
       "reach": [
@@ -29069,11 +30287,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       }
     },
     {
+      "key": "user-questions#keyboard-answer",
+      "plugin": "user-questions",
+      "id": "keyboard-answer",
+      "title": "Answer a question by keyboard",
+      "summary": "A question can be answered with a digit and Enter, and focus goes back to the composer.",
+      "destination": "transcript",
+      "currentSurface": "composer: question card",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "vcs-provider-port#vcs-provider-resolution",
       "plugin": "vcs-provider-port",
       "id": "vcs-provider-resolution",
       "title": "One port for version-control providers",
-      "summary": "Providers serve the same dshx API id under their own owner; a caller asks every served provider which claims a path and uses the highest priority one to isolate a thread or snapshot and restore files.",
+      "summary": "Jujutsu and git support plug in the same way, and the best one for a folder is used.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -29085,7 +30315,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "vcs-provider-port",
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
-      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
+      "summary": "DSH tells whether a folder uses Jujutsu or git from the folder itself.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -29096,8 +30326,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "vcs-provider-port#workspace-attribution",
       "plugin": "vcs-provider-port",
       "id": "workspace-attribution",
-      "title": "Which project a Session belongs to",
-      "summary": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspac…",
+      "title": "Which project a thread belongs to",
+      "summary": "Tells other plugins which project a thread belongs to, counting a thread workspace for the project it was cut from.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
@@ -29108,8 +30338,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "web-fetch-readable#readable-web-fetch",
       "plugin": "web-fetch-readable",
       "id": "readable-web-fetch",
-      "title": "Answer ctx.web fetches across redirects with the readable article",
-      "summary": "A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.",
+      "title": "Fetch pages as readable articles",
+      "summary": "Fetched web pages arrive as the readable article, safely across redirects.",
       "destination": "settings",
       "currentSurface": "settings: dshfiles-web-fetch-readable",
       "reach": [],
@@ -29121,7 +30351,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "web-fetch-readable",
       "id": "web-citations",
       "title": "Source chips under web_search and web_fetch results",
-      "summary": "Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…",
+      "summary": "Web search and fetch results show a chip for each page they returned.",
       "destination": "transcript",
       "currentSurface": "transcript: web_search / web_fetch rows",
       "reach": [],
@@ -29138,8 +30368,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "web-search-brave#brave-web-search",
       "plugin": "web-search-brave",
       "id": "brave-web-search",
-      "title": "Answer ctx.web searches with Brave Web Search",
-      "summary": "A Brave backend for the web search seam: the API key setting holds a Secret Catalog reference resolved on the Host per search (falling back to BRAVE_API_KEY), results are stripped of markup, deduplicated by URL and mapped to sources.",
+      "title": "Search the web with Brave",
+      "summary": "Web searches use Brave Search with a key kept in your secrets.",
       "destination": "settings",
       "currentSurface": "settings: Brave web search",
       "reach": [],
@@ -29151,7 +30381,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "whiteboard",
       "id": "project-whiteboards",
       "title": "Project whiteboards",
-      "summary": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
+      "summary": "Draw on whiteboards kept per project, with autosave and a Recently deleted list.",
       "destination": "knowledge",
       "currentSurface": "left-nav: Whiteboard",
       "reach": [
@@ -29170,10 +30400,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Whiteboards\"",
+          "text": "expect heading \"Whiteboard\"",
           "action": "expect",
           "by": "heading",
-          "name": "Whiteboards",
+          "name": "Whiteboard",
           "value": null
         }
       ],
@@ -29194,7 +30424,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "whiteboard",
       "id": "agent-diagrams",
       "title": "Agent-drawn diagrams",
-      "summary": "whiteboard_write queues Mermaid or Excalidraw skeleton source; the editor converts it into editable shapes the next time the board opens, and whiteboard_read returns the scene and its texts.",
+      "summary": "The agent can draw diagrams on a whiteboard that you can then edit.",
       "destination": "none",
       "currentSurface": "agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore",
       "reach": [],
@@ -29205,8 +30435,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "whiteboard#xstate-diagram",
       "plugin": "whiteboard",
       "id": "xstate-diagram",
-      "title": "xstate machine diagrams",
-      "summary": "The xstate-diagram module turns any xstate v5 machine into a Mermaid flowchart for whiteboard_write or a stateDiagram-v2 for Markdown.",
+      "title": "State machine diagrams",
+      "summary": "A state machine can be drawn as a diagram on a whiteboard or in Markdown.",
       "destination": "none",
       "currentSurface": "module: @dshfiles/whiteboard/xstate-diagram",
       "reach": [],
@@ -29217,8 +30447,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workbench#conversation-header",
       "plugin": "workbench",
       "id": "conversation-header",
-      "title": "Keep the original conversation toolbar and child views inside each thread",
-      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and one thread actions `⋯` whose Open Trajectory/Traces/Requests items open those views as thread-panel facets (productivity…",
+      "title": "Keep the thread header inside each thread",
+      "summary": "Each thread tab keeps its own header with title, workspace controls and the ⋯ menu.",
       "destination": "none",
       "currentSurface": "thread-header: conversation toolbar",
       "reach": [
@@ -29237,10 +30467,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Open Traces\"",
+          "text": "click menuitem \"Open in\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open in",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Traces\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Open Traces",
+          "name": "Traces",
           "value": null
         }
       ],
@@ -29252,7 +30489,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "last-right-tab-close",
       "title": "Close the right pane when its final tab closes",
-      "summary": "Closing the final actual right-pane tab, including its empty chooser, closes the existing browser-owned right pane instead of replacing it with a chooser. Other tabs and right-owned floating windows keep it open. Explicit manual reopen supplies one chooser; an explicit resource/…",
+      "summary": "Closing the last tab of the right pane closes the pane.",
       "destination": "none",
       "currentSurface": "workbench: right pane",
       "reach": [
@@ -29342,7 +30579,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "single-tab-rows",
       "title": "Hide a single tab row without hiding its view",
-      "summary": "Right-click the sole tab or blank row space and choose Hide tab row. Its original docked content and input stay mounted; a hover/keyboard Show tab row control and the global Show tab rows command recover it. Native hideHeader persists in the existing layout JSON. A second tab ad…",
+      "summary": "Hide the tab row of a pane with one tab, and bring it back from a control or command.",
       "destination": "none",
       "currentSurface": "workbench: Hide tab row",
       "reach": [
@@ -29351,6 +30588,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "tab",
           "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
           "value": null
         },
         {
@@ -29396,8 +30640,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workbench#sidebar-preview-tab",
       "plugin": "workbench",
       "id": "sidebar-preview-tab",
-      "title": "Account Preview is a regular movable docked view",
-      "summary": "The existing footer.above assembly is seated once as an ordinary left Workbench tab, preserving the real account preview owner and actions. Existing saved placements in any root/nested region win; moving or explicitly closing it never creates a duplicate or resurrects it on relo…",
+      "title": "Account preview is a movable tab",
+      "summary": "The account preview is a tab you can move like any other.",
       "destination": "none",
       "currentSurface": "workbench: Quota tab",
       "reach": [
@@ -29413,6 +30657,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "tab",
           "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
           "value": null
         },
         {
@@ -29438,7 +30689,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "window-floating",
       "title": "Root-pane windows float across the application",
-      "summary": "Float panel and native Shift-float keep the same pane API, panel and renderer but move native chrome and persistent content through window coordinates. Main, left, right and bottom floats can leave their source pane, overlap with native chrome/body interleaving and per-window fo…",
+      "summary": "Float any pane as a window over the app, and dock it back.",
       "destination": "none",
       "currentSurface": "workbench: Float panel",
       "reach": [
@@ -29447,6 +30698,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "rightclick",
           "by": "tab",
           "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layout",
           "value": null
         },
         {
@@ -29471,8 +30729,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workbench#main-conversation",
       "plugin": "workbench",
       "id": "main-conversation",
-      "title": "Workbench as the main conversation surface",
-      "summary": "One fixed Session-bound conversation tab contains both native chat history and the real text-input editor. Sidebar clicks open a closed conversation in the reusable italic preview tab (kept once edited, double-clicked or pinned) or focus its existing tab; other tabs never follow…",
+      "title": "Workbench as the main thread view",
+      "summary": "The main view is a thread tab, and clicking a thread opens it in a preview tab or its own tab.",
       "destination": "none",
       "currentSurface": "workbench: main conversation tab",
       "reach": [
@@ -29506,7 +30764,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory, and producer-declared names otherwise (Quota, Files); a \"Plugin: View\" name shows without its plugin (Settings Shell:…",
+      "summary": "Each pane's + opens a chooser of plugin views and one Settings panel.",
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "reach": [
@@ -29533,7 +30791,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "all-region-drag",
       "title": "Drag panels across centre right and bottom",
-      "summary": "Real tab drags move one owned panel across all root regions, including an empty target, and each region restores its persisted arrangement.",
+      "summary": "Drag tabs between the centre, right and bottom panes.",
       "destination": "none",
       "currentSurface": "workbench: panel drag",
       "reach": [
@@ -29567,7 +30825,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears. Selecting a tab also scrolls it fully into view once its title and the…",
+      "summary": "Tabs keep preview, pin, unread and close behaviour in the Workbench.",
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "reach": [
@@ -29586,45 +30844,52 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Account menu\"",
+          "text": "click button \"Open command palette\"",
           "action": "click",
           "by": "button",
-          "name": "Account menu",
+          "name": "Open command palette",
           "value": null
         },
         {
-          "text": "click menuitem \"Settings*\"",
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Settings*",
+          "by": "option",
+          "name": "Settings: General*",
           "value": null
         },
         {
-          "text": "click button \"Main tabs\"",
+          "text": "click button \"Layout\"",
           "action": "click",
           "by": "button",
-          "name": "Main tabs",
+          "name": "Layout",
           "value": null
         },
         {
-          "text": "expect radio \"left\"",
+          "text": "expect radio \"Left\"",
           "action": "expect",
           "by": "radio",
-          "name": "left",
+          "name": "Left",
           "value": null
         },
         {
-          "text": "click radio \"right\"",
+          "text": "click radio \"Right\"",
           "action": "click",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         },
         {
-          "text": "expect radio \"right\"",
+          "text": "expect radio \"Right\"",
           "action": "expect",
           "by": "radio",
-          "name": "right",
+          "name": "Right",
           "value": null
         }
       ],
@@ -29636,7 +30901,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "terminal-pages",
       "title": "Open native terminals from any pane's view chooser",
-      "summary": "Terminal in the view chooser explicitly creates an independently owned native terminal in the selected tab group without opening the right pane. Moving and restoring the real occurrence preserves its native PTY and Session ownership.",
+      "summary": "Open a terminal in any pane from its view chooser.",
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Terminal",
       "reach": [
@@ -29684,7 +30949,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "thread-facets",
       "title": "Open thread facets from any pane's view chooser",
-      "summary": "Every pane's Choose a view lists the native right-pane page types that offer a guide entry (Changes, Cost, Jobs, Workspace files, Jujutsu, Editor, Land) under Thread panels, with their guide title, description, icon and order. Picking one opens that page for the on-screen thread…",
+      "summary": "Open a thread panel such as Changes, Cost or Jobs in any pane from its view chooser.",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels",
       "reach": [
@@ -29735,7 +31000,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "phone-thread-panel-sheet",
       "title": "Open the thread panel as a bottom sheet on a phone",
-      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with Close,…",
+      "summary": "On a phone, the thread panel rises as a bottom sheet.",
       "destination": "thread-panel",
       "currentSurface": "workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab",
       "reach": [],
@@ -29746,8 +31011,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workbench#native-resource-panels",
       "plugin": "workbench",
       "id": "native-resource-panels",
-      "title": "Host native preview diff and terminal resources as panels",
-      "summary": "The owned sidebar-right declarer supplies addressable real tab occurrences, retaining their Session resource lifecycle while their presentation docks in the workbench.",
+      "title": "Previews, diffs and terminals as panels",
+      "summary": "Previews, diffs and terminals open as panels tied to their thread.",
       "destination": "none",
       "currentSurface": "right-pane: native preview, diff and terminal resources",
       "reach": [
@@ -29802,7 +31067,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "nested-surfaces",
       "title": "Split panes into Dockview groups and restore legacy layouts",
-      "summary": "Pane options Split right and Split down create actual Dockview groups with chooser tabs. Existing nested-container layouts remain restorable, movable and resettable, but no control creates new nested containers.",
+      "summary": "Split a pane right or down, and older layouts still restore.",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Split",
       "reach": [
@@ -29836,7 +31101,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
-      "summary": "Quiet group chrome has New tab after tabs and Pane options at the far right, without a Workbench heading or persistent toolbar. Pane options groups Split right/down, Layouts, Move tab to, Reset layout and bottom toggling. Splits are Dockview groups; saved layouts win. Scratchpad…",
+      "summary": "Arrange panels in layouts with splits, and switch or reset them from Pane options.",
       "destination": "settings",
       "currentSurface": "workbench: Pane options › Layouts",
       "reach": [
@@ -29877,7 +31142,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "global-dock",
       "title": "Keep one docking surface in the right column and a bottom panel",
-      "summary": "Only main Pane options offers Open right pane while closed; the original sidebar shortcut drives that same full-height pane. With exactly one panel open it closes that panel and the pane follows its last-tab rule; with several panels it hides the pane and keeps them. Right/botto…",
+      "summary": "One right pane and one bottom panel hold the docked views.",
       "destination": "none",
       "currentSurface": "workbench: right pane and bottom panel",
       "reach": [
@@ -29925,7 +31190,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "layout-recovery",
       "title": "Recover all panes and semantic tabs",
-      "summary": "Reset always reveals the left chat list and selects the authorized current-conversation view in a docked centre group, even when a tool was active or views were floating, moved or absent. Root, nested and project-scoped layouts reset together without changing chat tabs, drafts,…",
+      "summary": "Reset layout always brings back the thread list and the current thread.",
       "destination": "none",
       "currentSurface": "workbench: Pane options › Reset layout",
       "reach": [
@@ -29959,7 +31224,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "early-panel-registration",
       "title": "Queue panel-open requests before mount",
-      "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",
+      "summary": "A panel asked to open before it is ready opens as soon as it is.",
       "destination": "none",
       "currentSurface": "workbench: panel registration",
       "reach": [],
@@ -29970,8 +31235,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workspace-folder-picker#workspace-folder-add-flow",
       "plugin": "workspace-folder-picker",
       "id": "workspace-folder-add-flow",
-      "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the works…",
+      "title": "Add projects from the folder browser",
+      "summary": "Add a project by browsing folders, or open your system's folder dialog.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › Add folder",
       "reach": [
@@ -30015,7 +31280,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "Clone repository… in the Add a project dialog (also in ⌘K) clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, regist…",
+      "summary": "Add a project by cloning a repository, with progress and Cancel.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › Add folder › Clone repository",
       "reach": [
@@ -30062,8 +31327,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workspace-folder-picker#project-registration-removal",
       "plugin": "workspace-folder-picker",
       "id": "project-registration-removal",
-      "title": "Remove a project registration",
-      "summary": "Remove a project from the New thread picker without deleting its folder or files; threads lose their project grouping.",
+      "title": "Remove a project",
+      "summary": "Remove a project from the picker without deleting its folder or files.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › Remove",
       "reach": [
@@ -30090,7 +31355,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New project… (the composer's and the thread list's project pickers, ⌘K, or the Add a project dialog; productivity pass Q5) creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a…",
+      "summary": "Create a new project folder with a Jujutsu repository and a first commit.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › Add folder › New project",
       "reach": [
@@ -30138,7 +31403,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host (drive and UNC paths too on a Windows Host), automatically enter one unique matching folder, open on a Projects scope that leaves JJ thread workspaces out, offer Ev…",
+      "summary": "Search your projects and browse folder paths, including ones under your home folder.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › search",
       "reach": [],
@@ -30150,7 +31415,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "keyboard-folder-selection",
       "title": "Select project folders with keyboard navigation",
-      "summary": "Move through result rows with wrapped selection and handle empty lists without selecting an invalid row.",
+      "summary": "Move through folders with the arrow keys.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › keyboard rows",
       "reach": [],
@@ -30162,7 +31427,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "unregistered-recent-folders",
       "title": "Offer recent folders not yet registered as projects",
-      "summary": "List recent folders in order on their own scope and first on Everything (before projects, then JJ thread workspaces, each folder once), show a registered recent as its project, and keep an unregistered folder's canonical path distinct from registered project identity.",
+      "summary": "Recent folders that are not projects yet are offered first.",
       "destination": "composer",
       "currentSurface": "composer: Choose project › Recent",
       "reach": [],
@@ -30173,8 +31438,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workspace-folder-picker#directory-only-mode",
       "plugin": "workspace-folder-picker",
       "id": "directory-only-mode",
-      "title": "Start directly in the Host folder browser",
-      "summary": "Consumers can open the picker with directory browsing active while omitting registered-project choices and registration actions.",
+      "title": "Start in the folder browser",
+      "summary": "Some pickers open straight on the folder browser, without your projects.",
       "destination": "composer",
       "currentSurface": "Hosts › Add folder (directory-only picker)",
       "reach": [],
@@ -30186,7 +31451,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "workspace-folder-setup",
       "title": "Inspect a folder before adding it",
-      "summary": "Choosing a folder opens a step that says what it is — no repository, a Git checkout with its origin, or a Jujutsu repository, and whether its .jj metadata is broken — before anything is registered. A Git checkout offers Enable Jujutsu and add, a plain folder offers Initialize re…",
+      "summary": "Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.",
       "destination": "composer",
       "currentSurface": "Add workspace › setup step",
       "reach": [
@@ -30234,7 +31499,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workspace-folder-picker",
       "id": "project-settings-section",
       "title": "Read a project's declared settings",
-      "summary": "Settings › Projects lists the Host's registered projects, shows the panels other plugins register for the chosen project (`project-settings-panels`, such as its main branch), leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key sho…",
+      "summary": "Settings › Projects lists your projects and the settings other features add for each one.",
       "destination": "settings",
       "currentSurface": "settings: Projects",
       "reach": [
@@ -30283,16 +31548,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Projects\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Projects\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Projects",
           "value": null
         },
@@ -30321,8 +31579,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "workspace-nav#new-thread-composer",
       "plugin": "workspace-nav",
       "id": "new-thread-composer",
-      "title": "Open a New thread's composer before the Host creates its Session",
-      "summary": "Every New thread entry point (the sidebar's +, the main-tabs +, the command palette, ⌘N, the hero project picker and the schedule dialog) switches the main view to a provisional blank Session immediately, so the composer accepts text while session/create is in flight. The Sessio…",
+      "title": "Open a new thread's composer at once",
+      "summary": "Every New thread button opens the composer at once, so you can type right away.",
       "destination": "composer",
       "currentSurface": "composer: New thread draft",
       "reach": [
@@ -30358,8 +31616,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "worktree-memory#memory-board",
       "plugin": "worktree-memory",
       "id": "memory-board",
-      "title": "Process memory and Node origins",
-      "summary": "The RAM tab of Observe › Processes (and this thread's share in the thread panel's Jobs facet): One page shows resident memory of DSH process trees grouped by workspace, plus current-user Node processes grouped by deterministic script labels, nearest app ancestor or immediate par…",
+      "title": "Process RAM",
+      "summary": "The RAM tab of Processes shows how much memory DSH and other Node processes use, by workspace.",
       "destination": "observe",
       "currentSurface": "left-nav: Worktree Memory: RAM",
       "reach": [
@@ -30405,8 +31663,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "worktree-memory#orphan-scratch-hosts",
       "plugin": "worktree-memory",
       "id": "orphan-scratch-hosts",
-      "title": "Orphaned scratch DSH Hosts",
-      "summary": "Scratch DSH Hosts (--profile dshx-boot) are listed on the RAM tab by the owner their dshx record names (E2E or dshx dev, workspace, owner pid), with CPU and resident memory. A Host whose owner exited, or a pre-record Host init adopted more than 2 h ago, is flagged Orphan; one St…",
+      "title": "Leftover test copies of DSH",
+      "summary": "Test copies of DSH left running are listed with their memory, and Stop orphans ends them.",
       "destination": "observe",
       "currentSurface": "status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts",
       "reach": [

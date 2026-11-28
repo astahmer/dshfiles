@@ -149,6 +149,28 @@ export class ThreadChildrenModel {
     return { shown, hiddenCount: options.children.length - shown.length }
   }
 
+  /**
+   * The one child order every subagent surface uses (council round 22, item 12): launch order, failed last. `launchOrder`
+   * is the parent's subagent catalog (creation order); a child it does not list (a grandchild, a catalog not loaded yet)
+   * follows the listed ones in its current order. Returns the input array when nothing moves, so a row keeps its props.
+   */
+  static readonly launchOrdered = <Thread extends { readonly id: string }>(options: {
+    readonly children: readonly Thread[]
+    readonly launchOrder: readonly string[] | undefined
+    readonly isFailed: (thread: Thread) => boolean
+  }): readonly Thread[] => {
+    if (options.children.length < 2) return options.children
+    const rank = new Map((options.launchOrder ?? []).map((id, index) => [id, index]))
+    const keyed = options.children.map((child, index) => ({ child, index, failed: options.isFailed(child), launched: rank.get(child.id) }))
+    keyed.sort((left, right) => {
+      if (left.failed !== right.failed) return left.failed ? 1 : -1
+      if (left.launched !== undefined && right.launched !== undefined) return left.launched - right.launched
+      if (left.launched !== right.launched) return left.launched === undefined ? 1 : -1
+      return left.index - right.index
+    })
+    return keyed.every((entry, index) => entry.index === index) ? options.children : keyed.map(entry => entry.child)
+  }
+
   static readonly shouldOpenChildThreadList = (options: {
     readonly children: readonly { readonly origin?: string; readonly running: boolean }[]
     readonly override: boolean | undefined
@@ -178,6 +200,7 @@ export class ThreadChildrenModel {
   }
 }
 export const groupThreadChildren = ThreadChildrenModel.groupThreadChildren
+export const launchOrdered = ThreadChildrenModel.launchOrdered
 export const listChildThreads = ThreadChildrenModel.listChildThreads
 export const partitionFinishedChildren = ThreadChildrenModel.partitionFinishedChildren
 export const shouldOpenChildThreadList = ThreadChildrenModel.shouldOpenChildThreadList

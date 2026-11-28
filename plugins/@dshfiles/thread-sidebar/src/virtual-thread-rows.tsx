@@ -7,6 +7,8 @@ const VIRTUALIZE_FROM = 40
 const OVERSCAN = 8
 /** Rows kept mounted on each side of a pinned row, so arrow keys from an off-screen focused row reach its neighbours. */
 const PINNED_NEIGHBOURS = 2
+/** Rows stand 6px apart (round five T1), 4px on touch (round five B1), so a washed or selected row never touches the next one; measured with the row. */
+const ROW_GAP = 'dshx:pb-1.5 dshx:pointer-coarse:pb-1'
 
 interface VirtualThreadRowsProps<Entry> {
   readonly entries: readonly Entry[]
@@ -117,7 +119,7 @@ export const VirtualThreadRows = <Entry,>(props: VirtualThreadRowsProps<Entry>):
     return (
       <div ref={listRef} role="list">
         {props.entries.map((entry, index) => (
-          <div key={props.keyOf(entry)} role="listitem" aria-posinset={index + 1} aria-setsize={props.entries.length}>
+          <div key={props.keyOf(entry)} role="listitem" className={ROW_GAP} aria-posinset={index + 1} aria-setsize={props.entries.length}>
             {props.render(entry)}
           </div>
         ))}
@@ -141,6 +143,7 @@ export const VirtualThreadRows = <Entry,>(props: VirtualThreadRowsProps<Entry>):
             key={item.key}
             ref={virtualizer.measureElement}
             role="listitem"
+            className={ROW_GAP}
             data-index={item.index}
             data-virtual-row={props.threadIdOf(entry)}
             aria-posinset={item.index + 1}

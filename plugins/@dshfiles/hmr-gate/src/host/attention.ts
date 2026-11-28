@@ -24,8 +24,8 @@ const draftsOf = (deferred: readonly DeferredPackage[]): readonly AttentionDraft
       subject: { kind: 'host', id: 'local', label: 'This DSH' },
       reason: `${count} for a DSH restart.`,
       detail: clamp(
-        `Waiting: ${ids.join(', ')}. Their new Host code is built but not loaded, so their pages keep the last matching version. ` +
-          'Restart DSH when no agent is working (Restart when idle in the sidebar when the supervisor runs it, or your own launcher); nothing restarts by itself.',
+        `Waiting: ${ids.join(', ')}. Their new version is built but not loaded, so their pages keep the previous one. ` +
+          'Restart DSH when no agent is working. Nothing restarts by itself.',
         2000,
       ),
       severity: 'ready',

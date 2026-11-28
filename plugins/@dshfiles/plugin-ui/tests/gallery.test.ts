@@ -9,6 +9,8 @@ const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000"><re
 const DARK_PIXELS: Rgb[] = Array.from({ length: 40 }, () => [12, 14, 40])
 const LIGHT_PIXELS: Rgb[] = Array.from({ length: 40 }, () => [230, 245, 250])
 const WHITE_PIXELS: Rgb[] = Array.from({ length: 10 }, () => [250, 250, 255])
+/** A `backdrop-filter` declaration that filters something: not a custom property that names one, and not `none`. */
+const LIVE_BACKDROP_FILTER = /^\s*(?:-webkit-)?backdrop-filter:\s*(?!none)/mu
 /** The same source for every built-in scene id. */
 const scene = (svg: string, sample?: Rgb[]) => new Map(SCENES.map(({ id }) => [id, sample === undefined ? { svg } : { svg, sample }]))
 
@@ -48,7 +50,7 @@ describe('gallery themes', () => {
     expect(css).toContain(encodeURIComponent('@media all{*{animation:none!important}}'))
     // The glass is a gradient tint and takes the first slot: nothing filters or masks the moving scene per frame.
     expect(css).toContain(`${host}::before {\n  content: '';`)
-    expect(css).not.toContain('backdrop-filter')
+    expect(css).not.toMatch(LIVE_BACKDROP_FILTER)
     // A light scene never shows in dark.
     expect(css).not.toContain(`body[data-ds-dark-theme][data-ds-dark-theme][data-ds-dark-theme] ${BACKDROP_HOST}`)
     expect(AppearanceModel.scenesNeeded({ ...settings, accentHue: 10 })).toEqual([])
@@ -92,7 +94,7 @@ describe('gallery themes', () => {
     expect(css).toContain('background-attachment: scroll, fixed;')
     expect(css).toMatch(/linear-gradient\(rgb\(\d+ \d+ \d+ \/ 0\.2\)/u)
     // A live filter only where the client found a GPU compositor.
-    for (const rule of css.split('\n}').filter(text => text.includes('backdrop-filter'))) expect(rule).toContain('[data-dshx-gpu] ')
+    for (const rule of css.split('\n}').filter(text => LIVE_BACKDROP_FILTER.test(text))) expect(rule).toContain('[data-dshx-gpu] ')
     // Out-of-bounds values are clamped; a theme without a backdrop has nothing to veil.
     expect(AppearanceModel.runtimeThemeCss({ ...settings, readingBlur: 99 }, scene(SVG, DARK_PIXELS))).toContain(encodeURIComponent('stdDeviation="24.00"'))
     expect(AppearanceModel.runtimeThemeCss({ ...DEFAULT_APPEARANCE, preset: 'moss', readingTint: 80 })).not.toContain('[data-conversation-content]::before')

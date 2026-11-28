@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import {
@@ -19,24 +20,25 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { BarChart3Icon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ChevronRightIcon, LogOutIcon, PencilIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { useState } from 'react'
 import { AccountSignOut } from './account-sign-out.js'
-import { AccountSettings, AccountInlineSettings } from './account-settings.js'
+import { AccountSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
-import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
-import { routedKind } from './account-labels.js'
+import { AccountConnection, type AccountSection } from './account-connection-status.js'
+import { AccountLabels } from './account-labels.js'
 import { accountRemoveMachine } from './account-remove-machine.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
+import { DETAIL_PANE_CLASS, DetailHeader } from './detail-header.js'
 import { QuotaSection } from './quota-section.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 export const AccountDetail = (props: {
   readonly state: AccountsPanelState
@@ -55,7 +57,9 @@ export const AccountDetail = (props: {
   const [removeSnapshot, sendRemove] = useMachine(accountRemoveMachine, { input: { removeAccount: remove } })
   const removing = removeSnapshot.matches('removing')
   const removeOpen = removeSnapshot.matches('confirming') || removing || removeSnapshot.matches('error')
-  const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
+  const status = selected === null ? null : AccountConnection.status(selected, props.state.usage)
+  const stateLine = status === null ? null : AccountConnection.stateLine(status)
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const connect = (): void => {
     if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
   }
@@ -64,63 +68,43 @@ export const AccountDetail = (props: {
     if (selected !== null) sendRemove({ type: 'request', target: { instanceId: selected.instanceId, displayName: selected.displayName } })
   }
   return (
-    <section
-      aria-label="Selected account"
-      className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border/60 dshx:bg-card"
-    >
-      <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-4 dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-4">
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-4">
-          <ProviderGlyph kind={draft.kind} large />
-          <div className="dshx:min-w-0 dshx:flex-1">
-            <AccountNameEditor
-              disabled={saving}
-              editing={props.editingName}
-              name={draft.displayName || draft.instanceId}
-              onChange={displayName => setDraft({ ...draft, displayName })}
-              onEditingChange={props.onEditingNameChange}
-            />
-            <p className="dshx:mt-1.5 dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-              {[selected?.plan, selected?.identity].filter(Boolean).join(' · ') || 'Identity not reported by provider'}
-            </p>
-          </div>
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-3">
-          <div
-            className={cn(
-              'dshx:rounded-lg dshx:px-3 dshx:py-2 dshx:text-xs',
-              status?.tone === 'success' ? 'dshx:bg-success/10 dshx:text-success' : 'dshx:bg-muted/50 dshx:text-muted-foreground',
-            )}
-          >
-            <span className="dshx:flex dshx:items-center dshx:gap-2">
-              <StatusDot tone="current" />
-              {status?.label ?? 'Not connected'}
-            </span>
-            <small className="dshx:mt-1 dshx:block dshx:text-2xs">
-              {status?.checkedAt == null
-                ? 'Not checked by provider'
-                : `Last checked ${new Date(status.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-            </small>
-          </div>
-          <Switch
-            aria-label={
-              routedKind(draft.kind)
-                ? draft.enabled
-                  ? 'Enabled in model picker'
-                  : 'Hidden from model picker'
-                : draft.enabled
-                  ? 'Tracking quota'
-                  : 'Quota tracking off'
-            }
-            checked={draft.enabled}
-            className="dshx:data-[state=checked]:bg-info"
+    <section aria-label="Selected account" className={DETAIL_PANE_CLASS}>
+      <DetailHeader
+        detail={[selected?.plan == null ? null : AccountLabels.planLabel(selected.plan), selected?.identity, status && AccountConnection.checkedLabel(status)]
+          .filter(Boolean)
+          .join(' · ')}
+        mark={<ProviderGlyph kind={draft.kind} />}
+        state={stateLine}
+        title={
+          <AccountNameEditor
             disabled={saving}
-            onCheckedChange={enabled => void props.state.persist({ enabled })}
+            editing={props.editingName}
+            name={draft.displayName || draft.instanceId}
+            onChange={displayName => setDraft({ ...draft, displayName })}
+            onEditingChange={props.onEditingNameChange}
           />
-          {selected === null ? null : <AccountSignOut account={selected} disabled={dirty || saving} onSignedOut={() => void props.state.load()} />}
+        }
+      >
+        <>
+          {/* The switch says what it controls in visible text, not only to assistive tech (council round 4, D2). */}
+          <Label className="dshx:gap-2 dshx:border-l dshx:border-border dshx:pl-3 dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            {AccountLabels.routedKind(draft.kind) ? 'Show this account' : 'Track quota'}
+            <Switch checked={draft.enabled} disabled={saving} onCheckedChange={enabled => void props.state.persist({ enabled })} />
+          </Label>
+          {selected === null ? null : (
+            <AccountSignOut
+              account={selected}
+              disabled={dirty || saving}
+              open={signOutOpen}
+              onOpenChange={setSignOutOpen}
+              onSignedOut={() => void props.state.load()}
+            />
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button aria-label="Account actions" size="icon-sm" type="button" variant="outline">
-                <MoreHorizontalIcon />
+              {/* A ghost icon button, as the kit page header's ⋯ on Inbox, Backlog and Usage (council round 19, D1). */}
+              <Button aria-label="Account actions" size="icon" type="button" variant="ghost">
+                <OverflowGlyph />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -137,14 +121,20 @@ export const AccountDetail = (props: {
                 Refresh model catalog
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {selected?.signedIn === true ? (
+                <DropdownMenuItem disabled={dirty || saving} onSelect={() => setSignOutOpen(true)}>
+                  <LogOutIcon />
+                  Sign out…
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem disabled={selected === null} onSelect={requestRemove} variant="destructive">
                 <Trash2Icon />
                 Remove profile
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </header>
+        </>
+      </DetailHeader>
       <Tabs
         className="dshx:min-w-0 dshx:gap-0"
         onValueChange={section => {
@@ -154,42 +144,52 @@ export const AccountDetail = (props: {
         }}
         value={props.activeSection}
       >
-        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:px-4 dshx:pb-0.5">
-          <TabsList aria-label="Account sections">
+        {/* Underline tabs, the page-section pattern Usage and Backlog use (council round 4, D2). */}
+        <div className="dshx:mx-4 dshx:min-w-0 dshx:overflow-x-auto dshx:border-b dshx:border-border">
+          <TabsList variant="line" aria-label="Account sections" className="dshx:h-10 dshx:gap-5 dshx:p-0">
             {(
               [
-                { id: 'models', label: 'Models', Icon: LayersIcon },
-                { id: 'settings', label: 'Settings', Icon: Settings2Icon },
-                { id: 'usage', label: 'Usage', Icon: BarChart3Icon },
+                { id: 'models', label: 'Models' },
+                { id: 'settings', label: 'Settings' },
+                { id: 'usage', label: 'Usage' },
               ] as const
             ).map(tab => (
-              <TabsTrigger className="dshx:flex-none" key={tab.id} value={tab.id}>
-                <tab.Icon className="dshx:size-4" />
+              <TabsTrigger
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-foreground"
+                key={tab.id}
+                value={tab.id}
+              >
                 {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
-        <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="models">
-          {routedKind(draft.kind) ? (
+        <TabsContent className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:divide-y dshx:px-4" value="models">
+          {AccountLabels.routedKind(draft.kind) ? (
             <>
-              <ModelCuration
-                account={draft}
-                catalog={catalog?.instanceId === draft.instanceId ? catalog.models : []}
-                onChange={patch => setDraft({ ...draft, ...patch })}
-              />
-              {catalog?.warning === undefined ? null : (
-                <p className="dshx:text-xs dshx:text-warning" role="status">
-                  {catalog.warning}
-                </p>
-              )}
-              <AccountInlineSettings draft={draft} file={props.file} state={props.state} onConnect={connect} />
+              <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:py-4">
+                <ModelCuration
+                  account={draft}
+                  catalog={catalog?.instanceId === draft.instanceId ? catalog.models : []}
+                  onChange={patch => setDraft({ ...draft, ...patch })}
+                />
+                {catalog?.warning === undefined ? null : (
+                  <p className="dshx:text-xs dshx:text-warning" role="status">
+                    {catalog.warning}
+                  </p>
+                )}
+                {/* Models is the models table; the account-wide defaults live on Settings (council round 3, D3). */}
+                <Button className="dshx:self-start dshx:px-0" onClick={() => props.onSectionChange('settings')} size="sm" type="button" variant="link">
+                  Model defaults
+                  <ChevronRightIcon aria-hidden />
+                </Button>
+              </div>
             </>
           ) : (
             <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">Cursor tracks quota here. Its models and threads use the Cursor Agent runtime.</p>
           )}
         </TabsContent>
-        <TabsContent className="dshx:min-w-0 dshx:p-4" value="settings">
+        <TabsContent className="dshx:min-w-0 dshx:px-4" value="settings">
           <AccountSettings draft={draft} file={props.file} state={props.state} folderPicker={props.folderPicker} onConnect={connect} />
         </TabsContent>
         <TabsContent className="dshx:min-w-0 dshx:space-y-4 dshx:p-4" value="usage">
@@ -198,7 +198,7 @@ export const AccountDetail = (props: {
           ) : (
             <>
               <AccountUsageSlot accountId={draft.instanceId} displayName={draft.displayName} onOpenUsageHistory={props.onOpenUsageHistory} />
-              <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:p-4">
+              <details className="dshx:border-t dshx:pt-4">
                 <summary className="dshx:cursor-pointer dshx:text-sm dshx:font-semibold">Subscription quota & history</summary>
                 <p className="dshx:my-3 dshx:text-xs dshx:text-muted-foreground">
                   Provider-reported subscription allowance is separate from recorded requests and list-price estimates.
@@ -247,7 +247,7 @@ export const AccountDetail = (props: {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removeSnapshot.context.target?.displayName ?? selected?.displayName ?? draft.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>The route leaves the model picker. Credentials stay on disk.</AlertDialogDescription>
-            {removeSnapshot.matches('error') ? <p role="alert">Could not remove this profile. Try again or cancel.</p> : null}
+            {removeSnapshot.matches('error') ? <p role="alert">Could not remove this profile. Retry or cancel.</p> : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
@@ -256,7 +256,7 @@ export const AccountDetail = (props: {
               onClick={() => sendRemove({ type: removeSnapshot.matches('error') ? 'retry' : 'confirm' })}
               variant="destructive"
             >
-              {removing ? 'Removing…' : removeSnapshot.matches('error') ? 'Try again' : 'Remove profile'}
+              {removing ? 'Removing…' : removeSnapshot.matches('error') ? 'Retry' : 'Remove profile'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

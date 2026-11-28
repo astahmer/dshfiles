@@ -9,9 +9,22 @@ export const DSHFILES_PLUGINS_SECTION_ID = 'dshfiles-plugins'
  * The task groups of the one Settings page (plan `docs/ade-ux` §4.6). Settings are grouped by what the user is doing,
  * never by the plugin that stores them: every native `settings.section`, every plugin settings namespace and the stage
  * pages other plugins own (AI accounts, MCP servers, Secrets, Hosts, Plugins) are placed in one group here. A section
- * or namespace nobody placed lands in "Other", so nothing becomes unreachable when a plugin adds one.
+ * or namespace nobody placed lands in "Other", so nothing becomes unreachable when a plugin adds one; every one this
+ * repository ships is placed (`settings-groups.test.ts` fails otherwise and says where to add it).
  */
-export type SettingsGroupId = 'general' | 'models' | 'agents' | 'tools' | 'projects' | 'hosts' | 'security' | 'notifications' | 'plugins' | 'about' | 'other'
+export type SettingsGroupId =
+  | 'general'
+  | 'models'
+  | 'agents'
+  | 'tools'
+  | 'projects'
+  | 'hosts'
+  | 'security'
+  | 'notifications'
+  | 'plugins'
+  | 'about'
+  | 'other'
+  | 'pages'
 
 export interface SettingsGroup {
   readonly id: SettingsGroupId
@@ -31,23 +44,63 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   { id: 'plugins', label: 'Plugins', description: 'Installed plugins and the marketplace.' },
   { id: 'about', label: 'About', description: 'Version, release notes and diagnostics.' },
   { id: 'other', label: 'Other', description: 'Settings no group claims yet.' },
+  { id: 'pages', label: 'Pages', description: 'Other Settings pages, opened in the stage.' },
+]
+
+/**
+ * The Settings destination's pages this list does not otherwise reach (round five B1). With the Settings page on the
+ * stage the sidebar folds to its rail, so the page lists them itself, as rows that open the page: nothing that
+ * destination holds becomes unreachable. A page an entry already links (Secrets, Installed plugins) or names is left
+ * out, so no page is listed twice.
+ */
+export const DESTINATION_PAGES: ReadonlyArray<{ readonly panelId: string; readonly label: string }> = [
+  { panelId: 'secret-catalog', label: 'Secrets' },
+  { panelId: 'plugins', label: 'Plugins' },
+  { panelId: 'dshfiles-plugin-market', label: 'Plugin market' },
+  { panelId: 'dshfiles-capabilities-hub', label: 'Capabilities hub' },
+  { panelId: 'component-gallery', label: 'Component gallery' },
+  { panelId: 'dshfiles-plugin-guide', label: 'Plugin guide' },
 ]
 
 /** Where one section, namespace or page sits. `entry` merges it into another entry (one nav row for one task). */
 interface Placement {
   readonly group: SettingsGroupId
-  /** Nav label; the section's or page's own label otherwise. */
+  /** Nav label; the section's or page's own label otherwise. Under a merged entry it is the block's subheading. */
   readonly label?: string
+  /** Position in its group, or among the blocks of the entry it joins. */
   readonly order?: number
-  /** The entry this one joins: a section id, or `plugin:<namespace>`. */
+  /** The entry this one joins: a section id, `plugin:<namespace>`, or a merged entry of `MERGED_ENTRIES`. */
   readonly entry?: string
 }
+
+/** A merged entry's place and name. */
+interface MergedEntry {
+  readonly group: SettingsGroupId
+  readonly label: string
+  readonly order: number
+}
+
+/**
+ * One task several plugins hold settings for: its members join one nav row instead of one row per plugin (audit
+ * 2026-11-16: General listed 15 rows, of which Composer, Message queue and Prompt stash were one task). A merged entry
+ * shows once a member is loaded, always under the task's name, so the row reads the same in every composition.
+ */
+const MERGED_ENTRIES: ReadonlyMap<string, MergedEntry> = new Map(
+  Object.entries({
+    layout: { group: 'general', label: 'Layout', order: 25 },
+    composer: { group: 'general', label: 'Composer', order: 30 },
+    transcript: { group: 'general', label: 'Transcript', order: 35 },
+    'web-access': { group: 'tools', label: 'Web search and fetch', order: 30 },
+    checks: { group: 'projects', label: 'Checks and tests', order: 30 },
+    diagnostics: { group: 'about', label: 'Diagnostics', order: 20 },
+  } satisfies Record<string, MergedEntry>),
+)
 
 /** Native and plugin `settings.section` ids. */
 const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   general: { group: 'general', order: 0 },
   'thread-sidebar': { group: 'general', label: 'Thread list', order: 20 },
-  'dshfiles-status-bar': { group: 'general', label: 'Status bar', order: 25 },
+  'dshfiles-status-bar': { group: 'general', label: 'Status bar', order: 3, entry: 'layout' },
   'archived-sessions': { group: 'general', label: 'Archived threads', order: 40 },
   'thread-notifications': { group: 'notifications', label: 'Thread notifications', order: 0 },
   account: { group: 'models', order: 0 },
@@ -55,8 +108,12 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'ai-accounts': { group: 'models', label: 'AI accounts', order: 5 },
   'agent-presets': { group: 'agents', order: 10 },
   'dshfiles-mcp-endpoint': { group: 'tools', order: 20 },
-  'dshfiles-new-thread': { group: 'projects', order: 0 },
+  // The projects a thread can run in: the first thing a new user sets up, so it leads its group.
+  'dshfiles-workspace-folder-picker-projects': { group: 'projects', label: 'Projects', order: 0 },
+  'dshfiles-new-thread': { group: 'projects', order: 1 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
+  'dshfiles-thread-share': { group: 'hosts', order: 30 },
+  'dshfiles-conversation-cleanup': { group: 'security', order: 45 },
   plugins: { group: 'plugins', order: 0 },
   [DSHFILES_PLUGINS_SECTION_ID]: { group: 'plugins', label: 'Plugins by category', order: 2 },
   // thread-sidebar's Update DSH (fetch, What's new, sync and rebuild, then Restart when idle).
@@ -101,19 +158,27 @@ const SECTION_BUNDLES = new Map<string, string>([
   ['ai-accounts', '@dshfiles/ai-accounts'],
   ['dshfiles-mcp-endpoint', '@dshfiles/mcp-endpoint'],
   ['dshfiles-new-thread', '@dshfiles/workspace-folder-picker'],
+  ['dshfiles-workspace-folder-picker-projects', '@dshfiles/workspace-folder-picker'],
+  ['dshfiles-thread-share', '@dshfiles/thread-share'],
+  ['dshfiles-conversation-cleanup', '@dshfiles/conversation-cleanup'],
   ['dshfiles-network-access', '@dshfiles/phone-pairing'],
   [DSHFILES_PLUGINS_SECTION_ID, '@dshfiles/settings-shell'],
   ['dshfiles-update-dsh', '@dshfiles/thread-sidebar'],
   ['market', 'dshmarket'],
 ])
 
-/** Known owning bundles for stage pages linked from Settings. */
+/** Known owning bundles for stage pages linked from Settings or listed in its Pages group. */
 const LINK_BUNDLES = new Map<string, string>([
   ['ai-accounts', '@dshfiles/ai-accounts'],
   ['mcp-servers', '@dshfiles/mcp-servers'],
   ['secret-catalog', '@dshfiles/secret-catalog'],
   ['dshfiles-multi-host-hosts', '@dshfiles/multi-host'],
   ['dshfiles-agents', '@dshfiles/agents'],
+  // The Pages group's rows (`DESTINATION_PAGES`).
+  ['dshfiles-plugin-market', '@dshfiles/capabilities-hub'],
+  ['dshfiles-capabilities-hub', '@dshfiles/capabilities-hub'],
+  ['component-gallery', '@dshfiles/component-gallery'],
+  ['dshfiles-plugin-guide', '@dshfiles/plugin-guide'],
 ])
 
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */
@@ -121,25 +186,31 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   // General
   // The theme owner (`@dshfiles/ui-styles`) serves the fields; Settings only places them (no dependency on the owner).
   'dshfiles-ui-styles': { group: 'general', label: 'Appearance', order: 1 },
-  'dshfiles-settings-shell': { group: 'general', label: 'Settings', order: 90 },
-  'thread-sidebar': { group: 'general', entry: 'thread-sidebar' },
-  'dshfiles-frame-layout': { group: 'general', entry: 'dshfiles-status-bar' },
-  'dshfiles-main-tabs': { group: 'general', label: 'Main tabs', order: 30 },
-  'dshfiles-workbench': { group: 'general', label: 'Docked panes', order: 31 },
-  'dshfiles-command-palette': { group: 'general', label: 'Command palette', order: 32 },
-  'dshfiles-rich-composer': { group: 'general', label: 'Composer', order: 33 },
-  'queue-reorder': { group: 'general', label: 'Message queue', order: 34 },
-  'dshfiles-turn-summary': { group: 'general', label: 'Turn summary', order: 35 },
-  'dshfiles-tool-meta': { group: 'general', label: 'Tool details', order: 36 },
-  'dshfiles-annotations': { group: 'general', label: 'Annotations', order: 37 },
-  'dshfiles-editor': { group: 'general', label: 'Editor', order: 38 },
   'dshfiles-shortcuts': { group: 'general', label: 'Keyboard shortcuts', order: 10 },
+  // Keyboard navigation with one setting: it sits with the shortcuts instead of holding a row.
+  'dshfiles-command-palette': { group: 'general', label: 'Command palette', order: 1, entry: 'plugin:dshfiles-shortcuts' },
+  // Under the Thread list section, so titled for what the fields do, not with the plugin's name ("Thread Sidebar").
+  'thread-sidebar': { group: 'general', label: 'Display and automation', entry: 'thread-sidebar' },
+  // Layout: the frame around a thread.
+  'dshfiles-main-tabs': { group: 'general', label: 'Main tabs', order: 0, entry: 'layout' },
+  'dshfiles-workbench': { group: 'general', label: 'Docked panes', order: 1, entry: 'layout' },
+  'dshfiles-sidebar-right': { group: 'general', label: 'Thread panel', order: 2, entry: 'layout' },
+  'dshfiles-frame-layout': { group: 'general', label: 'Status bar', order: 3, entry: 'layout' },
+  // Composer: writing and queueing a message.
+  'dshfiles-rich-composer': { group: 'general', label: 'Composer', order: 0, entry: 'composer' },
+  'queue-reorder': { group: 'general', label: 'Message queue', order: 1, entry: 'composer' },
+  'dshfiles-prompt-stash': { group: 'general', label: 'Saved prompts', order: 2, entry: 'composer' },
+  // Transcript: how a turn reads back.
+  'dshfiles-turn-summary': { group: 'general', label: 'Turn summary', order: 0, entry: 'transcript' },
+  'dshfiles-tool-meta': { group: 'general', label: 'Tool details', order: 1, entry: 'transcript' },
+  'dshfiles-agent-plan': { group: 'general', label: 'Agent plan', order: 2, entry: 'transcript' },
+  'dshfiles-editor': { group: 'general', label: 'Editor', order: 40 },
   // Models & accounts
   'ai-accounts': { group: 'models', entry: 'ai-accounts' },
   'dshfiles-model-effort-picker': { group: 'models', label: 'Model picker', order: 20 },
   // Drawn by the native Account section when it is loaded (see DRAWN_BY_SECTION); otherwise their own entries here.
   'llm-deepseek-account': { group: 'models', label: 'DeepSeek account', order: 40 },
-  'ui-settings-account': { group: 'models', label: 'Account display', order: 41 },
+  'ui-settings-account': { group: 'models', label: 'Account display', order: 1, entry: 'plugin:llm-deepseek-account' },
   'llm-deepseek': { group: 'models', label: 'DeepSeek API', order: 42 },
   'llm-pi-ai': { group: 'models', label: 'Other model providers', order: 43 },
   'agent-default-model': { group: 'models', label: 'Default model', order: 44 },
@@ -154,21 +225,34 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-memory': { group: 'agents', label: 'Memory', order: 30 },
   'dshfiles-agents': { group: 'agents', label: 'Agents', order: 5 },
   subagent: { group: 'agents', label: 'Subagents', order: 20 },
-  'subagent-model-selection-settings': { group: 'agents', label: 'Subagent models', order: 21 },
+  'subagent-model-selection-settings': { group: 'agents', label: 'Subagent models', order: 1, entry: 'plugin:subagent' },
+  'dshfiles-background-jobs': { group: 'agents', label: 'Background jobs', order: 25 },
   // Tools & MCP
-  'dshfiles-web-search-brave': { group: 'tools', label: 'Web search (Brave)', order: 30 },
-  'web-search-deepseek': { group: 'tools', label: 'Web search (DeepSeek)', order: 31 },
-  'web-deepseek-api': { group: 'tools', label: 'DeepSeek web API', order: 32 },
+  // The server list the MCP servers page edits: one entry with the link to that page.
+  'mcp-manager': { group: 'tools', label: 'MCP servers', order: 0 },
+  // Web access: which provider searches and fetches, then each provider's own settings.
+  web: { group: 'tools', label: 'Providers', order: 0, entry: 'web-access' },
+  'dshfiles-web-search-brave': { group: 'tools', label: 'Brave search', order: 1, entry: 'web-access' },
+  'web-search-deepseek': { group: 'tools', label: 'DeepSeek search', order: 2, entry: 'web-access' },
+  'web-deepseek-api': { group: 'tools', label: 'DeepSeek web API', order: 3, entry: 'web-access' },
+  'dshfiles-web-fetch-readable': { group: 'tools', label: 'Page fetch', order: 4, entry: 'web-access' },
   // Projects & workspaces
-  'dshfiles-backlog': { group: 'projects', label: 'Backlog', order: 40 },
+  // Upstream #287: each project's chip name and colour, edited on the Projects entry it belongs to.
+  'dshfiles-workspace-folder-picker': { group: 'projects', label: 'Names and colours', order: 1, entry: 'dshfiles-workspace-folder-picker-projects' },
   'jj-integration': { group: 'projects', label: 'Thread workspaces', order: 10 },
-  'dshfiles-git-worktrees': { group: 'projects', label: 'Git worktrees', order: 11 },
+  'dshfiles-git-worktrees': { group: 'projects', label: 'Git worktrees', order: 1, entry: 'plugin:jj-integration' },
+  'dshfiles-session-undo': { group: 'projects', label: 'Undo a turn', order: 2, entry: 'plugin:jj-integration' },
   'dshfiles-jujutsu': { group: 'projects', label: 'Repository history', order: 12 },
-  'dshfiles-test-runs': { group: 'projects', label: 'Test runs', order: 30 },
+  'dshfiles-project-checks': { group: 'projects', label: 'Project checks', order: 0, entry: 'checks' },
+  'dshfiles-test-runs': { group: 'projects', label: 'Test runs', order: 1, entry: 'checks' },
   'dshfiles-preview': { group: 'projects', label: 'Preview and dev servers', order: 31 },
-  'dshfiles-project-checks': { group: 'projects', label: 'Project checks', order: 32 },
+  // The browser a preview is picked from: with the preview settings, not a row in General.
+  'dshfiles-annotations': { group: 'projects', label: 'Annotations', order: 1, entry: 'plugin:dshfiles-preview' },
+  'dshfiles-backlog': { group: 'projects', label: 'Backlog', order: 40 },
+  'dshfiles-backlog-image-editor': { group: 'projects', label: 'Image editor', order: 1, entry: 'plugin:dshfiles-backlog' },
+  'dshfiles-pull-requests': { group: 'projects', label: 'Pull requests', order: 41 },
+  'dshfiles-project-automations': { group: 'projects', label: 'Automations', order: 42 },
   // Hosts & network
-  web: { group: 'hosts', label: 'Web server', order: 30 },
   'dshfiles-multi-host': { group: 'hosts', label: 'Hosts', order: 10 },
   // Security
   'secret-catalog': { group: 'security', label: 'Secrets', order: 0 },
@@ -177,9 +261,14 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'session-log-deepseek': { group: 'security', label: 'Thread log sharing', order: 40 },
   // Plugins
   'dshfiles-hmr-gate': { group: 'plugins', label: 'Plugin updates', order: 20 },
-  // About (diagnostics)
-  'dshfiles-agent-telemetry': { group: 'about', label: 'Agent telemetry', order: 20 },
-  'dshfiles-traces': { group: 'about', label: 'Traces', order: 21 },
+  'dshfiles-opencode-compat': { group: 'plugins', label: 'OpenCode plugins', order: 30 },
+  // About: updates, first-run surfaces and diagnostics
+  // Settings' own fields are the release check and, under Advanced, the preview notice: they sit with Update DSH.
+  'dshfiles-settings-shell': { group: 'about', label: 'Release checks and notices', order: 6, entry: 'dshfiles-update-dsh' },
+  'dshfiles-onboarding': { group: 'about', label: 'Getting started', order: 10 },
+  'dshfiles-agent-telemetry': { group: 'about', label: 'Agent telemetry', order: 0, entry: 'diagnostics' },
+  'dshfiles-traces': { group: 'about', label: 'Traces', order: 1, entry: 'diagnostics' },
+  'dshfiles-worktree-memory': { group: 'about', label: 'Process RAM alerts', order: 2, entry: 'diagnostics' },
 }
 
 /**
@@ -231,7 +320,14 @@ export const PAGE_LINKS: readonly PageLink[] = [
     order: 5,
     entry: ['ai-accounts', 'plugin:ai-accounts'],
   },
-  { panelId: 'mcp-servers', group: 'tools', label: 'MCP servers', description: 'Add, connect and authorize the tool servers agents use.', order: 0 },
+  {
+    panelId: 'mcp-servers',
+    group: 'tools',
+    label: 'MCP servers',
+    description: 'Add, connect and authorize the tool servers agents use.',
+    order: 0,
+    entry: ['plugin:mcp-manager'],
+  },
   {
     panelId: 'secret-catalog',
     group: 'security',
@@ -252,6 +348,12 @@ export const PAGE_LINKS: readonly PageLink[] = [
   { panelId: 'dshfiles-agents', group: 'agents', label: 'Agent definitions', description: 'Configured agents, their instructions and routes.', order: 0 },
 ]
 
+/**
+ * Sections that draw the same view as a stage page of their own (Plugins by category is both): with that page loaded,
+ * the entry stands for the page and holds no settings, so the side column lists it once, with no settings row under it.
+ */
+const SECTIONS_REPEATING_PAGE: ReadonlyMap<string, string> = new Map([[DSHFILES_PLUGINS_SECTION_ID, 'dshfiles-plugin-list']])
+
 /** Sections that already draw a button to their plugin's stage page. */
 const SECTIONS_LINKING_THEIR_PAGE: ReadonlySet<string> = new Set(['ai-accounts'])
 
@@ -262,7 +364,7 @@ export type SettingsOriginFilter = 'all' | SettingsEntryOrigin
 
 /** One row in the Settings navigation: what opens when it is picked. */
 export interface SettingsEntry {
-  /** Nav id: a section id, a `plugin:<namespace>` page id, `link:<panelId>` or `jev`. */
+  /** Nav id: a section id, a `plugin:<namespace>` page id, `link:<panelId>`, `jev` or a merged entry (`layout`). */
   readonly id: string
   readonly group: SettingsGroupId
   readonly label: string
@@ -273,12 +375,20 @@ export interface SettingsEntry {
   readonly bundleName?: string | undefined
   /** The native or plugin `settings.section` it renders. */
   readonly sectionId?: string
+  /** The section's own name, when it is one block of an entry named after a task: drawn as that block's subheading. */
+  readonly sectionLabel?: string
   /** Plugin settings pages it renders below the section, already stripped of fields shown elsewhere. */
   readonly pages: readonly PluginSettingsPage[]
   /** Pages the section draws natively: searchable, and opening this entry, but not drawn twice. */
   readonly hiddenPages: readonly PluginSettingsPage[]
   /** Another plugin's stage page it opens. */
   readonly link?: PageLink
+  /** The stage page this entry stands for: its link's, or the one its section links itself (AI accounts). */
+  readonly page?: string
+  /** The section only repeats the stage page `page` names (`SECTIONS_REPEATING_PAGE`): no settings of its own. */
+  readonly repeatsPage?: boolean
+  /** A row of the Pages group: picking it opens this stage page instead of a Settings entry. */
+  readonly opens?: string
   /** Words that find it in search without showing: namespaces, former names. */
   readonly keywords: string
 }
@@ -338,7 +448,7 @@ const pageTitle = (page: PluginSettingsPage): string => {
 const PROMOTED_FIELDS: ReadonlyArray<{ readonly ns: string; readonly key: string; readonly entry: string; readonly title: string }> = []
 
 /** The namespace holding the one Jev key (this plugin's own settings). */
-const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'
+export const SHARED_JEV_NAMESPACE = 'dshfiles-settings-shell'
 
 /** Jev settings live together in Tools & MCP: every field whose key names Jev. */
 const isJevField = (field: SettingField): boolean => /^jev/iu.test(field.key)
@@ -358,29 +468,76 @@ const groupEntries = (input: {
   readonly pages: readonly PluginSettingsPage[]
   readonly panels: ReadonlySet<string>
 }): readonly GroupedEntries[] => {
-  const entries = new Map<
-    string,
-    {
-      group: SettingsGroupId
-      label: string
-      order: number
-      origin: SettingsEntryOrigin
-      bundleName?: string | undefined
-      sectionId?: string
-      pages: PluginSettingsPage[]
-      hiddenPages: PluginSettingsPage[]
-      link?: PageLink
-      keywords: string[]
+  interface Draft {
+    group: SettingsGroupId
+    label: string
+    order: number
+    /** DSH's when its section or any block is stock DSH's (a DSH category, whoever draws it), a plugin's otherwise. */
+    origin: SettingsEntryOrigin
+    /** The one bundle behind the entry; unset for a merged entry, whose blocks come from several. */
+    bundleName?: string | undefined
+    /** One task several plugins share (`MERGED_ENTRIES`): no single bundle to name. */
+    merged?: boolean
+    sectionId?: string
+    sectionLabel?: string
+    /** Each page with its place among the entry's blocks. */
+    pages: Array<{ readonly page: PluginSettingsPage; readonly order: number }>
+    hiddenPages: PluginSettingsPage[]
+    link?: PageLink
+    /** The stage page its section already links itself (AI accounts). */
+    page?: string
+    keywords: string[]
+  }
+  const entries = new Map<string, Draft>()
+  /** The entry of one task several plugins share, created when its first member arrives. */
+  const mergedEntry = (id: string): Draft | undefined => {
+    const merged = MERGED_ENTRIES.get(id)
+    if (merged === undefined) return undefined
+    const existing = entries.get(id)
+    if (existing !== undefined) return existing
+    const draft: Draft = {
+      group: merged.group,
+      label: merged.label,
+      order: merged.order,
+      origin: 'plugin',
+      merged: true,
+      pages: [],
+      hiddenPages: [],
+      keywords: [id, 'plugin'],
     }
-  >()
+    entries.set(id, draft)
+    return draft
+  }
+  /** What a placement's `entry` names: an entry id, the entry drawing that section, or a merged entry. */
+  const entryNamed = (id: string): Draft | undefined => entries.get(id) ?? [...entries.values()].find(entry => entry.sectionId === id) ?? mergedEntry(id)
+  /** A block joins an entry: a merged entry becomes DSH's with its first DSH block; a single-plugin entry learns its bundle. */
+  const join = (target: Draft, origin: SettingsEntryOrigin, bundleName: string | undefined): void => {
+    if (target.merged === true) {
+      if (origin === 'dsh' && target.origin !== 'dsh') {
+        target.origin = 'dsh'
+        target.keywords.push(...Origin.keywords({ origin, bundleName: undefined }))
+      }
+      return
+    }
+    if (target.bundleName === undefined && bundleName !== undefined && target.origin === 'plugin') target.bundleName = bundleName
+  }
   for (const section of input.sections) {
     const placement = placementOfSection(section.id)
     const origin = originOfSection(section.id)
     const bundleName = SECTION_BUNDLES.get(section.id)
+    const merged = placement.entry === undefined ? undefined : mergedEntry(placement.entry)
+    // A merged entry draws one section as a block under the task's name; a second one keeps its own row.
+    if (merged !== undefined && merged.sectionId === undefined) {
+      merged.sectionId = section.id
+      merged.sectionLabel = placement.label ?? section.label
+      merged.keywords.push(section.id, section.label)
+      join(merged, origin, bundleName)
+      continue
+    }
     entries.set(section.id, {
       group: placement.group,
       label: placement.label ?? section.label,
-      order: placement.order ?? 100 + section.order,
+      order: placement.entry === undefined ? (placement.order ?? 100 + section.order) : 100 + section.order,
       origin,
       bundleName,
       sectionId: section.id,
@@ -398,7 +555,10 @@ const groupEntries = (input: {
       const target = entries.get(promotion.entry)
       const fields = original.fields.filter(field => field.key === promotion.key && field.path.length === 1)
       if (target === undefined || fields.length === 0) continue
-      target.pages.push({ ...original, pageId: `${promotion.entry}:${original.ns}:${promotion.key}`, title: promotion.title, description: '', fields })
+      target.pages.push({
+        page: { ...original, pageId: `${promotion.entry}:${original.ns}:${promotion.key}`, title: promotion.title, description: '', fields },
+        order: 0,
+      })
     }
     const kept = original.fields.filter(
       field => !isPromoted(field) || !entries.has(PROMOTED_FIELDS.find(promotion => promotion.key === field.key)?.entry ?? ''),
@@ -426,27 +586,34 @@ const groupEntries = (input: {
     }
     pending.push({ page: { ...original, title, fields: rest }, placement: placementOfNamespace(original.ns) })
   }
-  // Pages join their entry once every section is known; a page whose entry is not loaded stands on its own.
-  for (const { page, placement } of pending) {
-    const target = placement.entry === undefined ? undefined : entries.get(placement.entry)
-    if (target !== undefined) {
-      target.pages.push(page)
-      target.keywords.push(page.ns, page.title)
-      if (target.bundleName === undefined && page.bundleName !== undefined && target.origin === 'plugin') target.bundleName = page.bundleName
-      continue
-    }
+  const standAlone = (page: PluginSettingsPage, placement: Placement): void => {
     const origin = originOfPage(page)
     const bundleName = origin === 'plugin' ? page.bundleName : undefined
     entries.set(page.pageId, {
       group: placement.group,
       label: page.title,
-      order: placement.order ?? 200,
+      // A page that meant to join an entry which is not loaded keeps its group but not the block position it had there.
+      order: placement.entry === undefined ? (placement.order ?? 200) : 200,
       origin,
       bundleName,
-      pages: [page],
+      pages: [{ page, order: 0 }],
       hiddenPages: [],
       keywords: [page.ns, page.title, ...Origin.keywords({ origin, bundleName })],
     })
+  }
+  // Pages with a row of their own come first, so a page joins its entry whatever order the Host listed them in.
+  for (const { page, placement } of pending) if (placement.entry === undefined) standAlone(page, placement)
+  for (const { page, placement } of pending) {
+    if (placement.entry === undefined) continue
+    const target = entryNamed(placement.entry)
+    if (target === undefined) {
+      standAlone(page, placement)
+      continue
+    }
+    target.pages.push({ page, order: placement.order ?? 0 })
+    target.keywords.push(page.ns, page.title)
+    const origin = originOfPage(page)
+    join(target, origin, origin === 'plugin' ? page.bundleName : undefined)
   }
   if (jevPages.length > 0) {
     entries.set(JEV_ENTRY_ID, {
@@ -455,7 +622,7 @@ const groupEntries = (input: {
       order: 40,
       origin: 'plugin',
       bundleName: '@dshfiles/settings-shell',
-      pages: jevPages,
+      pages: jevPages.map(page => ({ page, order: 0 })),
       hiddenPages: [],
       keywords: ['jev', 'typesafe', 'classifier', 'plugin', ...jevPages.map(page => page.ns)],
     })
@@ -466,14 +633,14 @@ const groupEntries = (input: {
     // A section that already opens its own page needs no second button.
     if (target !== undefined && SECTIONS_LINKING_THEIR_PAGE.has(target.sectionId ?? '')) {
       target.keywords.push(link.panelId)
+      target.page = link.panelId
       continue
     }
     if (target !== undefined) {
       target.link = link
       target.label = link.label
       target.keywords.push(link.panelId)
-      const linkedBundle = LINK_BUNDLES.get(link.panelId)
-      if (target.bundleName === undefined && linkedBundle !== undefined) target.bundleName = linkedBundle
+      join(target, originOfLink(link.panelId), LINK_BUNDLES.get(link.panelId))
       continue
     }
     const origin = originOfLink(link.panelId)
@@ -490,7 +657,27 @@ const groupEntries = (input: {
       keywords: [link.panelId, link.description, ...Origin.keywords({ origin, bundleName })],
     })
   }
-  const byGroup = new Map<SettingsGroupId, SettingsEntry[]>()
+  const linked = new Set([...entries.values()].flatMap(entry => (entry.link === undefined ? [] : [entry.link.panelId])))
+  const named = new Set([...entries.values()].map(entry => entry.label.trim().toLowerCase()))
+  const pageRows: SettingsEntry[] = DESTINATION_PAGES.flatMap((page, index) =>
+    !input.panels.has(page.panelId) || linked.has(page.panelId) || named.has(page.label.toLowerCase())
+      ? []
+      : [
+          {
+            id: `page:${page.panelId}`,
+            group: 'pages',
+            label: page.label,
+            order: index,
+            origin: originOfLink(page.panelId),
+            bundleName: originOfLink(page.panelId) === 'plugin' ? LINK_BUNDLES.get(page.panelId) : undefined,
+            pages: [],
+            hiddenPages: [],
+            opens: page.panelId,
+            keywords: page.panelId,
+          },
+        ],
+  )
+  const byGroup = new Map<SettingsGroupId, SettingsEntry[]>(pageRows.length === 0 ? [] : [['pages', pageRows]])
   for (const [id, entry] of entries) {
     const row: SettingsEntry = {
       id,
@@ -499,12 +686,18 @@ const groupEntries = (input: {
       order: entry.order,
       origin: entry.origin,
       bundleName: entry.bundleName,
-      pages: entry.pages,
+      // Blocks in their placed order; equal orders keep the order the Host listed them in.
+      pages: entry.pages.toSorted((left, right) => left.order - right.order).map(block => block.page),
       hiddenPages: entry.hiddenPages,
       keywords: entry.keywords.join(' '),
     }
     const withSection: SettingsEntry = entry.sectionId === undefined ? row : { ...row, sectionId: entry.sectionId }
-    const finished: SettingsEntry = entry.link === undefined ? withSection : { ...withSection, link: entry.link }
+    const withSectionLabel: SettingsEntry = entry.sectionLabel === undefined ? withSection : { ...withSection, sectionLabel: entry.sectionLabel }
+    const linked: SettingsEntry = entry.link === undefined ? withSectionLabel : { ...withSectionLabel, link: entry.link }
+    const repeated = entry.sectionId === undefined ? undefined : SECTIONS_REPEATING_PAGE.get(entry.sectionId)
+    const repeats = repeated !== undefined && input.panels.has(repeated) && entry.pages.length === 0
+    const page = entry.link?.panelId ?? entry.page ?? (repeats ? repeated : undefined)
+    const finished: SettingsEntry = page === undefined ? linked : repeats ? { ...linked, page, repeatsPage: true } : { ...linked, page }
     const list = byGroup.get(entry.group) ?? []
     list.push(finished)
     byGroup.set(entry.group, list)
@@ -540,6 +733,13 @@ const entryForField = (groups: readonly GroupedEntries[], ns: string, fieldPath:
 const searchablePages = (groups: readonly GroupedEntries[]): readonly PluginSettingsPage[] =>
   groups.flatMap(group => group.entries.flatMap(entry => [...entry.pages, ...entry.hiddenPages]))
 
+/** The group a namespace is placed in; `other` when nobody placed it. */
+const groupOfNamespace = (ns: string): SettingsGroupId =>
+  DRAWN_BY_SECTION[ns] === undefined ? placementOfNamespace(ns).group : placementOfSection(DRAWN_BY_SECTION[ns]).group
+
+/** The group a `settings.section` is placed in; `other` when nobody placed it. */
+const groupOfSection = (id: string): SettingsGroupId => placementOfSection(id).group
+
 const filterByOrigin = (groups: readonly GroupedEntries[], filter: SettingsOriginFilter): readonly GroupedEntries[] => {
   if (filter === 'all') return groups
   return groups.flatMap(group => {
@@ -568,6 +768,8 @@ const originCounts = (groups: readonly GroupedEntries[]): SettingsOriginCounts =
 
 export class SettingsGroups {
   static readonly group = groupEntries
+  static readonly groupOfNamespace = groupOfNamespace
+  static readonly groupOfSection = groupOfSection
   static readonly entryFor = entryFor
   static readonly entryForField = entryForField
   static readonly searchablePages = searchablePages

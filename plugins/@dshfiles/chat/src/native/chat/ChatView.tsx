@@ -1,15 +1,16 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowDownIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   NodeKey, RenderEntry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  Button, classifyLinkPath, FenceCodeBlock, MarkdownDelegateProvider, Modal,
+  Button, classifyLinkPath, CodeBlock, MarkdownDelegateProvider, Modal,
   type MarkdownDelegateFenceInfo, type MarkdownMenuTarget,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
@@ -39,6 +40,8 @@ import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } fro
 import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { OlderRowsSentinel } from './older-rows-sentinel.tsx'
+import { dockJumpSeat } from './dock-jump-seat.ts'
+import { CodeFold } from '../../code-fold.tsx'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
 import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
@@ -82,7 +85,7 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
+  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding, usePendingInteraction,
   sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
   loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, seenTurns, forkAt,
   usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag, viewRequest, completeViewRequest, openView,
@@ -111,6 +114,7 @@ export function ChatView({
   const nodeStore = useChat(s => s.nodes)
   const imageGalleryScope = useImageGalleryScope(scope => scope)
   const unreadLanding = useUnreadLanding(landing => landing)
+  const pendingInteraction = usePendingInteraction(key => key)
   const unreadLabel = t('chat.unreadDivider')
   const unread = useMemo(() => ({ landing: unreadLanding, seenAnswer, label: unreadLabel }), [unreadLanding, seenAnswer, unreadLabel])
   const deferCompletedTurns = usePresentation(policy => policy.collapseTiming === 'next-input')
@@ -144,10 +148,25 @@ export function ChatView({
   const codeLabels = useMemo(() => markdownLabels(t).code, [t])
   // Every fence in the flow dispatches by language; the content is the plain
   // code block, so a language without a layer renders as code without diff rows.
+  // dshfiles (unslop r5 C2, council round 5): the plain card goes through Chat's CodeFold (no-wrap with a sideways
+  // scroll by default, the wrap toggle, the fold); a bare FenceCodeBlock kept the native wrapped default.
   const renderCode = useCallback((fence: MarkdownDelegateFenceInfo) => renderSlot('conversation.chat.markdown.fence', fence, {
     entryKey: fence.lang,
     children: (
-      <FenceCodeBlock lang={fence.lang} code={fence.code} streaming={fence.streaming} labels={codeLabels} diff={false} />
+      <CodeFold
+        block={
+          <CodeBlock
+            // FenceCodeBlock's convention: the native card trims one trailing newline for display.
+            code={`${fence.code}\n`}
+            lang={fence.lang}
+            streaming={fence.streaming}
+            diff={false}
+            copyLabel={codeLabels.copyLabel}
+            copiedLabel={codeLabels.copiedLabel}
+            toolbarLabels={codeLabels.toolbarLabels}
+          />
+        }
+      />
     ),
   }), [renderSlot, codeLabels])
   const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(() =>
@@ -366,6 +385,7 @@ export function ChatView({
     steeringId,
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
     submissionSteers: visibleSubmissions.at(-1)?.placement === 'steering',
+    pendingInteraction,
     loadedTurns: turnNavigationItems,
     transcriptView,
     unread,
@@ -577,7 +597,7 @@ export function ChatView({
     return location?.kind === 'turn' || location?.kind === 'step' ? location.turn.turn : undefined
   }, [groupMembers, nodeStore])
   const sincePlacement = useMemo<SinceYouLeftPlacement | null>(() => {
-    if (recap === null) return null
+    if (recap === null || !SinceYouLeftRecapModel.worthShowing(recap)) return null
     const before = transcript.entries.find(entry => (entryTurn(entry) ?? -1) >= recap.firstTurn)
     if (before === undefined) return null
     // Opening at the final answer (the default): the recap sits right above that answer, the landing position, when the
@@ -590,6 +610,24 @@ export function ChatView({
       ...(atAnswer ? { answerTurn: latest.turn } : {}),
     }
   }, [recap, transcript.entries, entryTurn, jumpToTurn, dismissSince, t, railItems, unreadLanding, running])
+
+  // dshfiles (unslop r5 C1): on a phone the control takes the dock's trailing seat, looked up each time it appears.
+  const [jumpSeat, setJumpSeat] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    setJumpSeat(scroll.followingTail ? null : dockJumpSeat(frameRef.current))
+  }, [scroll.followingTail])
+  const toBottom = (
+    <button
+      type="button"
+      className={jumpSeat === null ? css.toBottom : `${css.toBottom} ${css.toBottomInDock}`}
+      aria-label={t('chat.toBottom')}
+      onClick={scroll.returnToBottom}
+    >
+      {/* A plain down arrow in a round seat (council round 10 C1): the arrow to a line of round 9 read as "download";
+          the filled seat keeps it apart from Live work's disclosure chevron on the same row. */}
+      <ArrowDownIcon size={16} strokeWidth={1.75} aria-hidden />
+    </button>
+  )
 
   return (
     <div ref={frameRef} className={css.frame} data-chat-frame="">
@@ -685,18 +723,9 @@ export function ChatView({
           <div className={css.turnSpacer} data-chat-turn-spacer aria-hidden="true" />
         </div>
       </div>
-      {!scroll.followingTail && (
-        <div className={css.toBottomSlot}>
-          <button
-            type="button"
-            className={css.toBottom}
-            aria-label={t('chat.toBottom')}
-            onClick={scroll.returnToBottom}
-          >
-            <ChevronDownIcon size={14} strokeWidth={1.5} />
-          </button>
-        </div>
-      )}
+      {!scroll.followingTail && (jumpSeat !== null && jumpSeat.isConnected
+        ? createPortal(toBottom, jumpSeat)
+        : <div className={css.toBottomSlot}>{toBottom}</div>)}
       {imagePreview.status === 'open' && (
         <ImageLightbox images={imagePreview.images} initialIndex={imagePreview.initialIndex} labels={imageLightboxLabels} onClose={closeImagePreview} />
       )}

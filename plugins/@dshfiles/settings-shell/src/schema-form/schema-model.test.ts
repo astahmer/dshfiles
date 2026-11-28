@@ -55,7 +55,7 @@ describe('settingFields', () => {
       options: [
         { value: 'preview', label: 'Preview', detail: 'what you open replaces the preview tab.' },
         { value: 'new', label: 'New tab', detail: '' },
-        { value: 'replace', label: 'replace', detail: '' },
+        { value: 'replace', label: 'Replace', detail: '' },
       ],
     })
     expect(byKey.get('notes')?.control).toEqual({ kind: 'text', multiline: true })
@@ -65,7 +65,7 @@ describe('settingFields', () => {
   it('edits arrays and dicts of scalars as lists and records, and anything else as JSON', () => {
     expect(byKey.get('tags')?.control).toEqual({ kind: 'list', item: { kind: 'text', multiline: false } })
     expect(byKey.get('colors')?.control).toMatchObject({ kind: 'record', value: { kind: 'choice' } })
-    expect(byKey.get('rows')?.control).toEqual({ kind: 'json' })
+    expect(byKey.get('rows')?.control).toEqual({ kind: 'json', shape: 'list' })
   })
 
   it('groups nested objects and leaves hidden and secret fields out', () => {
@@ -80,6 +80,24 @@ describe('settingFields', () => {
   })
 })
 
+describe('advanced settings', () => {
+  it('marks a field the schema folds away, alone or through the object that holds it', () => {
+    const folded = Schema.decodeUnknownSync(jsonValueSchema)(
+      Schemastery.object({
+        enabled: Schemastery.boolean().default(true),
+        chromePath: Schemastery.string().default('').collapse(),
+        tuning: Schemastery.object({ retries: Schemastery.natural().default(3) }).collapse(),
+      }).toJSON(),
+    )
+    const fields = SettingsSchemaModel.settingFields({ schema: folded, secrets: [], text })
+    expect(fields.map(field => [field.key, field.advanced])).toEqual([
+      ['enabled', false],
+      ['chromePath', true],
+      ['retries', true],
+    ])
+  })
+})
+
 describe('labels and units', () => {
   it('humanizes keys and reads units from their suffix', () => {
     expect(SettingsSchemaModel.humanizeKey('archiveUndoDurationSeconds')).toBe('Archive undo duration seconds')
@@ -88,9 +106,77 @@ describe('labels and units', () => {
     expect(SettingsSchemaModel.unitOfKey('maxTabs')).toBeUndefined()
   })
 
+  it('words a raw choice value and a key for a person, acronyms included', () => {
+    const raw = Schema.decodeUnknownSync(jsonValueSchema)(
+      Schemastery.object({
+        billing: Schemastery.union(['auto', 'api-key', 'last_used']).default('auto'),
+        purpose: Schemastery.union([Schemastery.const('office'), Schemastery.const(null)]),
+        baseURL: Schemastery.string(),
+        cdpPort: Schemastery.natural().default(9222),
+      }).toJSON(),
+    )
+    const byKey = new Map(SettingsSchemaModel.settingFields({ schema: raw, secrets: [], text }).map(field => [field.key, field]))
+    const labels = (key: string): readonly string[] => {
+      const control = byKey.get(key)?.control
+      return control?.kind === 'choice' ? control.options.map(option => option.label) : []
+    }
+    expect(labels('billing')).toEqual(['Auto', 'API key', 'Last used'])
+    expect(labels('purpose')).toEqual(['Office', 'None'])
+    expect(byKey.get('baseURL')?.title).toBe('Base URL')
+    expect(byKey.get('cdpPort')?.title).toBe('CDP port')
+  })
+
   it('shows a few short choices as segments and the rest as a select', () => {
     expect(SettingsSchemaModel.choiceDisplay([{ value: 'a', label: 'A', detail: '' }])).toBe('segmented')
     expect(SettingsSchemaModel.choiceDisplay(['a', 'b', 'c', 'd', 'e'].map(value => ({ value, label: value, detail: '' })))).toBe('select')
+  })
+})
+
+describe('readable units', () => {
+  const machine = Schema.decodeUnknownSync(jsonValueSchema)(
+    Schemastery.object({
+      streamIdleTimeoutMs: Schemastery.natural().default(300_000),
+      autoSaveDelayMs: Schemastery.natural().default(800),
+      maxRequestFilesBytes: Schemastery.natural().min(1_048_576).default(134_217_728),
+      maxResponseBytes: Schemastery.natural().default(5_000_000),
+      maxOutputBytes: Schemastery.natural().default(64_000),
+      imageOffloadByteQuantum: Schemastery.natural().default(67_108_864),
+      blockBytes: Schemastery.natural().default(1600),
+      fileExpiresAfterSeconds: Schemastery.natural().default(604_800),
+      waitSeconds: Schemastery.natural().default(0),
+      idleMinutes: Schemastery.natural().default(120),
+      timeoutMs: Schemastery.natural().description('How long a command may run.').default(60_000),
+      ms: Schemastery.natural().default(5),
+    }).toJSON(),
+  )
+  const byKey = new Map(SettingsSchemaModel.settingFields({ schema: machine, secrets: [], text }).map(field => [field.key, field]))
+
+  it('shows milliseconds as seconds and bytes as KB or MB, storing the same number', () => {
+    expect(byKey.get('streamIdleTimeoutMs')?.control).toMatchObject({ kind: 'number', unit: 's', factor: 1000 })
+    expect(byKey.get('maxRequestFilesBytes')?.control).toMatchObject({ unit: 'MB', factor: 1_048_576, min: 1_048_576 })
+    expect(byKey.get('maxResponseBytes')?.control).toMatchObject({ unit: 'MB', factor: 1_000_000 })
+    expect(byKey.get('maxOutputBytes')?.control).toMatchObject({ unit: 'KB', factor: 1000 })
+    expect(byKey.get('imageOffloadByteQuantum')?.control).toMatchObject({ unit: 'MB', factor: 1_048_576 })
+    expect(byKey.get('fileExpiresAfterSeconds')?.control).toMatchObject({ unit: 'h', factor: 3600 })
+  })
+
+  it('keeps the unit a value already reads well in', () => {
+    expect(byKey.get('autoSaveDelayMs')?.control).toEqual({ kind: 'number', percent: false, step: 1, min: 0, unit: 'ms' })
+    expect(byKey.get('blockBytes')?.control).toMatchObject({ unit: 'bytes' })
+    expect(byKey.get('waitSeconds')?.control).toMatchObject({ unit: 's' })
+    expect(byKey.get('idleMinutes')?.control).toMatchObject({ unit: 'min' })
+    for (const key of ['autoSaveDelayMs', 'blockBytes', 'waitSeconds', 'idleMinutes']) expect(byKey.get(key)?.control).not.toHaveProperty('factor')
+  })
+
+  it('names the setting without the unit its control already shows', () => {
+    expect(byKey.get('streamIdleTimeoutMs')?.title).toBe('Stream idle timeout')
+    expect(byKey.get('maxRequestFilesBytes')?.title).toBe('Max request files')
+    expect(byKey.get('fileExpiresAfterSeconds')?.title).toBe('File expires after')
+    expect(byKey.get('idleMinutes')?.title).toBe('Idle')
+    expect(byKey.get('timeoutMs')?.title).toBe('Timeout')
+    // The unit word is part of the name here, and a key that is only a unit keeps it.
+    expect(byKey.get('imageOffloadByteQuantum')?.title).toBe('Image offload byte quantum')
+    expect(byKey.get('ms')?.title).toBe('Ms')
   })
 })
 

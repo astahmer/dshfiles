@@ -2,6 +2,7 @@ import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option, Ref, Schema, Stream } from 'effect'
 import { InflightTurns, type InflightTurn } from './inflight-turns.js'
 import { SessionEvents, type SessionEvent } from './session-events.js'
+import { ToolSteps } from './tool-steps.js'
 
 /**
  * What a running turn is doing right now, for the thread list's live activity line (polish pass b:r4et): when the turn
@@ -16,11 +17,15 @@ export interface LiveTurn {
   readonly startedAt: number
   /** The current step in words, or null before the first tool call of the turn. */
   readonly step: string | null
+  /** Set only while the turn waits for the user's answer: it is Needs you, not Working. */
+  readonly needsYou?: true
 }
 
 interface TurnState {
   readonly startedAt: number
   readonly step: string | null
+  /** The turn's open call is a question to the user. */
+  readonly needsYou: boolean
   /** Files this turn edited, so a second edit reads "Editing 2 files". */
   readonly edited: readonly string[]
 }
@@ -38,8 +43,7 @@ const clip = (text: string): string => {
 
 const basename = (path: string): string => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path
 
-/** `mcp__dsh__bash` and `bash` are the same tool to a reader. */
-const toolName = (name: string): string => (name.split('__').at(-1) ?? name).toLowerCase()
+const { toolName, EDIT_TOOLS, SHELL_TOOLS, QUESTION_TOOL, FIXED_STEPS } = ToolSteps
 
 /** The few argument fields the activity line reads; every other field of a tool's input is ignored. */
 const callArgumentsSchema = Schema.Struct({
@@ -71,32 +75,16 @@ const stringField = (args: CallArguments, ...keys: readonly ArgumentKey[]): stri
   return undefined
 }
 
-const EDIT_TOOLS = new Set(['edit', 'write', 'apply_patch', 'editor_write', 'str_replace_editor', 'multiedit', 'notebookedit'])
-const SHELL_TOOLS = new Set(['bash', 'shell', 'pwsh', 'powershell', 'terminal', 'exec', 'multi_host_exec'])
-
 /** One tool call in words, and the turn's edited files after it. */
 interface CallStep {
   readonly step: string
   readonly edited: readonly string[]
+  readonly needsYou: boolean
 }
-
-const FIXED_STEPS = new Map<string, string>([
-  ['grep', 'Searching'],
-  ['glob', 'Searching'],
-  ['find_threads', 'Searching'],
-  ['memory_search', 'Searching'],
-  ['web_search', 'Searching the web'],
-  ['web_fetch', 'Reading a web page'],
-  ['subagent', 'Delegating to a subagent'],
-  ['subagent_fork', 'Delegating to a subagent'],
-  ['workflow', 'Delegating to a subagent'],
-  ['ask_user_question', 'Asking you a question'],
-  ['todo_write', 'Planning'],
-])
 
 const describeCall = (state: TurnState, name: string, args: CallArguments): CallStep => {
   const tool = toolName(name)
-  const unchanged = (step: string): CallStep => ({ step, edited: state.edited })
+  const unchanged = (step: string): CallStep => ({ step, edited: state.edited, needsYou: tool === QUESTION_TOOL })
   if (SHELL_TOOLS.has(tool)) {
     const command = stringField(args, 'command', 'cmd')
     return unchanged(command === undefined ? 'Running a command' : `Running ${clip(command.split('\n')[0] ?? command)}`)
@@ -105,13 +93,13 @@ const describeCall = (state: TurnState, name: string, args: CallArguments): Call
     const path = stringField(args, 'file_path', 'path', 'filePath')
     const edited = path === undefined || state.edited.includes(path) ? state.edited : [...state.edited, path].slice(-50)
     const step = edited.length > 1 ? `Editing ${String(edited.length)} files` : path === undefined ? 'Editing a file' : `Editing ${clip(basename(path))}`
-    return { step, edited }
+    return { step, edited, needsYou: false }
   }
   if (tool === 'read' || tool === 'read_image') {
     const path = stringField(args, 'file_path', 'path')
     return unchanged(path === undefined ? 'Reading a file' : `Reading ${clip(basename(path))}`)
   }
-  return unchanged(FIXED_STEPS.get(tool) ?? `Using ${clip(tool.replaceAll('_', ' '))}`)
+  return unchanged(FIXED_STEPS.get(tool) ?? ToolSteps.usingWords(tool))
 }
 
 /** Fold one Session event into the live turns; every other event leaves the state as it is (same reference). */
@@ -121,7 +109,7 @@ const apply = (state: LiveTurnsState, input: SessionEvent): LiveTurnsState => {
     case 'turn/start': {
       const next = new Map(state)
       next.delete(sessionId)
-      next.set(sessionId, { startedAt: event.time, step: null, edited: [] })
+      next.set(sessionId, { startedAt: event.time, step: null, edited: [], needsYou: false })
       while (next.size > MAX_LIVE_TURNS) {
         const oldest = next.keys().next()
         if (oldest.done === true) break
@@ -140,14 +128,14 @@ const apply = (state: LiveTurnsState, input: SessionEvent): LiveTurnsState => {
       const call = decodeToolCall(event)
       if (turn === undefined || Option.isNone(call)) return state
       const described = describeCall(turn, call.value.data.name, readArguments(call.value.data.arguments))
-      if (described.step === turn.step && described.edited === turn.edited) return state
+      if (described.step === turn.step && described.edited === turn.edited && described.needsYou === turn.needsYou) return state
       return new Map(state).set(sessionId, { ...turn, ...described })
     }
     case 'tool/result': {
       // The model reads the result and decides what to do next: it is thinking until its next call.
       const turn = state.get(sessionId)
       if (turn === undefined || turn.step === 'Thinking') return state
-      return new Map(state).set(sessionId, { ...turn, step: 'Thinking' })
+      return new Map(state).set(sessionId, { ...turn, step: 'Thinking', needsYou: false })
     }
     default:
       return state
@@ -159,7 +147,12 @@ const apply = (state: LiveTurnsState, input: SessionEvent): LiveTurnsState => {
  * or a Host restart empties the in-memory map, while the markers keep each open turn's start, so its clock stays right.
  */
 const snapshot = (state: LiveTurnsState, inflight: readonly InflightTurn[] = []): readonly LiveTurn[] => [
-  ...[...state.entries()].map(([sessionId, turn]) => ({ sessionId, startedAt: turn.startedAt, step: turn.step })),
+  ...[...state.entries()].map(([sessionId, turn]) => ({
+    sessionId,
+    startedAt: turn.startedAt,
+    step: turn.step,
+    ...(turn.needsYou && { needsYou: true as const }),
+  })),
   ...inflight.filter(turn => !state.has(turn.sessionId)).map(turn => ({ sessionId: turn.sessionId, startedAt: turn.startedAt, step: null })),
 ]
 

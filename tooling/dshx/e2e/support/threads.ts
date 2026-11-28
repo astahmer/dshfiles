@@ -69,12 +69,23 @@ export const confirmFolderSetupStep = async (page: Page, path: string): Promise<
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
 export const sendMessage = async (page: Page, text: string): Promise<void> => {
-  const settled = page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
+  const settled = page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })
   const before = await settled.count()
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }))
   await composer.fill(text)
   await composer.press('Enter')
   await expect(settled).toHaveCount(before + 1, { timeout: 60_000 })
+}
+
+/**
+ * The New thread composer folds its host ("Run on Local") and working location ("Workspace: …") into one location
+ * chip, "Where this thread runs: …" (council round 16 C1): open its panel before using either picker. A no-op while
+ * the panel is open.
+ */
+export const openComposerLocation = async (page: Page): Promise<void> => {
+  const chip = page.getByRole('button', { name: /^Where this thread runs: /u }).first()
+  await expect(chip).toBeVisible({ timeout: 20_000 })
+  if ((await chip.getAttribute('aria-expanded')) !== 'true') await chip.click()
 }
 
 export const selectModelForNewThread = async (page: Page, model: string): Promise<void> => {

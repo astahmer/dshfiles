@@ -63,8 +63,13 @@ export interface TurnNavigatorHandle {
 
 /** Fixed pitch between neighbouring marks; overflow scrolls inside the frame. */
 const TURN_SPACING_PX = 10
-/** Rail padding above the first mark and below the last one, per end. */
-const RAIL_INSET_PX = 6
+/**
+ * dshfiles (council round 34 B2): the resting track's padding outside the first and last mark's 10px seat, so the active
+ * 20px tick never meets the track's rounded ends.
+ */
+const RAIL_PAD_PX = 6
+/** Rail padding above the first mark's centre and below the last one's, per end. */
+const RAIL_INSET_PX = TURN_SPACING_PX / 2 + RAIL_PAD_PX
 /** Fade band the mask reserves at a scrollable end. */
 const FADE_PX = 24
 
@@ -264,7 +269,8 @@ function TurnNavigatorRail(
     scrollToIndex(activeIndex, 'if-needed', behavior)
   }, [activeIndex, items.length, viewHeight, scrollToIndex])
 
-  if (items.length < 2 && filter === 'all') return null
+  // dshfiles (council round 34 B2): two Turns read as a stray glyph; the rail shows from three (a filter keeps it up).
+  if (items.length < 3 && filter === 'all') return null
   const preview = previewIndex === undefined ? undefined : items[previewIndex]
   const previewKind = preview === undefined ? undefined : KIND_LABEL[preview.kind]
   const previewPosition = virtualItems.find(item => item.index === previewIndex)

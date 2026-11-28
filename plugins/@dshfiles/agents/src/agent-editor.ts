@@ -109,6 +109,8 @@ export class AgentEditor {
       handle: agent?.handle ?? '',
       name: agent?.name ?? '',
       glyph: agent?.glyph ?? '🤖',
+      // Always a key, null for "the handle's default", so a draft and its base compare equal and a save can clear it.
+      tone: agent?.tone ?? null,
       description: agent?.description ?? '',
       instructions: agent?.instructions ?? '',
       preset: agent?.preset ?? null,

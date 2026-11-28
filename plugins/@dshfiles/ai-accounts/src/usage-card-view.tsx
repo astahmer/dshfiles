@@ -11,7 +11,7 @@ const SPARKLINE_POINTS = 12
 
 const creditTone = { ok: 'success', low: 'warning', critical: 'destructive' } as const satisfies Record<QuotaTone, CreditTone>
 
-const formatLeft = (percent: number): string => `${String(Math.round(percent))}% left`
+const formatPercent = (percent: number): string => `${String(Math.round(percent))}%`
 
 /** The window's own money when the provider reports it, so a spent credit is never hidden behind a full allowance. */
 const formatAmount = (amount: UsageWindowAmount): string =>
@@ -43,8 +43,9 @@ export const quotaWindowCategories = (input: {
     label: window.label,
     tone: creditTone[quotaTone(window.percentRemaining)],
     total: window.percentRemaining,
-    unit: '',
-    formatTotal: formatLeft,
+    // "left" is the card's unit, drawn as its own word beside the rolling number (it glued to it as one string).
+    unit: 'left',
+    formatTotal: formatPercent,
     caption: windowCaption(window, input.now),
     chart: 'area',
     series: recentPercents(input.history, window.label),

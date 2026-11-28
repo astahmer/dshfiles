@@ -5,7 +5,8 @@
     {
       "id": "changed-files-card",
       "title": "Changed-files card and review tab",
-      "summary": "The native \"Edited N files\" card under a turn, its per-file hover comparison, the right-sidebar review tab, delivery cards and closing-prose file mentions, from one owned fork of the stock row.",
+      "summary": "Each turn lists the files it changed, with a comparison on hover and a review tab.",
+      "details": "The native \"Edited N files\" card under a turn, its per-file hover comparison, the right-sidebar review tab, delivery cards and closing-prose file mentions, from one owned fork of the stock row.",
       "surfaces": ["client", "host"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -38,7 +39,8 @@
     {
       "id": "changed-image-preview",
       "title": "Changed images preview instead of the binary placeholder",
-      "summary": "A changed png, jpg, jpeg, gif, webp, svg or avif file that the card or review tab would answer with \"Binary file\" or \"File too large\" shows the image itself, labelled Current version. The Host route api/changes.image serves the listed file's current bytes: only inside the Session's working directory after resolving symlinks, only an image extension, under its own media type with a sandboxing Content-Security-Policy and nosniff, and at most 8 MB. The turn-start (\"before\") bytes are not shown: workspaceChanges serves no bytes, its turn-start snapshot objects live in a Session-private temporary object directory, and neither jj nor git records the working copy at turn start, so the current file is the only correct side available.",
+      "summary": "A changed image shows as the image itself instead of a binary file note.",
+      "details": "A changed png, jpg, jpeg, gif, webp, svg or avif file that the card or review tab would answer with \"Binary file\" or \"File too large\" shows the image itself, labelled Current version. The Host route api/changes.image serves the listed file's current bytes: only inside the Session's working directory after resolving symlinks, only an image extension, under its own media type with a sandboxing Content-Security-Policy and nosniff, and at most 8 MB. The turn-start (\"before\") bytes are not shown: workspaceChanges serves no bytes, its turn-start snapshot objects live in a Session-private temporary object directory, and neither jj nor git records the working copy at turn start, so the current file is the only correct side available.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\": \\\"git init -q && echo git-ready\\\", \\\"description\\\": \\\"Track the sample with git\\\"}]]\"",

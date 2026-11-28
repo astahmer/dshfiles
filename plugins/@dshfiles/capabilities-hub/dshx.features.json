@@ -5,7 +5,8 @@
     {
       "id": "capabilities-hub",
       "title": "Open the manager for skills, MCP servers or plugins from one page",
-      "summary": "Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skills, the MCP servers list, the plugin inventory) and a button that opens that owner's page. Skills also link out to skills.sh and offer a copyable install command with telemetry off and a pinned CLI version; DSH never runs it. The hub stores nothing, installs nothing and makes no network call. The capabilities_hub_overview agent tool returns the same routing and guidance.",
+      "summary": "One Settings page counts your skills, MCP servers and plugins and opens the page that manages each.",
+      "details": "Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skills, the MCP servers list, the plugin inventory) and a button that opens that owner's page. Skills also link out to skills.sh and offer a copyable install command with telemetry off and a pinned CLI version; DSH never runs it. The hub stores nothing, installs nothing and makes no network call. The capabilities_hub_overview agent tool returns the same routing and guidance.",
       "reach": ["click tab \"Settings\"", "click button \"Capabilities hub\"", "expect heading \"Capabilities hub\""],
       "surfaces": ["client", "host", "api", "tool"],
       "surface": "destinationSection",
@@ -16,7 +17,7 @@
       "failureModes": [
         "A manager page that is not loaded keeps its card with a disabled Open button and names the package to add to the profile.",
         "An owner API that is absent shows which plugin the count needs instead of a number.",
-        "skills.sh search needs a Vercel OIDC login DSH cannot hold, so the hub links to the site instead of searching in place."
+        "Searching skills.sh needs a sign-in DSH cannot keep safely, so the hub links to the site instead of searching in place."
       ],
       "externalDependencies": [
         {

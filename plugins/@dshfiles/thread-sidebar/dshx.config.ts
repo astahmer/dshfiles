@@ -13,6 +13,8 @@ export default defineConfig({
     'auto-settle-api': 'src/auto-settle-api.ts',
     'thread-actions-api': 'src/thread-actions-api.ts',
     'attention-client': 'src/attention-client.ts',
+    // The thread list's one status per thread, rolled up, for the tab, the header and the palette (DESIGN.md R2).
+    'thread-status-client': 'src/thread-status-client.ts',
     'thread-views-api': 'src/thread-views-api.ts',
     snapshots: 'src/snapshots.ts',
     'thread-mention': 'src/thread-mention.ts',
@@ -29,6 +31,8 @@ export default defineConfig({
     'thread-directories': 'src/thread-directories.ts',
     // The colour chosen when a project is imported, and the palette class it resolves to.
     'project-colors': 'src/project-colors.ts',
+    // Surfaces that mark a failed thread (a tab strip) read the Host's failed-turn record through the list's own hook.
+    'failed-turns-client': 'src/failed-turns-client.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

@@ -75,4 +75,26 @@ describe('AgentRunStatus', () => {
     expect(screen.getByText('Working')).not.toBeNull()
     expect(screen.getByText(/步骤/)).not.toBeNull()
   })
+
+  it('says a run is Working and Done, never Running or Completed', () => {
+    const { rerender } = render(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} state="running" />)
+    expect(screen.getByText('Working')).not.toBeNull()
+    expect(screen.queryByText('Running')).toBeNull()
+    rerender(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} endedAt={9_000} state="done" />)
+    expect(screen.getByText('Done')).not.toBeNull()
+    expect(screen.queryByText('Completed')).toBeNull()
+  })
+
+  it('marks the run with the kit status glyph, not an amber asterisk', () => {
+    const { container, rerender } = render(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} state="running" />)
+    expect(container.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+    expect(container.querySelector('.dshx\\:text-chart-3')).toBeNull()
+    rerender(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} endedAt={9_000} state="done" />)
+    expect(container.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
+  })
+
+  it('shows the clock in the kit duration grammar', () => {
+    render(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} endedAt={126_000} state="done" />)
+    expect(screen.getByLabelText('Elapsed').textContent).toBe('2m 05s')
+  })
 })

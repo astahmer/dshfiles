@@ -220,7 +220,7 @@ export const StartThreadDialog = (props: {
               value={mode === 'per-item' ? instructions : message}
               onChange={event => (mode === 'per-item' ? setInstructions(event.currentTarget.value) : setMessage(event.currentTarget.value))}
               rows={4}
-              placeholder={mode === 'per-item' ? 'Optional; each thread gets its own item reference' : 'Leave empty to create an empty thread'}
+              placeholder={mode === 'per-item' ? 'Optional. Each thread gets its own item reference' : 'Leave empty to create an empty thread'}
               className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-sm dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">

@@ -70,8 +70,28 @@ describe('CapabilitiesHubPanel', () => {
 
     fireEvent.click(within(mcp).getByRole('button', { name: 'Open MCP servers' }))
     fireEvent.click(within(plugins).getByRole('button', { name: 'Open Plugins' }))
-    fireEvent.click(within(skills).getByRole('button', { name: 'Open Agent toolkit' }))
+    fireEvent.click(within(skills).getByRole('button', { name: 'Open Capabilities' }))
     expect(openPanel.mock.calls).toEqual([['mcp-servers'], ['plugins'], ['dshfiles-agent-toolkit']])
+  })
+
+  it('draws the three kinds as one list that fills the pane, with neutral chips and no card inside a card', async () => {
+    renderPanel()
+    const list = document.querySelector('[data-hub-list]')
+    expect(list).not.toBeNull()
+    // The page fills its pane: no max-width column around the list.
+    expect(list?.className).not.toMatch(/max-w-/u)
+    for (const name of ['Skills', 'MCP servers', 'DSH plugins']) {
+      const row = screen.getByRole('region', { name })
+      // A row of the list, not a bordered card of its own.
+      expect(row.className).not.toMatch(/dshx:border\b|rounded-lg/u)
+      const chip = row.querySelector('[data-slot="badge"]')
+      // What a kind grants is said in words; blue, amber and solid red were permanent colour on a healthy install.
+      expect(chip?.getAttribute('data-variant')).toBe('muted')
+    }
+    // The warning sentence stays as text beside the chip.
+    expect(screen.getByText(/A DSH plugin runs code on the computer that runs DSH and in this browser/u)).toBeTruthy()
+    const skillsSh = document.querySelector('[data-skills-sh]')
+    expect(skillsSh?.className).not.toMatch(/bg-muted|rounded-md|dshx:border\b/u)
   })
 
   it('links out to skills.sh and copies the telemetry-off command without running it', async () => {
@@ -87,7 +107,7 @@ describe('CapabilitiesHubPanel', () => {
   it('keeps a missing manager visible with the fix instead of a dead button', () => {
     renderPanel(panelId => panelId !== 'dshfiles-agent-toolkit')
     const skills = screen.getByRole('region', { name: 'Skills' })
-    expect(within(skills).getByRole('button', { name: 'Open Agent toolkit' }).hasAttribute('disabled')).toBe(true)
+    expect(within(skills).getByRole('button', { name: 'Open Capabilities' }).hasAttribute('disabled')).toBe(true)
     expect(within(skills).getByText(/Add @dshfiles\/agent-toolkit to the profile and restart DSH/u)).toBeTruthy()
   })
 })

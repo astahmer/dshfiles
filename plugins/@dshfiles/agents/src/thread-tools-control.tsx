@@ -1,3 +1,4 @@
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { RotateCcwIcon, WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { ReactNode } from 'react'
 import type { Agent } from './agent.js'
 import { composerAgentKeys } from './composer-agent-chip.js'
@@ -57,8 +59,22 @@ export const ThreadToolsControl = (props: ThreadToolsControlProps): ReactNode =>
     },
     onSuccess: view => client.setQueryData(composerAgentKeys.access(props.sessionId), view),
   })
-  if (access.data === undefined) return null
-  const state = ThreadTools.state(access.data)
+  const state = access.data === undefined ? undefined : ThreadTools.state(access.data)
+  const shown = state === undefined ? '' : state.overridden && state.value === 'all' ? 'All tools' : `@${state.agent}`
+  // A phone bar has no room for the words (they would push the model name out), and a bare wrench says nothing (council
+  // round 34 B1): there the control leaves the bar for the thread's ⋯ sheet as a labelled row, as Saved prompts and
+  // Annotations do, and comes back in place while its menu is open.
+  const phoneTool = usePhoneThreadTool({
+    id: '@dshfiles/agents/tools',
+    label: 'Tools',
+    detail: `${shown}${state?.overridden === true ? ' (changed)' : ''}`,
+    icon: <WrenchIcon />,
+    opens: true,
+    open: () => menu.onOpenChange(true),
+    active: menu.open,
+    available: state !== undefined,
+  })
+  if (access.data === undefined || state === undefined) return null
   const apply = (value: string): void => {
     if (!ThreadTools.isValue(value) || value === state.value) return
     change.mutate(ThreadTools.requestFor(value, state.agent))
@@ -69,23 +85,31 @@ export const ThreadToolsControl = (props: ThreadToolsControlProps): ReactNode =>
       <DropdownMenuTrigger asChild>
         <Button
           {...menu.triggerProps}
+          {...phoneTool.triggerProps}
           type="button"
           variant="ghost"
           size="sm"
           aria-label={label}
           data-thread-tools={state.value}
           data-thread-tools-source={access.data.policy.source}
-          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:min-w-11"
+          // The bar's 28px chip height: the composer row gives every button its 44pt tap area, so a taller box would only
+          // grow the bar and pull Send off the + control's line (council round 34 A2).
+          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground"
           onMouseDown={event => event.preventDefault()}
         >
           <WrenchIcon aria-hidden />
           <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:sr-only">
-            {state.overridden && state.value === 'all' ? 'All tools' : `@${state.agent}`}
+            {shown}
           </span>
-          {state.overridden ? <span aria-hidden className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-warning" /> : null}
+          {state.overridden ? <StatusDot size="sm" tone="warning" /> : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)]">
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)]"
+        onCloseAutoFocus={phoneTool.onCloseAutoFocus}
+      >
         <DropdownMenuLabel className="dshx:flex dshx:flex-col dshx:gap-0.5">
           <span>
             Thread agent <span className="dshx:font-mono!">@{state.agent}</span>

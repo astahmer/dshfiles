@@ -4,7 +4,8 @@
     {
       "id": "thread-artifacts",
       "title": "Edit thread artifacts",
-      "summary": "Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.",
+      "summary": "Create and edit Markdown and HTML documents that belong to a thread, which the agent can edit too.",
+      "details": "Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.",
       "surfaces": ["client", "host", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -44,7 +45,8 @@
     {
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
-      "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host file APIs.",
+      "summary": "Browse and edit the workspace's files in tabs, with search, go to line and Markdown preview.",
+      "details": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview whose code fences go through Chat's registry (a ```mermaid block is a diagram with @dshfiles/mermaid-diagrams), and save through Host file APIs.",
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -182,7 +184,8 @@
     {
       "id": "file-links",
       "title": "Open file links in the editor",
-      "summary": "A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a New-thread draft the Host has not created yet is on screen.",
+      "summary": "A file link in a thread opens the file in the editor, reusing its tab when it is already open.",
+      "details": "A file row in the native Workspace files page, a tool-call path or a composer reference opens that file in the editor surface, focusing its existing tab instead of opening a second one. The editor shows the session the file belongs to, and keeps the last thread's files while a New-thread draft the Host has not created yet is on screen.",
       "surfaces": ["client", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -234,7 +237,8 @@
     {
       "id": "workspace-file-index",
       "title": "Index workspace files with bounded traversal",
-      "summary": "Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.",
+      "summary": "The workspace's file list loads in steps and skips version control and dependency folders.",
+      "details": "Traverse breadth-first with concurrency and entry limits, skipping VCS and dependency directories while surfacing partial results.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -277,8 +281,9 @@
     },
     {
       "id": "session-screen-contract",
-      "title": "Session screen and workspace files for other plugins",
-      "summary": "Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file search reads its index through it.",
+      "title": "Open thread and workspace files for other plugins",
+      "summary": "Other features can read which thread is on screen and list or search its workspace files.",
+      "details": "Provides dshx's SessionScreen contract: the session the main view shows and the one side panels follow, the mounted session's workspace file index (indexing, then ready, kept fresh while followed), one tree level per call, and the Host's file search. The command palette's file search reads its index through it.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",

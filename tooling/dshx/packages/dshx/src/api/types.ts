@@ -205,6 +205,13 @@ export interface ApiError extends Error {
   readonly remoteCode?: string | undefined
   /** JSON details a `remote` failure carries, e.g. the encoded Effect error the Host chose to expose. */
   readonly remoteDetails?: Readonly<Record<string, unknown>> | undefined
+  /**
+   * The HTTP status a `transport` or owner-missing failure answered with (500, 404); absent when nothing answered
+   * (the network or the tunnel is down). Read it instead of parsing `message`.
+   */
+  readonly status?: number | undefined
+  /** The channel-relative endpoint the call went to (`dshx-inbox/inbox/list`): for Details and logs, never for UI copy. */
+  readonly endpoint?: string | undefined
 }
 
 export type ApiFetchStatus = 'idle' | 'fetching' | 'paused'

@@ -15,6 +15,8 @@ import type { PendingQuestion } from './contract/slots.ts'
 import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
 import { QuestionMarkdownText } from '../rich/question-markdown.ts'
+import { CardChrome } from '../card-chrome.ts'
+import { QuestionKeys } from '../question-keys.ts'
 import { OptionDescription, QuestionMarkdown, QuestionTitle } from '../rich/QuestionMarkdown.tsx'
 import css from './QuestionComposer.module.css'
 
@@ -452,11 +454,67 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     submitDrafts(nextDrafts)
   }
 
+  // Owned delta (unslop r3 item 22): answer by keyboard. On a fine pointer the shown question's chosen, recommended or
+  // first option takes focus at once (not after the card's entrance), digits 1-9 choose at card level, Enter on the
+  // focused option submits, and focus goes back to the composer when the card leaves.
+  const cardRef = useRef<HTMLElement>(null)
+  const focusOption = (optionIndex: number): void => {
+    cardRef.current?.querySelector<HTMLElement>(`[data-option-index="${String(optionIndex)}"]`)?.focus({ preventScroll: true })
+  }
+  const shown = useRef({ question, draft, locked, minimized })
+  shown.current = { question, draft, locked, minimized }
+  const focusShownOption = useRef(() => {
+    const card = cardRef.current
+    const current = shown.current
+    if (card === null || current.locked || current.minimized || !QuestionKeys.finePointer()) return
+    const scope = { body: document.body, within: [card, card.closest('[data-composer-seat]')], typesText: QuestionKeys.typesText }
+    if (!QuestionKeys.mayTakeFocus<Element>(document.activeElement, scope)) return
+    const target = QuestionKeys.initialOption(current.question.options ?? [], current.draft.selected, label => parseRecommendedLabel(label).recommended)
+    if (target !== undefined) focusOption(target)
+  })
+  useEffect(() => { focusShownOption.current() }, [index, pending.key])
+  // A thread view the workbench kept mounted is shown again without remounting this card: take focus the same way,
+  // as the composer does in its place (unslop r3 item 21).
+  useEffect(() => {
+    const onShown = (event: Event): void => {
+      const card = cardRef.current
+      if (card !== null && event.target instanceof Node && event.target.contains(card)) focusShownOption.current()
+    }
+    document.addEventListener(QuestionKeys.THREAD_VIEW_SHOWN, onShown)
+    return () => document.removeEventListener(QuestionKeys.THREAD_VIEW_SHOWN, onShown)
+  }, [])
+  useEffect(() => {
+    const card = cardRef.current
+    const conversation = card?.closest('[data-conversation-content]') ?? null
+    return () => {
+      if (conversation !== null && QuestionKeys.finePointer()) QuestionKeys.focusComposer(conversation)
+    }
+  }, [])
+  const chooseByDigit = (event: KeyboardEvent<HTMLElement>): void => {
+    const options = question.options ?? []
+    const optionIndex = QuestionKeys.digitOption({
+      key: event.key, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey,
+      isComposing: event.nativeEvent.isComposing,
+    }, options.length)
+    if (optionIndex === undefined || locked || QuestionKeys.typesText(event.target)) return
+    const option = options[optionIndex]
+    if (option === undefined) return
+    event.preventDefault()
+    choose(option.label)
+    // A single choice on an earlier question moves to the next one, whose own option takes focus above.
+    if (question.multiSelect === true || index === questions.length - 1) focusOption(optionIndex)
+  }
+
+  const exit = CardChrome.exitOf({ dismissal: pending.dismissal, review: review !== undefined })
+
   return (
     <div className={css.frame} data-question-key={pending.key}>
+      {/* Digits are shortcuts for the radio and checkbox controls inside (each names its key); the card is not a control. */}
       <section
+        ref={cardRef}
         className={clsx(css.card, minimized && css.cardMinimized, questionBody !== '' && css.cardRich)}
         aria-labelledby={`question-${pending.key}-${String(index)}`}
+        onKeyDown={chooseByDigit}
       >
         <header className={css.header}>
           {(question.header !== undefined || minimized) && (
@@ -499,14 +557,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             >
               {minimized ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
             </button>
-            <button
-              type="button" className={css.iconButton}
-              aria-label={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
-              title={t(pending.dismissal === 'hide' ? 'nav.close' : 'nav.cancel')}
-              disabled={submitting} onClick={dismissFlow}
-            >
-              <IconCloseOutlineRegular />
-            </button>
+            {/* Owned delta: leaving a pending question says what it does ("Answer later") instead of a bare close icon
+                beside Collapse and Skip; a review card and an unkeyed request keep the close icon. */}
+            {exit === 'later'
+              ? (
+                <Tooltip label={t('nav.close')} side="top" portal>
+                  <button type="button" className={css.exitButton} disabled={submitting} onClick={dismissFlow}>
+                    {t('nav.later')}
+                  </button>
+                </Tooltip>
+              )
+              : (
+                <button
+                  type="button" className={css.iconButton}
+                  aria-label={t(exit === 'close' ? 'nav.close' : 'nav.cancel')}
+                  title={t(exit === 'close' ? 'nav.close' : 'nav.cancel')}
+                  disabled={submitting} onClick={dismissFlow}
+                >
+                  <IconCloseOutlineRegular />
+                </button>
+              )}
           </div>
         </header>
 
@@ -580,6 +650,8 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                         aria-checked={selected}
                         aria-label={display.label}
                         aria-describedby={hasDescription || richDescription !== undefined ? descriptionId : undefined}
+                        aria-keyshortcuts={optionIndex < 9 ? String(optionIndex + 1) : undefined}
+                        data-option-index={optionIndex}
                         disabled={locked}
                         onClick={() => { choose(option.label) }}
                         onKeyDown={(event) => {
@@ -698,23 +770,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             </div>
 
             <footer className={css.footer}>
-              <div className={css.pager}>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.prev')}
-                  disabled={index === 0 || submitting}
-                  onClick={() => { replaceProgress(index - 1, drafts); clearFeedback() }}
-                >
-                  <IconChevronLeftOutlineRegular />
-                </button>
-                <span className={css.progress}>{index + 1} / {questions.length}</span>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.next')}
-                  disabled={index === questions.length - 1 || submitting}
-                  onClick={() => { replaceProgress(index + 1, drafts); clearFeedback() }}
-                >
-                  <IconChevronRightOutlineRegular />
-                </button>
-              </div>
+              {/* Owned delta: a single question has nowhere to page to, so "1 / 1" between two dead arrows is not drawn. */}
+              {CardChrome.showsPager(questions.length) && (
+                <div className={css.pager}>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.prev')}
+                    disabled={index === 0 || submitting}
+                    onClick={() => { replaceProgress(index - 1, drafts); clearFeedback() }}
+                  >
+                    <IconChevronLeftOutlineRegular />
+                  </button>
+                  <span className={css.progress}>{index + 1} / {questions.length}</span>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.next')}
+                    disabled={index === questions.length - 1 || submitting}
+                    onClick={() => { replaceProgress(index + 1, drafts); clearFeedback() }}
+                  >
+                    <IconChevronRightOutlineRegular />
+                  </button>
+                </div>
+              )}
               <div className={css.feedback} role="status">
                 {feedback === null ? null : 'key' in feedback ? t(feedback.key) : feedback.text}
               </div>

@@ -81,3 +81,11 @@ test('the item target follows its project, not the Host default', () => {
   assert.deepEqual(defaultTargetFor([{ ...item, project: '/tmp/bare' }], projects), { kind: 'cwd', path: '/tmp/bare' })
   assert.deepEqual(defaultTargetFor([{ ...item, project: null }], projects), { kind: 'default' })
 })
+
+test('an agent choice carries the colour the user chose, so its completion tile matches its other surfaces', () => {
+  assert.equal(AgentComments.choice(agent({ tone: 4 })).tone, 4)
+})
+
+test('an agent choice without a chosen colour carries none, so the tile takes the handle default', () => {
+  assert.equal('tone' in AgentComments.choice(agent()), false)
+})

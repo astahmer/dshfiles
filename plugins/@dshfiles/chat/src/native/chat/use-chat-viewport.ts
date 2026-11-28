@@ -75,6 +75,8 @@ const READING_INTENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'befor
 const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
 /** How long after a wheel, touch or key a scroll still belongs to the reader; wheel momentum keeps renewing it. */
 const READER_GESTURE_MS = 300
+/** An unread landing's distance below the scrollport's top edge: within the smallest flow gap above an answer (12px). */
+const UNREAD_TOP_INSET = 12
 
 /** Owns one Chat scrollport's DOM operations, event listeners, and size observer. */
 export class ChatViewport {
@@ -83,6 +85,8 @@ export class ChatViewport {
   private events: ViewportEvents | null = null
   private turns: ReturnType<ChatSnapshot['navigation']['items']> = []
   private observation: { top: number; landing: ViewportLanding | null } = { top: 0, landing: null }
+  /** dshfiles (unslop r5 C1): an unread landing the range could not reach yet; see {@link ChatViewport.landAtUnread}. */
+  private heldUnread: { row: HTMLElement; label: string } | null = null
   private paging: PagingPosition | null = null
   private historyPrepend: PagingPosition | null = null
   private reader: FoldReader | null = null
@@ -838,9 +842,70 @@ export class ChatViewport {
    */
   landAtUnread(row: HTMLElement, label: string): ViewportLanding | null {
     this.clearUnread()
-    row.dataset.chatUnreadLabel = label
+    // dshfiles (unslop r5 C3, council round 5): an answer that opens its Turn (only "Worked for" above it) needs no
+    // divider: the whole Turn is new. The label marks an answer after output of its Turn the reader may have seen.
+    if (!this.opensTurn(row)) row.dataset.chatUnreadLabel = label
     const turn = Number(row.dataset.chatTurn)
-    return this.align(row, 24, Number.isInteger(turn) ? turn : null)
+    // dshfiles (unslop r5 C3): a 24px inset showed the bottom half of the Turn's "Worked for" row (12px above the
+    // answer) cut by the scrollport's top edge. That row now lands whole, 12px below the edge; with no such row
+    // directly above, the answer lands 12px below it, inside the smallest flow gap, so nothing above shows clipped.
+    const offset = UNREAD_TOP_INSET + this.leadIn(row)
+    const landing = this.align(row, offset, Number.isInteger(turn) ? turn : null)
+    // dshfiles (unslop r5 C1, council round 3): on open the Turn's tail (its summary, the edit card) mounts after the
+    // landing, so the range may still end short of it: the landing stops at the floor, and the reading policy then
+    // followed the floor down as the tail grew, cutting "Worked for" again. A landing that fell short is held and
+    // re-applied as rows below mount (`resumeUnreadLanding`), until it is reached or the reader scrolls.
+    const short = landing?.position !== null && landing?.position !== undefined && landing.position.anchorTop > offset + 1
+    this.heldUnread = short ? { row, label } : null
+    return landing
+  }
+
+  /**
+   * Re-apply an unread landing that the content could not reach yet, after it grew.
+   * @returns the new landing, or null when no landing is held (reached, dropped, or its row left).
+   */
+  resumeUnreadLanding(): ViewportLanding | null {
+    const held = this.heldUnread
+    if (held === null || !held.row.isConnected) {
+      this.heldUnread = null
+      return null
+    }
+    return this.landAtUnread(held.row, held.label)
+  }
+
+  /** The reader scrolled or typed: a held unread landing no longer moves the transcript. */
+  dropUnreadLanding(): void {
+    this.heldUnread = null
+  }
+
+  /**
+   * How far above an answer its Turn's "Worked for" row starts, when that row is the visible flow item directly above.
+   * @param row - the final answer row.
+   * @returns the distance in pixels, or 0 when another row (or none) precedes the answer.
+   */
+  private leadIn(row: HTMLElement): number {
+    let previous = row.closest<HTMLElement>('[data-chat-flow-kind]')?.previousElementSibling ?? null
+    while (previous instanceof HTMLElement && (previous.hidden || previous.getBoundingClientRect().height === 0)) {
+      previous = previous.previousElementSibling
+    }
+    if (!(previous instanceof HTMLElement) || previous.dataset.chatFlowKind !== 'turn-process') return 0
+    return Math.max(0, row.getBoundingClientRect().top - previous.getBoundingClientRect().top)
+  }
+
+  /**
+   * Whether an answer is the first output its Turn shows: the visible flow items above it, past its "Worked for" row, start
+   * with the Turn's prompt (a user message or a trigger).
+   * @param row - the final answer row.
+   * @returns true when nothing of the Turn's own output precedes the answer.
+   */
+  private opensTurn(row: HTMLElement): boolean {
+    let previous = row.closest<HTMLElement>('[data-chat-flow-kind]')?.previousElementSibling ?? null
+    while (previous instanceof HTMLElement) {
+      const kind = previous.dataset.chatFlowKind
+      if (!previous.hidden && previous.getBoundingClientRect().height > 0 && kind !== 'turn-process') return kind === 'user' || kind === 'turn-trigger'
+      previous = previous.previousElementSibling
+    }
+    return false
   }
 
   /** Remove the unread divider, once the reader's own input starts newer content. */

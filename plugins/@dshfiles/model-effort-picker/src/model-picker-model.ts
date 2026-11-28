@@ -3,6 +3,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import type { AccountsUsage } from '@dshfiles/ai-accounts/api'
 import type { FallbackRoute } from '@dshfiles/ai-accounts/model-fallback-api'
 import { UsageOverviewModel } from '@dshfiles/ai-accounts/usage-overview-model'
+import { modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
 import type { BrandKey } from './brand-marks.js'
 
 type ModelGroup = ModelDirectoryState['groups'][number]
@@ -35,6 +36,15 @@ const brandOfToken = (token: string): BrandKey | undefined => {
   return BRAND_TOKENS.find(entry => entry.tokens.some(candidate => token === candidate || token.startsWith(candidate)))?.brand
 }
 
+/** A route the details pane shows: the model, and the account it would run on. */
+export interface InspectedRoute {
+  readonly provider: string
+  readonly model: string
+}
+
+/** What the details pane does with a change: stage it on a draft, or apply it to the thread at once. */
+export type DetailsChange = { readonly kind: 'stage' } | { readonly kind: 'apply'; readonly selection: ModelSelection }
+
 /** A fallback rung named for display: catalog names when the catalog still lists the route, its ids otherwise. */
 interface FallbackLabel {
   readonly provider: string
@@ -42,7 +52,152 @@ interface FallbackLabel {
   readonly effort: string | undefined
 }
 
+/** A model name split for one ellipsis by width (round 5 U1): the head truncates, the tail stays. */
+export interface NameParts {
+  readonly head: string
+  readonly tail: string
+}
+
+/** An ai-accounts account as its `read` list gives it, in priority order. */
+export interface PriorityAccount {
+  readonly instanceId: string
+  readonly kind: string
+  readonly enabled: boolean
+}
+
 export class ModelPickerModel {
+  /**
+   * Council picker round 1, S1: details of a model the thread does not use are a draft. Inspecting, choosing its account,
+   * effort or Fast mode never moves the thread; only "Use ‹model›" does. The thread's own model (on any of its accounts)
+   * applies in place.
+   */
+  static isDraft = (input: { readonly inspected: InspectedRoute | null; readonly current: ModelSelection | null }): boolean =>
+    input.inspected !== null && input.current?.model !== input.inspected.model
+
+  /** A change in the details pane: staged on a draft, applied to the thread on its own model. */
+  static detailsChange = (input: {
+    readonly inspected: InspectedRoute
+    readonly current: ModelSelection | null
+    readonly change: { readonly provider: string } | { readonly reasoningEffort: string | undefined }
+  }): DetailsChange => {
+    if (ModelPickerModel.isDraft(input)) return { kind: 'stage' }
+    const base = { provider: input.inspected.provider, model: input.inspected.model }
+    if ('provider' in input.change) {
+      const effort = input.current?.reasoningEffort
+      return { kind: 'apply', selection: { ...base, provider: input.change.provider, ...(effort !== undefined && { reasoningEffort: effort }) } }
+    }
+    const effort = input.change.reasoningEffort
+    return { kind: 'apply', selection: { ...base, ...(effort !== undefined && { reasoningEffort: effort }) } }
+  }
+
+  /** The selection "Use ‹model›" commits: the staged account and effort, else the model's own default effort. */
+  static draftSelection = (input: {
+    readonly inspected: InspectedRoute
+    readonly model: CatalogModel
+    readonly stagedEffort: { readonly value: string | undefined } | null
+  }): ModelSelection => {
+    const effort = input.stagedEffort === null ? input.model.reasoning?.defaultEffort : input.stagedEffort.value
+    return { provider: input.inspected.provider, model: input.inspected.model, ...(effort !== undefined && { reasoningEffort: effort }) }
+  }
+
+  /** Council picker C1: a level's segment label (Off, Min, Low, Med, High, XHigh, Max); any other name stays whole. */
+  /** Round 4 T16: the trigger's effort word; "Off" beside a model name read as the model being off. */
+  static triggerEffortText = (label: string): string => (/^(?:off|none)$/iu.test(label.trim()) ? 'No reasoning' : label)
+
+  /** Round 6 V8: a level's spoken name; \"Xhigh\" reads as one odd word, so it is \"Extra high\". */
+  static effortSpokenName = (name: string): string => (/^x-?high$/iu.test(name.trim()) ? 'Extra high' : name)
+
+  /** Round 6 V8: an account radio's name: the account, whether it is the default, and its quota. */
+  static accountSpokenName = (input: {
+    readonly name: string
+    readonly isDefault: boolean
+    readonly quota: ModelQuota | undefined
+    readonly quotaShown: boolean
+  }): string => {
+    const parts = [input.name]
+    if (input.isDefault) parts.push('default account')
+    if (input.quotaShown) {
+      const window =
+        input.quota?.label
+          .replace(/\s*limit$/iu, '')
+          .trim()
+          .toLowerCase() ?? ''
+      parts.push(input.quota === undefined ? 'quota unknown' : `${String(Math.round(input.quota.percent))} % ${window === '' ? '' : `${window} `}quota left`)
+    }
+    return parts.join(', ')
+  }
+
+  static effortShortLabel = (effort: { readonly id: string; readonly name: string }): string => {
+    const key = `${effort.id} ${effort.name}`.toLowerCase()
+    const known: readonly (readonly [RegExp, string])[] = [
+      [/^(?:off|none)\b/u, 'Off'],
+      [/^(?:minimal|min)\b/u, 'Min'],
+      [/^low\b/u, 'Low'],
+      [/^(?:medium|med)\b/u, 'Med'],
+      [/^high\b/u, 'High'],
+      [/^(?:xhigh|x-high|extra[ -]high)\b/u, 'XHigh'],
+      [/^(?:max|maximum)\b/u, 'Max'],
+    ]
+    return known.find(([pattern]) => pattern.test(key))?.[1] ?? effort.name
+  }
+
+  /** C3: the accounts' quota column heading, named for the window that limits them ("Weekly quota left"). */
+  static quotaHeading = (quotas: readonly ModelQuota[]): string | undefined => {
+    if (quotas.length === 0) return undefined
+    const windows = new Set(quotas.map(quota => quota.label.replace(/\s*limit$/iu, '').trim()))
+    const [only] = windows
+    return windows.size === 1 && only !== undefined && only.length > 0 ? `${only} quota left` : 'Quota left'
+  }
+
+  /**
+   * C5: what a key in the search combobox does to the listbox. Up and Down move the active row, Enter uses it, Right (at
+   * the end of the query) opens its details; any other key edits the query.
+   */
+  static listKey = (input: {
+    readonly key: string
+    readonly active: number
+    readonly count: number
+    readonly caretAtEnd: boolean
+  }): { readonly kind: 'move' | 'use' | 'inspect'; readonly index: number } | { readonly kind: 'none' } => {
+    if (input.count === 0) return { kind: 'none' }
+    const at = input.active < 0 ? 0 : Math.min(input.active, input.count - 1)
+    if (input.key === 'ArrowDown') return { kind: 'move', index: input.active < 0 ? 0 : Math.min(input.count - 1, at + 1) }
+    if (input.key === 'ArrowUp') return { kind: 'move', index: Math.max(0, at - 1) }
+    if (input.key === 'Enter') return { kind: 'use', index: at }
+    if (input.key === 'ArrowRight' && input.caretAtEnd) return { kind: 'inspect', index: at }
+    return { kind: 'none' }
+  }
+
+  /** C5: the live announcement after a search. */
+  static resultAnnouncement = (input: { readonly query: string; readonly count: number }): string =>
+    input.count === 0 ? `No models match “${input.query.trim()}”` : `${String(input.count)} model${input.count === 1 ? '' : 's'}`
+
+  /** N4: which empty state the list shows, if any: still loading, a search with no match, or no model at all. */
+  static emptyState = (input: {
+    readonly status: string
+    readonly query: string
+    readonly rowCount: number
+    readonly catalogEmpty: boolean
+  }): 'loading' | 'no-match' | 'no-models' | null => {
+    if (input.rowCount > 0) return null
+    if (input.status === 'loading') return 'loading'
+    if (input.query.trim() !== '' && !input.catalogEmpty) return 'no-match'
+    return 'no-models'
+  }
+
+  /**
+   * Round 5 U1: a long name splits into a head that the row's width truncates and a tail that never shrinks, so one
+   * ellipsis falls in the middle by width (round 4 cut by character count, then CSS cut again: two ellipses). The tail
+   * is the final token with its dash (\"-preview\") when that is 4 to 13 characters, else the last 12 characters.
+   */
+  static nameTail = (name: string): NameParts => {
+    if (name.length <= 24) return { head: name, tail: '' }
+    const dash = name.lastIndexOf('-')
+    const token = dash < 0 ? '' : name.slice(dash)
+    const tail = token.length >= 4 && token.length <= 13 ? token : name.slice(-12)
+    return { head: name.slice(0, name.length - tail.length), tail }
+  }
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups
@@ -84,54 +239,83 @@ export class ModelPickerModel {
     return { percent: binding.percentRemaining, label: binding.windowLabel, onReserve: binding.onReserve }
   }
 
-  /** Account providers prefix every model name with their instance id; under its provider the prefix says nothing. */
-  static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'name'> }): string =>
-    model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name
+  /**
+   * Council picker round 1, N1: one naming everywhere, the kit's (`modelIdentity`, as every subagent surface names a
+   * route): read from the model id, so one model reads the same on every account and in one case; an account's
+   * `<instance>/` prefix and a vendor prefix that names the same family drop (`google/gemini-3.8-flash` →
+   * `gemini-3.8-flash`). The full id stays in the tooltip.
+   */
+  static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'id' | 'name'> }): string =>
+    modelIdentity(group.id, model.id)?.name ?? model.name
 
   /**
-   * The account tag drops a leading service name so the provider label can name the service without repeating it.
-   * An ordinal remainder becomes "#1" instead of repeating the service, and anything else stays whole.
+   * Council picker round 1, N2: one short account tag everywhere, the account's badge as AI Accounts and the status bar
+   * show it ("CC2", not "#2"): its own badge when it has one, else the initials of its name with any number kept.
    */
-  static accountTag = ({ name, provider }: { readonly name: string; readonly provider: string | undefined }): string => {
-    const prefix = provider === undefined ? '' : `${provider} `
-    if (prefix.length === 0 || !name.toLowerCase().startsWith(prefix.toLowerCase())) return name
-    const remainder = name.slice(prefix.length).trim()
-    if (remainder.length === 0) return name
-    if (/\p{L}/u.test(remainder)) return remainder
-    return /^\d+$/u.test(remainder) ? `#${remainder}` : name
+  static accountTag = ({ name, badge }: { readonly name: string; readonly badge?: string | undefined }): string => {
+    if (badge !== undefined && badge.trim() !== '') return badge.trim()
+    const initials = name
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map(part => (/^\d+$/u.test(part) ? part : part[0]))
+      .join('')
+      .slice(0, 3)
+      .toUpperCase()
+    return initials === '' ? name : initials
   }
 
   /** The trigger names the provider (its initials) only when another provider offers the same model name. */
   static triggerLabel = ({
     groups,
     current,
+    accounts,
   }: {
     readonly groups: readonly ModelGroup[]
     readonly current: ModelSelection
-  }): { readonly model: string; readonly providerTag?: string; readonly title: string } | undefined => {
+    readonly accounts?: readonly PriorityAccount[] | undefined
+  }): { readonly model: string; readonly providerTag?: string; readonly offDefault?: boolean; readonly title: string } | undefined => {
     const group = groups.find(candidate => candidate.id === current.provider)
     const model = group?.models.find(candidate => candidate.id === current.model)
     if (group === undefined || model === undefined) return undefined
     const name = ModelPickerModel.displayName({ group, model })
     const title = `${group.name} · ${name}`
-    // b:4qjm: the chip reads just the model; it names the account only when the thread uses another account than the
-    // default one for this model (the first account, in priority order, that offers it). The menu's Account section and
-    // the tooltip always name it.
-    const fallback = ModelPickerModel.defaultAccountFor({ groups, model: current.model })
-    if (fallback === undefined || fallback.id === group.id) return { model: name, title }
-    const initials = group.name
-      .split(/\s+/u)
-      .filter(Boolean)
-      .map(part => part[0])
-      .join('')
-      .slice(0, 3)
-      .toUpperCase()
-    return { model: name, providerTag: initials || group.id, title }
+    // b:4qjm, round 3 R8, round 4 T13: a model one account of its service offers reads just the model. When several do,
+    // the chip names the account: quietly on the default one (where DSH routes a new thread on that model), and marked as
+    // off default on any other, so two accounts never read alike. The menu's Account section and the tooltip name it.
+    const siblings = ModelPickerModel.sameServiceOffering({ groups, provider: current.provider, model: current.model, accounts })
+    if (siblings.length < 2) return { model: name, title }
+    const fallback = ModelPickerModel.defaultAccountFor({ groups, provider: current.provider, model: current.model, accounts })
+    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), offDefault: fallback?.id !== group.id, title }
   }
 
-  /** The account a model runs on by default: the first account, in catalog (priority) order, that offers it. */
-  static defaultAccountFor = (input: { readonly groups: readonly ModelGroup[]; readonly model: string }): ModelGroup | undefined =>
-    input.groups.find(group => group.models.some(model => model.id === input.model))
+  /** The accounts of `provider`'s service that offer `model`, in ai-accounts' priority order (catalog order without it). */
+  static sameServiceOffering = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly provider: string
+    readonly model: string
+    readonly accounts?: readonly PriorityAccount[] | undefined
+  }): readonly ModelGroup[] => {
+    const offers = (id: string): ModelGroup | undefined => input.groups.find(group => group.id === id && group.models.some(model => model.id === input.model))
+    const own = input.accounts?.find(account => account.instanceId === input.provider)
+    if (input.accounts === undefined || own === undefined) return input.groups.filter(group => group.models.some(model => model.id === input.model))
+    return input.accounts.filter(account => account.kind === own.kind && account.enabled).flatMap(account => offers(account.instanceId) ?? [])
+  }
+
+  /**
+   * Round 4 T13: the account DSH routes a new thread on `model` to, for `provider`'s service: the first enabled account
+   * of that service, in ai-accounts' priority order (its `read` list, which Priority distribution walks and the account
+   * priority control reorders), that offers the model. An account ai-accounts does not manage falls back to catalog
+   * order. Health is not counted: a cooled-down account is still the default, it is only skipped for a turn.
+   */
+  static defaultAccountFor = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly model: string
+    readonly provider?: string | undefined
+    readonly accounts?: readonly PriorityAccount[] | undefined
+  }): ModelGroup | undefined =>
+    input.provider === undefined
+      ? input.groups.find(group => group.models.some(model => model.id === input.model))
+      : ModelPickerModel.sameServiceOffering({ groups: input.groups, provider: input.provider, model: input.model, accounts: input.accounts })[0]
 
   /**
    * One list row per model (b:16yr). A route is still model × account; the view groups the routes of one model and one
@@ -143,7 +327,6 @@ export class ModelPickerModel {
   static modelRows = (input: {
     readonly groups: readonly ModelGroup[]
     readonly current: ModelSelection | null
-    readonly providerOf: (groupId: string) => string | undefined
   }): readonly {
     readonly key: string
     readonly group: ModelGroup
@@ -154,7 +337,9 @@ export class ModelPickerModel {
     const rows = new Map<string, { group: ModelGroup; model: CatalogModel; accounts: ModelGroup[] }>()
     for (const group of input.groups) {
       for (const model of group.models) {
-        const key = `${input.providerOf(group.id) ?? group.id}\u0000${model.id}`
+        // N4: keyed by the model id alone, which the catalog knows from the first frame; keyed by service, the rows of
+        // one model split and then merged once the account profiles arrived, so the list jumped as it opened.
+        const key = model.id
         const row = rows.get(key)
         if (row === undefined) rows.set(key, { group, model, accounts: [group] })
         else {
@@ -216,6 +401,13 @@ export class ModelPickerModel {
       if (brand !== undefined) return brand
     }
     return undefined
+  }
+
+  /** The family mark the composer chip leads with: the catalog model in use, else its raw id. */
+  static triggerBrand = ({ groups, current }: { readonly groups: readonly ModelGroup[]; readonly current: ModelSelection | null }): BrandKey | undefined => {
+    if (current === null) return undefined
+    const model = groups.find(group => group.id === current.provider)?.models.find(candidate => candidate.id === current.model)
+    return ModelPickerModel.brandFor({ model: model ?? { id: current.model, name: current.model } })
   }
 
   /** The current selection as a fallback rung, keeping its explicit effort only. */

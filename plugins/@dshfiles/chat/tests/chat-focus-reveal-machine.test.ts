@@ -95,4 +95,43 @@ describe('chat focus reveal machine', () => {
     vi.advanceTimersByTime(HIGHLIGHT_MS)
     expect(document.getElementById('turn-2')?.hasAttribute(CHAT_FOCUS_ATTRIBUTE)).toBe(false)
   })
+
+  /** A folded tool call: its row is mounted under a hidden group and opens its card on click. */
+  const foldedCall = () => {
+    const list = document.createElement('div')
+    list.innerHTML =
+      '<div data-chat-turn="1" hidden id="group"><div data-chat-call-id="call-1" id="call">' +
+      '<div role="button" aria-expanded="false" id="row">Bash · Build the project</div>' +
+      '<div><div role="button" aria-expanded="false" id="nested">nested</div></div></div></div>'
+    document.body.append(list)
+    const group = list.querySelector('#group')
+    group?.addEventListener('beforematch', () => group.removeAttribute('hidden'))
+    const row = list.querySelector('#row')
+    const toggle = vi.fn(() => row?.setAttribute('aria-expanded', 'true'))
+    row?.addEventListener('click', toggle)
+    return { list, toggle }
+  }
+
+  it('opens the folded turn, lands on the tool call and opens its card when the request asks to', () => {
+    const { list, toggle } = foldedCall()
+    const actor = start({ list })
+    actor.send({ type: 'request', focus: { turn: 1, toolCallId: 'call-1', open: true } })
+    vi.advanceTimersToNextFrame()
+    vi.advanceTimersToNextFrame()
+    expect(highlighted()?.id).toBe('call')
+    expect(toggle).toHaveBeenCalledTimes(1)
+    expect(document.getElementById('row')?.getAttribute('aria-expanded')).toBe('true')
+    // Only the call's own row: a row nested in its body stays as it was.
+    expect(document.getElementById('nested')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('leaves the card closed for a plain focus on a tool call', () => {
+    const { list, toggle } = foldedCall()
+    const actor = start({ list })
+    actor.send({ type: 'request', focus: { turn: 1, toolCallId: 'call-1' } })
+    vi.advanceTimersToNextFrame()
+    vi.advanceTimersToNextFrame()
+    expect(highlighted()?.id).toBe('call')
+    expect(toggle).not.toHaveBeenCalled()
+  })
 })

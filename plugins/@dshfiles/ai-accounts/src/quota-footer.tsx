@@ -1,3 +1,4 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
@@ -210,9 +211,18 @@ export const UsagePopoverContent = (props: {
   readonly order?: 'arranged' | 'remaining'
   readonly onOpenUsageHistory: () => void
   readonly onConnectAccount: (accountId: string) => void
+  readonly onAddAccount?: (() => void) | undefined
+  readonly onOpenAccounts?: (() => void) | undefined
   readonly close: () => void
 }): JSX.Element => {
   const { usage, refreshing, failure, refresh } = useAccountsUsage()
+  const closing = (action: (() => void) | undefined): (() => void) | undefined =>
+    action === undefined
+      ? undefined
+      : () => {
+          props.close()
+          action()
+        }
   return (
     <PopoverContent
       align="start"
@@ -234,6 +244,8 @@ export const UsagePopoverContent = (props: {
           props.close()
           props.onConnectAccount(accountId)
         }}
+        onAddAccount={closing(props.onAddAccount)}
+        onOpenAccounts={closing(props.onOpenAccounts)}
         onRefresh={() => void refresh()}
         order={props.order ?? 'arranged'}
         refreshing={refreshing}
@@ -265,7 +277,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const withShortName = useShortNames()
   const stripRef = useRef<HTMLDivElement>(null)
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
-  const activeLabel = props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'
+  const activeLabel = props.activeAccountRunning ? 'In use by this thread' : 'Last used by this thread'
   // Minutes and reset countdowns are all the closed strip shows, so its clock wakes on those boundaries instead of
   // every second; the open overview keeps its own second-resolution clock.
   const now = useQuotaClock({ resetsAt: items.map(item => ('unavailable' in item ? null : item.resetsAt)) })
@@ -273,7 +285,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Popover onOpenChange={setOpen} open={open}>
         <PopoverAnchor asChild>
           <div
@@ -371,6 +383,11 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
             {arrangement.error === null ? null : (
               <p className="dshx:w-full dshx:text-xs dshx:text-destructive" role="alert">
                 {arrangement.error}
+                {arrangement.retry === null ? null : (
+                  <Button className="dshx:ml-1 dshx:h-auto dshx:p-0 dshx:text-xs" onClick={arrangement.retry} size="xs" type="button" variant="link">
+                    Retry
+                  </Button>
+                )}
               </p>
             )}
           </div>
@@ -401,7 +418,7 @@ const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
   const critical =
     props.activeAccountId === null ? (UsageOverviewModel.mostCritical(items) ?? items[0]) : items.find(item => item.instanceId === props.activeAccountId)
   const activeLabel =
-    activeProfile === undefined ? label : `${activeProfile.displayName}. ${props.activeAccountRunning ? 'In use by active chat' : 'Last used by active chat'}`
+    activeProfile === undefined ? label : `${activeProfile.displayName}. ${props.activeAccountRunning ? 'In use by this thread' : 'Last used by this thread'}`
   const stripTitle = items.map(item => describeItem(item, now)).join('\n') || label
   return (
     <TooltipProvider delayDuration={500}>
@@ -476,7 +493,7 @@ export const QuotaFooter = (props: QuotaSurfaceProps & { readonly wide: boolean;
 }
 
 const AddAccountPreviewButton = (props: { readonly onClick: () => void }): JSX.Element => (
-  <TooltipProvider delayDuration={200}>
+  <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <button

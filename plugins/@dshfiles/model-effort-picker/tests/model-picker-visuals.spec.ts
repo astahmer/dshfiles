@@ -1,5 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ACCOUNT_HUES, accountColor } from '../src/account-color.js'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
+
+const { of: accountColor, hueOfHex } = AccountColor
 import { EFFORT_BAR_COUNT, effortGlyph } from '../src/effort-levels.js'
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
@@ -22,25 +25,29 @@ describe('model brand marks', () => {
   })
 })
 
-describe('account colours', () => {
-  it('uses the account accent when it is a full hex colour and a stable hue otherwise', () => {
-    expect(accountColor({ accentColor: '#10A37F', instanceId: 'codex_alex' })).toBe('#10A37F')
-    expect(accountColor({ accentColor: '', instanceId: 'codex_alex' })).toBe(accountColor({ instanceId: 'codex_alex' }))
-    expect(ACCOUNT_HUES).toContain(accountColor({ instanceId: 'commandcode_work_1' }))
-    expect(accountColor({ instanceId: 'codex_alex1' })).not.toBe(accountColor({ instanceId: 'codex_alex2' }))
+describe('composer model chip mark', () => {
+  it('opens no tooltip faster than the kit default (400 ms)', () => {
+    const fast = readdirSync(new URL('../src/', import.meta.url))
+      .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
+      .filter(name => [...readFileSync(new URL(name, new URL('../src/', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400))
+    expect(fast).toEqual([])
+  })
+
+  it('leads with the family mark of the model in use, read from its catalog name, and none for an unknown family', () => {
+    const codex = { id: 'codex', name: 'Codex', models: [{ id: 'm-1', name: 'GPT-6 Luna' }] }
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: { provider: 'codex', model: 'm-1' } })).toBe('openai')
+    expect(ModelPickerModel.triggerBrand({ groups: [], current: { provider: 'claude', model: 'claude-haiku-5-5' } })).toBe('claude')
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: { provider: 'acme', model: 'acme-secret' } })).toBeUndefined()
+    expect(ModelPickerModel.triggerBrand({ groups: [codex], current: null })).toBeUndefined()
   })
 })
 
-describe('account tags', () => {
-  it('drops the service name when the remainder still identifies the account', () => {
-    expect(ModelPickerModel.accountTag({ name: 'OpenCode Go Alex', provider: 'OpenCode Go' })).toBe('Alex')
-    expect(ModelPickerModel.accountTag({ name: 'Codex Alex2', provider: 'Codex' })).toBe('Alex2')
-    expect(ModelPickerModel.accountTag({ name: 'ClaudeWork', provider: 'Claude' })).toBe('ClaudeWork')
-  })
-
-  it('keeps the account identifiable when the service prefix leaves an ordinal', () => {
-    expect(ModelPickerModel.accountTag({ name: 'GitHub Copilot 1', provider: 'GitHub Copilot' })).toBe('#1')
-    expect(ModelPickerModel.accountTag({ name: 'Any Account', provider: undefined })).toBe('Any Account')
+describe('account colours', () => {
+  it('uses the account accent when it is a full hex colour and a stable hue otherwise', () => {
+    // Round 3 R9: the accent sets the dot's hue; the dot's lightness is the picker's, for contrast in both schemes.
+    expect(accountColor({ accentColor: '#10A37F', instanceId: 'codex_alex' }).hue).toBe(Math.round(hueOfHex('#10A37F')))
+    expect(accountColor({ accentColor: '', instanceId: 'codex_alex' })).toEqual(accountColor({ instanceId: 'codex_alex' }))
+    expect(accountColor({ instanceId: 'codex_alex1' })).not.toEqual(accountColor({ instanceId: 'codex_alex2' }))
   })
 })
 
@@ -58,7 +65,7 @@ describe('effort glyphs', () => {
 })
 
 describe('fallback labels', () => {
-  it('names a stored rung with its catalog name rather than the account-prefixed id', () => {
+  it('names a stored rung with the kit display name rather than the account-prefixed id', () => {
     const groups = [
       {
         id: 'opencode-go-alex',
@@ -68,7 +75,7 @@ describe('fallback labels', () => {
     ]
     expect(ModelPickerModel.fallbackLabel(groups, { model: 'deepseek-v4', provider: 'opencode-go-alex' })).toEqual({
       effort: undefined,
-      model: 'DeepSeek V4',
+      model: 'deepseek-v4',
       provider: 'OpenCode Go Alex',
     })
     expect(ModelPickerModel.fallbackLabel(groups, { model: 'gone', provider: 'gone-provider' })).toEqual({

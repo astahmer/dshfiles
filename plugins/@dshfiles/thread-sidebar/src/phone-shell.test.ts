@@ -109,20 +109,24 @@ describe('PhoneTopBarModel', () => {
     expect(PhoneTopBarModel.depth({ ...base, listOpen: true, moreOpen: true })).toBe(0)
     expect(PhoneTopBarModel.depth({ ...base, activePanelId: 'attention-inbox' })).toBe(0)
     expect(PhoneTopBarModel.depth({ ...base, selectedThreadId: 'session-1' })).toBe(1)
-    expect(PhoneTopBarModel.depth({ ...base, listOpen: true, destination: find('land') })).toBe(1)
+    // Land is a tab (unslop phone 24): its list is a root, like Threads and the Inbox.
+    expect(PhoneTopBarModel.depth({ ...base, listOpen: true, destination: find('land') })).toBe(0)
+    expect(PhoneTopBarModel.depth({ ...base, listOpen: true, destination: find('knowledge') })).toBe(1)
     expect(PhoneTopBarModel.depth({ ...base, activePanelId: SETTINGS_PANEL_ID })).toBe(1)
-    // A page in a list opened from More: page → Land → More.
-    expect(PhoneTopBarModel.depth({ ...base, activePanelId: 'diffs-review' })).toBe(2)
+    // A page in the Land tab's list: page → Land.
+    expect(PhoneTopBarModel.depth({ ...base, activePanelId: 'diffs-review' })).toBe(1)
     // A thread opened from the Inbox page sits one above that root; from the Review page, one above that page.
     expect(PhoneTopBarModel.depth({ ...base, selectedThreadId: 'session-1', origin: { panelId: 'attention-inbox' } })).toBe(1)
-    expect(PhoneTopBarModel.depth({ ...base, selectedThreadId: 'session-1', origin: { panelId: 'diffs-review' } })).toBe(3)
+    expect(PhoneTopBarModel.depth({ ...base, selectedThreadId: 'session-1', origin: { panelId: 'diffs-review' } })).toBe(2)
   })
 
   it('shows the open list: tab roots have no Back, a destination opened from More goes back to More', () => {
     expect(PhoneTopBarModel.resolve({ ...base, listOpen: true })).toEqual({ title: 'Threads', back: null, thread: false })
     expect(PhoneTopBarModel.resolve({ ...base, listOpen: true, moreOpen: true })).toEqual({ title: 'More', back: null, thread: false })
-    expect(PhoneTopBarModel.resolve({ ...base, listOpen: true, destination: find('land') })).toEqual({
-      title: 'Land',
+    // Land is in the tab bar, so its list has no "Back to More" (unslop phone 24).
+    expect(PhoneTopBarModel.resolve({ ...base, listOpen: true, destination: find('land') })).toEqual({ title: 'Land', back: null, thread: false })
+    expect(PhoneTopBarModel.resolve({ ...base, listOpen: true, destination: find('knowledge') })).toEqual({
+      title: 'Knowledge',
       back: { to: 'more', label: 'More' },
       thread: false,
     })

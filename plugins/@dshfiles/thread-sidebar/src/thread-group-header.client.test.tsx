@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ThreadGroupHeader } from './thread-group-header.js'
+import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 
 const mount = (
   options: {
@@ -13,6 +16,8 @@ const mount = (
     action?: ReactNode
     icon?: ReactNode
     checkoutCount?: number
+    statusCounts?: { readonly needsYou: number; readonly failed: number }
+    status?: 'working' | 'ready' | 'idle' | 'done'
   } = {},
 ) => {
   const onToggle = vi.fn()
@@ -25,14 +30,16 @@ const mount = (
     className: 'dshx:sticky dshx:top-0',
     onToggle,
     startProjectSession,
-    t: (_key, params) => `New chat in ${String(params?.project)}`,
+    t: (_key, params) => `New thread in ${String(params?.project)}`,
   }
   const withAction = options.action === undefined ? props : { ...props, action: options.action }
   const withIcon = options.icon === undefined ? withAction : { ...withAction, icon: options.icon }
   const withCheckouts = options.checkoutCount === undefined ? withIcon : { ...withIcon, checkoutCount: options.checkoutCount }
+  const withSplit = options.statusCounts === undefined ? withCheckouts : { ...withCheckouts, statusCounts: options.statusCounts }
+  const withCounts = options.status === undefined ? withSplit : { ...withSplit, status: options.status }
   const view = render(
     <TooltipProvider>
-      <ThreadGroupHeader {...withCheckouts} />
+      <ThreadGroupHeader {...withCounts} />
     </TooltipProvider>,
   )
   return { ...view, onToggle, startProjectSession }
@@ -43,7 +50,7 @@ afterEach(cleanup)
 describe('ThreadGroupHeader', () => {
   it.each([false, true])('keeps create visible and independent of collapse (collapsed=%s)', collapsed => {
     const header = mount({ collapsed, projectId: 'project:explicit' })
-    const create = screen.getByRole('button', { name: 'New chat in Shared project' })
+    const create = screen.getByRole('button', { name: 'New thread in Shared project' })
     const toggle = screen.getByRole('button', { name: 'Shared project (12)' })
 
     expect(header.container.querySelector('button button')).toBeNull()
@@ -61,9 +68,50 @@ describe('ThreadGroupHeader', () => {
     expect(header.startProjectSession).toHaveBeenCalledOnce()
   })
 
+  it('seats the touch chevron in a 44pt column that ends on the row edge, on the row ⋯ axis (council round 18 B1.3)', () => {
+    const header = mount({ status: 'working' })
+    const seat = header.container.querySelector<HTMLElement>('[data-group-chevron]')
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:w-11')
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:justify-center')
+    // The phone header pads 12px; the seat reaches through it to the row edge.
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:-mr-3')
+    cleanup()
+    // A trailing control (the project's +) keeps the edge: the chevron stays inside the padding beside it.
+    const project = mount({ status: 'working', projectId: 'p' })
+    expect(project.container.querySelector<HTMLElement>('[data-group-chevron]')?.className).not.toContain('-mr-3')
+  })
+
+  it('draws the row expand chevron\'s 16px glyph, ending on the time column\'s edge when it ends the row (council round 19 B3)', () => {
+    const header = mount({ status: 'working' })
+    const seat = header.container.querySelector<HTMLElement>('[data-group-chevron]')
+    const glyph = seat?.querySelector('svg')
+    // The row chevron (data-children-chevron) is a size-4 glyph at a 1.5 stroke; the head's was a 12px glyph at 2.
+    expect(glyph?.getAttribute('class')).toContain('dshx:size-4')
+    expect(glyph?.getAttribute('stroke-width')).toBe('1.5')
+    expect(seat?.className).toContain('dshx:size-4')
+    // The glyph sits 4px inside its 16px box: the box reaches 4px into the head's 10px padding, so the glyph ends where
+    // a comfortable row's age and chevron do (10px inside the row).
+    expect(seat?.className).toContain('dshx:-mr-1')
+    cleanup()
+    // Beside the project's + it stays inside the padding.
+    const project = mount({ status: 'working', projectId: 'p' })
+    expect(project.container.querySelector<HTMLElement>('[data-group-chevron]')?.className).not.toContain('-mr-1')
+  })
+
+  it('draws the same chevron on the section and Drafts heads (council round 19 B3)', () => {
+    const client = readFileSync('src/client.tsx', 'utf8')
+    const drafts = readFileSync('src/drafts-section.tsx', 'utf8')
+    expect(client).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
+    expect(drafts).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
+    // The Custom sections draw it through the standard head since council round 34, B10.
+    expect(client).not.toContain('<GroupChevron open={!collapsed} last />')
+    expect(readFileSync('src/thread-group-header.tsx', 'utf8')).toContain('<GroupChevron\n            open={collapsed !== true}')
+    expect(drafts).toContain('<GroupChevron open={props.open} last={!props.cleanable} />')
+  })
+
   it('uses a focusable native button and accepts keyboard-origin clicks independently', () => {
     const header = mount({ projectId: 'keyboard-project' })
-    const create = screen.getByRole('button', { name: 'New chat in Shared project' })
+    const create = screen.getByRole('button', { name: 'New thread in Shared project' })
     expect(create.tagName).toBe('BUTTON')
     expect(create.getAttribute('type')).toBe('button')
     expect(create.tabIndex).toBe(0)
@@ -78,7 +126,7 @@ describe('ThreadGroupHeader', () => {
   it('does not offer creation without an explicit registered project target', () => {
     const header = mount()
     expect(screen.getAllByRole('button')).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: 'New chat in Shared project' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New thread in Shared project' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Shared project (12)' }))
     expect(header.onToggle).toHaveBeenCalledOnce()
     expect(header.startProjectSession).not.toHaveBeenCalled()
@@ -110,6 +158,62 @@ describe('ThreadGroupHeader', () => {
     expect(toggle.contains(mark)).toBe(true)
   })
 
+  it('tints the Needs you count chips in their status hue and keeps the label and the spoken count unchanged', () => {
+    const header = mount({ label: 'Needs you', statusCounts: { needsYou: 2, failed: 1 } })
+    const toggle = screen.getByRole('button', { name: 'Needs you (12)' })
+    const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+    expect(chips.map(chip => [chip.dataset.groupCount, chip.textContent?.replace(/\s.*$/su, '')])).toEqual([
+      ['needs-you', '2'],
+      ['failed', '1'],
+    ])
+    // The kit's StatusCount (round five B3): each number beside its status glyph, so the counts read without colour.
+    expect(chips.map(chip => chip.getAttribute('data-slot'))).toEqual(['status-count', 'status-count'])
+    expect(chips.map(chip => chip.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status'))).toEqual(['needs-you', 'failed'])
+    expect(chips[0]?.className).toContain('dshx:bg-attention-tint')
+    expect(chips[0]?.className).toContain('dshx:text-attention-foreground')
+    expect(chips[1]?.className).toContain('dshx:bg-danger-tint')
+    expect(chips[1]?.className).toContain('dshx:text-danger-tint-foreground')
+    expect(screen.getAllByText('Needs you')[0]?.className).toContain('dshx:truncate')
+    expect(toggle.className).toContain('dshx:text-muted-foreground')
+    cleanup()
+    const plain = mount({ label: 'Working' })
+    expect(plain.container.querySelector('[data-group-count]')).toBeNull()
+  })
+
+  it.each(['working', 'ready', 'idle'] as const)(
+    'counts the %s group with its 10px status glyph in a muted chip, the spoken name unchanged (council round 15 B2)',
+    status => {
+      const header = mount({ label: 'Group', status })
+      screen.getByRole('button', { name: 'Group (12)' })
+      const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+      expect(chips.map(chip => [chip.dataset.groupCount, chip.getAttribute('data-slot'), chip.textContent?.replace(/\s.*$/su, '')])).toEqual([
+        [status, 'status-count', '12'],
+      ])
+      const glyph = chips[0]?.querySelector('[data-slot="status-glyph"]')
+      expect(glyph?.getAttribute('data-status')).toBe(status)
+      expect(glyph?.className).toContain('dshx:size-2.5')
+      // Neutral: the muted chip, no new hue.
+      expect(chips[0]?.className).toContain('dshx:bg-muted')
+      expect(chips[0]?.getAttribute('aria-hidden')).toBe('true')
+      // The bracketed total stays for assistive tech only.
+      expect(screen.getAllByText('(12)').map(node => node.className)).toEqual(['dshx:sr-only'])
+    },
+  )
+
+  it('counts the Drafts group with the idle glyph its never-prompted rows carry, as the other groups do (council round 16 B2)', () => {
+    // "Drafts (1)" kept the bracketed count beside groups that count in the chip.
+    const status = groupCountStatusOf('draft')
+    expect(status).toBe('idle')
+    if (status === undefined) throw new Error('the Drafts group maps to a status')
+    const header = mount({ label: 'Drafts', status })
+    const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+    expect(chips.map(chip => chip.getAttribute('data-slot'))).toEqual(['status-count'])
+    expect(chips[0]?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
+    expect(screen.getAllByText('(12)').map(node => node.className)).toEqual(['dshx:sr-only'])
+    // Pinned and project groups keep "(n)": they stand for no one status.
+    expect(groupCountStatusOf('pinned')).toBeUndefined()
+  })
+
   it('names how many local checkouts a repository row stands for', () => {
     mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
     expect(screen.getByText('2 checkouts')).toBeTruthy()
@@ -121,7 +225,7 @@ describe('ThreadGroupHeader', () => {
   it('truncates long project names without shrinking or hover-hiding creation at narrow widths', () => {
     const label = 'An extremely long project name that does not fit in a narrow sidebar'
     const header = mount({ label, projectId: 'long-project' })
-    const create = screen.getByRole('button', { name: `New chat in ${label}` })
+    const create = screen.getByRole('button', { name: `New thread in ${label}` })
     const title = screen.getByText(label)
     const toggle = screen.getByRole('button', { name: `${label} (12)` })
     expect(title.className).toContain('dshx:truncate')
@@ -131,5 +235,65 @@ describe('ThreadGroupHeader', () => {
     expect(header.container.querySelector('[title]')).toBeNull()
     fireEvent.click(create)
     expect(header.startProjectSession).toHaveBeenCalledExactlyOnceWith('long-project')
+  })
+})
+
+// Council round 34, B10 (Fable; Opus and Fable in rounds 30–33): the Custom grouping drew its own heads ("⚡ Active (6)"
+// with a rule and a native tooltip, "Approval needed (1)" as a coloured word) and its rows a second status vocabulary.
+describe('the Custom grouping uses the standard heads and rows (council round 34, B10)', () => {
+  const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
+  const t = ((key: string) => key) as Parameters<typeof ThreadGroupHeader>[0]['t']
+
+  it('draws a group that stands for no status with a neutral pill count, its total spoken', () => {
+    render(<ThreadGroupHeader label="Active" count={6} pill collapsed={false} className="" onToggle={vi.fn()} t={t} />)
+    const pill = document.querySelector<HTMLElement>('[data-group-count="plain"]')
+    expect(pill?.textContent).toBe('6')
+    expect(pill?.getAttribute('aria-hidden')).toBe('true')
+    for (const token of ['dshx:rounded-full', 'dshx:bg-muted', 'dshx:h-4.5', 'dshx:text-2xs']) expect(pill?.className).toContain(token)
+    expect(screen.getByRole('button', { name: /Active/u }).textContent).toContain('(6)')
+    expect(screen.getByText('(6)').className).toContain('dshx:sr-only')
+  })
+
+  it('draws a hoisted group that does not fold as the same head with no button and no chevron', () => {
+    render(<ThreadGroupHeader label="Approval needed" count={1} statusCounts={{ needsYou: 1, failed: 0 }} className="" t={t} />)
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(document.querySelector('[data-group-chevron]')).toBeNull()
+    expect(document.querySelector('[data-group-count="needs-you"]')?.textContent).toContain('1')
+    expect(document.querySelector('[data-thread-group-head]')?.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('passes the Custom sections\' drag and keyboard reorder to its fold button', () => {
+    const onPointerDown = vi.fn()
+    const onKeyDown = vi.fn()
+    render(
+      <>
+        <span id="hint">Drag to reorder</span>
+        <ThreadGroupHeader label="Active" count={2} pill collapsed={false} className="" onToggle={vi.fn()} t={t} toggleProps={{ onPointerDown, onKeyDown, 'aria-describedby': 'hint', className: 'dshx:opacity-70' }} />
+      </>,
+    )
+    const head = screen.getByRole('button', { name: /Active/u })
+    fireEvent.pointerDown(head)
+    fireEvent.keyDown(head, { key: 'ArrowUp', altKey: true })
+    expect(onPointerDown).toHaveBeenCalledOnce()
+    expect(onKeyDown).toHaveBeenCalledOnce()
+    expect(head.getAttribute('aria-describedby')).toBe('hint')
+    expect(head.className).toContain('dshx:opacity-70')
+    expect(head.hasAttribute('title')).toBe(false)
+  })
+
+  it('gives Custom rows the status glyphs and draws its sections and hoisted groups through the standard head', () => {
+    expect(client).toContain("const statusGlyphs = stateGrouping || threadView.groupBy === 'project' || threadView.groupBy === 'status'")
+    const custom = client.slice(client.indexOf("{threadView.groupBy === 'status'\n              ? ("), client.indexOf(': groupedThreadEntries.map(group => {'))
+    expect(custom).toMatch(/<ThreadGroupHeader\s+label=\{props\.tSidebar\(sectionLabels\[section\]\)\}\s+count=\{sectionRows\.length\}\s+pill/u)
+    expect(custom).not.toContain("title={props.tSidebar('threadSidebarSectionReorderHint')}")
+    expect(custom).not.toContain('<GripVerticalIcon')
+    expect(custom).not.toContain('dshx:h-px dshx:flex-1 dshx:bg-border')
+    for (const key of ['threadSidebarInterrupted', 'threadSidebarNeedsResume', 'threadSidebarApprovalNeeded', 'threadSidebarInputNeeded', 'threadSidebarTurnFinished']) {
+      const at = client.indexOf(`aria-label={props.tSidebar('${key}')}>`)
+      expect(at, key).toBeGreaterThan(-1)
+      const head = client.slice(at, at + 500)
+      expect(head, key).toContain('<ThreadGroupHeader')
+      expect(head, key).not.toContain('attentionLabelClass')
+    }
   })
 })

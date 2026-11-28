@@ -6,6 +6,7 @@ import { Effect } from 'effect'
 import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import type { AttentionItem } from './attention-api.js'
 import { WebPushCrypto, type PushSubscriptionKeys, type VapidKeys } from './web-push-crypto.js'
+import { InboxPreview } from './inbox-preview.js'
 
 export interface PushPayload {
   readonly title: string
@@ -39,10 +40,12 @@ const fresh = (known: ReadonlySet<string> | null, items: readonly AttentionItem[
 /** The notification for one item: its subject as title, the question or failure (with its recovery) as body. */
 const payloadOf = (item: AttentionItem): PushPayload => {
   const title = item.subject.label ?? (item.severity === 'failed' ? 'Failed' : 'Needs you')
+  // A question arrives as Markdown; a notification shows words, never source.
+  const reason = InboxPreview.firstParagraph(item.reason) || item.reason
   const recovery = item.severity === 'failed' && item.detail !== null ? item.detail.split('\n')[0]?.trim() : undefined
   return {
     title,
-    body: shorten(recovery === undefined || recovery === '' ? item.reason : `${item.reason} ${recovery}`),
+    body: shorten(recovery === undefined || recovery === '' ? reason : `${reason} ${recovery}`),
     tag: `dshfiles-attention-${item.id}`,
     path: item.subject.kind === 'session' ? `?thread=${encodeURIComponent(item.subject.id)}` : '',
   }

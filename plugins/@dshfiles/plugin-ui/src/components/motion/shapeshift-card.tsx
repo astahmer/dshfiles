@@ -140,7 +140,7 @@ export function ShapeshiftCard({
               type="submit"
               aria-label="Send"
               disabled={prompt.trim() === ''}
-              className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-foreground dshx:text-background dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:bg-muted dshx:disabled:text-muted-foreground dshx:motion-safe:transition-colors"
+              className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary-hover dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:bg-muted dshx:disabled:text-muted-foreground dshx:motion-safe:transition-colors"
             >
               <ArrowUpIcon aria-hidden className="dshx:size-4" />
             </button>

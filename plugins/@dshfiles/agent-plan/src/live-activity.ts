@@ -94,16 +94,10 @@ export const LiveActivity = {
     return activity.tools.length + activity.jobs.length + activity.subagents.length === 0
   },
 
-  /** "bash · 2 jobs · 1 subagent". */
+  /** "bash", or "bash +1" with two calls open. Jobs and subagents are not counted: the dock above the composer shows them. */
   summary(activity: LiveActivity): string {
-    const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`
     const [first] = activity.tools
-    return [
-      first === undefined ? undefined : activity.tools.length === 1 ? first.name : `${first.name} +${activity.tools.length - 1}`,
-      activity.jobs.length > 0 ? plural(activity.jobs.length, 'job', 'jobs') : undefined,
-      activity.subagents.length > 0 ? plural(activity.subagents.length, 'subagent', 'subagents') : undefined,
-    ]
-      .filter(part => part !== undefined)
-      .join(' · ')
+    if (first === undefined) return ''
+    return activity.tools.length === 1 ? first.name : `${first.name} +${activity.tools.length - 1}`
   },
 }

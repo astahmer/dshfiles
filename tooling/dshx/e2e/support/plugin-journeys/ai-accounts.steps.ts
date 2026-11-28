@@ -52,6 +52,12 @@ const openAccountAdvanced = async (page: Page): Promise<void> => {
   await expect(selectedAccount(page).getByRole('heading', { name: 'Runtime paths', exact: true })).toBeVisible()
 }
 
+/** Settings shows "Failure handling: default"; its options open on Edit. */
+const editFailureHandling = async (page: Page): Promise<void> => {
+  const edit = page.getByRole('button', { name: 'Edit failure handling', exact: true })
+  if ((await edit.count()) > 0) await edit.click()
+}
+
 const openPageOptions = async (page: Page): Promise<void> => {
   const options = page.getByRole('button', { name: 'Account page options', exact: true })
   if ((await options.getAttribute('data-state')) !== 'open') await options.click()
@@ -64,11 +70,28 @@ const moveAccountEarlier = async (page: Page, name: string): Promise<void> => {
   await page.getByRole('menuitem', { name: `Move ${name} earlier in account order`, exact: true }).click()
 }
 
+/**
+ * Add account and AI account settings open from the quota popover: the status strip is one item. A surface that
+ * still shows the tool itself (the docked usage strip) is used as it is.
+ */
+const accountTool = async (page: Page, name: 'Add AI account' | 'AI account settings') => {
+  const tool = page.getByRole('button', { name, exact: true }).first()
+  if (!(await tool.isVisible()))
+    await page
+      .getByRole('group', { name: /^AI accounts usage/ })
+      .first()
+      .getByRole('button')
+      .first()
+      .click()
+  await expect(tool).toBeVisible()
+  return tool
+}
+
 const chooseNewAccount = async (page: Page, provider: string): Promise<void> => {
   // Header and empty state intentionally share this action; the header is first.
   const add = page.getByRole('button', { name: 'Add account', exact: true }).first()
   if (await add.isVisible()) await add.click()
-  else await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+  else await (await accountTool(page, 'Add AI account')).click()
   await page
     .getByRole('dialog', { name: 'Add account', exact: true })
     .getByRole('button', { name: `${provider} account`, exact: true })
@@ -146,7 +169,7 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
   await keyDialog.getByRole('button', { name: 'Verify and add account', exact: true }).click()
   await expect(keyDialog).toBeHidden()
   await expect(selectedAccount(page).getByRole('heading', { name: input.name, exact: true })).toBeVisible()
-  await expect(accountCard(page, input.name).getByRole('switch')).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'Show this account', exact: true })).toBeChecked()
   if (input.routeSlug === undefined) return
   // Only rename a successfully connected saved route. Keep its verified unique credential reference unchanged.
   await openAccountAdvanced(page)
@@ -209,9 +232,8 @@ Given('the isolated account dashboard reference profile is booted', async ({ pag
 
 When('two synthetic work accounts and recorded account usage populate the dashboard', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
-  const accountSettings = page.getByRole('button', { name: 'AI account settings', exact: true })
-  await expect(accountSettings).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Add AI account', exact: true })).toBeVisible()
+  const accountSettings = await accountTool(page, 'AI account settings')
+  await expect(page.getByRole('button', { name: 'Add AI account', exact: true }).first()).toBeVisible()
   await accountSettings.click()
   await expect(page.getByRole('heading', { name: 'AI accounts', exact: true, level: 1 })).toBeVisible()
   await addCommandCodeAccount(page, { name: 'Command Code 1', routeSlug: 'commandcode_work', key: 'e2e-fake-key-ALPHA1' })
@@ -223,7 +245,9 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
     await accountCard(page, oldName)
       .getByRole('button', { name: `Select ${oldName}`, exact: true })
       .click()
-    await selectedAccount(page).getByRole('button', { name: 'Rename account', exact: true }).click()
+    // Rename is a row of the account's ⋯ menu; the header keeps one row of controls.
+    await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Rename account', exact: true }).click()
     const nameInput = selectedAccount(page).getByRole('textbox', { name: 'Account name', exact: true }).first()
     await nameInput.fill(newName)
     await nameInput.press('Enter')
@@ -272,7 +296,9 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
     }),
   )
   await openGlobalPanel(page, 'Usage')
-  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
+  // A healthy index keeps Re-index in the page ⋯ (council round 8, D1).
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Re-index thread logs', exact: true }).click()
   await expect.poll(() => page.getByRole('table').getByRole('row').count()).toBeGreaterThan(20)
   await page.reload()
   await openAccountsPanel(page)
@@ -284,9 +310,8 @@ Then('the account dashboard reference screens fit desktop mobile and dark layout
     for (const width of [1816, 1536, 1024, 768, 480, 360]) {
       await page.setViewportSize({ width, height: 1150 })
       if (width >= 1024) {
-        const accountSettings = page.getByRole('button', { name: 'AI account settings', exact: true })
-        await expect(accountSettings).toBeVisible()
         await openGlobalPanel(page, 'AI Accounts: Usage history')
+        const accountSettings = await accountTool(page, 'AI account settings')
         await accountSettings.focus()
         await accountSettings.press('Enter')
         await expect(page.getByRole('heading', { name: 'AI accounts', exact: true, level: 1 })).toBeVisible()
@@ -348,7 +373,7 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     await selectedAccount(page).getByRole('tab', { name: 'Models', exact: true }).click()
     await selectedAccount(page).getByRole('button', { name: 'Star gpt-6-luna', exact: true }).click()
     await expect(selectedAccount(page).getByRole('button', { name: 'Unstar gpt-6-luna', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    const show = selectedAccount(page).getByRole('switch', { name: 'Show gpt-6-luna in the picker', exact: true })
+    const show = selectedAccount(page).getByRole('checkbox', { name: 'Show gpt-6-luna in the picker', exact: true })
     await show.click()
     await expect(show).not.toBeChecked()
     await expect
@@ -365,9 +390,9 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     const routing = selectedAccount(page).getByRole('switch', { name: 'Enable for model routing', exact: true })
     await routing.click()
-    await expect(accountCard(page, 'Command Code Work').getByRole('switch')).not.toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Show this account', exact: true })).not.toBeChecked()
     await routing.click()
-    await expect(accountCard(page, 'Command Code Work').getByRole('switch')).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Show this account', exact: true })).toBeChecked()
     await expect
       .poll(async () => (await readSavedAccounts(page)).find(account => account.instanceId === 'commandcode_work'))
       .toMatchObject({ enabled: true, favoriteModelIds: [], hiddenModelIds: [] })
@@ -387,14 +412,18 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     }
     page.on('request', recordSignOut)
     try {
-      await selectedAccount(page).getByRole('button', { name: 'Sign out', exact: true }).click()
+      // Sign out lives in the account actions menu (council round 4, D2).
+      await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Sign out…', exact: true }).click()
       const confirmation = page.getByRole('alertdialog')
       await expect(confirmation.getByRole('heading', { name: 'Sign out of Command Code Work?', exact: true })).toBeVisible()
       await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
       await expect(confirmation).toBeHidden()
       expect(await readSavedAccounts(page)).toEqual(before)
       expect(signOutCalls).toHaveLength(0)
-      await expect(selectedAccount(page).getByRole('button', { name: 'Sign out', exact: true })).toBeEnabled()
+      await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+      await expect(page.getByRole('menuitem', { name: 'Sign out…', exact: true })).toBeEnabled()
+      await page.keyboard.press('Escape')
     } finally {
       page.off('request', recordSignOut)
     }
@@ -479,7 +508,7 @@ When('the sidebar add-account shortcut is opened from the composer', async ({ pa
   const composer = page.getByRole('textbox', { name: /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u })
   await composer.fill('Keep this unsent draft while connecting an account.')
   sidebarAddOrigins.set(page, page.url())
-  await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+  await (await accountTool(page, 'Add AI account')).click()
   await expect(page.getByRole('dialog', { name: 'Add account', exact: true })).toBeVisible()
 })
 
@@ -488,7 +517,7 @@ Then('account setup closes without navigating away or losing the composer draft'
     let first = true
     for (const name of ['Codex', 'Claude', 'GitHub Copilot', 'OpenCode Go', 'Command Code', 'Cursor']) {
       for (const dismissal of ['Cancel', 'Close', 'Escape']) {
-        if (!first) await page.getByRole('button', { name: 'Add AI account', exact: true }).click()
+        if (!first) await (await accountTool(page, 'Add AI account')).click()
         first = false
         const chooser = page.getByRole('dialog', { name: 'Add account', exact: true })
         await chooser.getByRole('button', { name: `${name} account`, exact: true }).click()
@@ -704,12 +733,12 @@ When('a provider request fails because its credential is missing', async ({ page
   await composer.fill('Verify inline recovery for missing provider credentials.')
   await page.getByRole('button', { name: 'Send message', exact: true }).click({ timeout: 10_000 })
   await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: 'Add or fix credentials', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Connect an account', exact: true })).toBeVisible()
 })
 
 Then('the inline credential action opens AI Accounts', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-credential-recovery-action', async () => {
-    await page.getByRole('button', { name: 'Add or fix credentials', exact: true }).click()
+    await page.getByRole('button', { name: 'Connect an account', exact: true }).click()
     await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add account', exact: true }).first()).toBeVisible()
   })
@@ -720,6 +749,7 @@ When('the AI Accounts settings section is opened', async ({ page }: { page: Page
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
+  await editFailureHandling(page)
 })
 
 When('a verified loopback account is edited in manual save mode', async ({ page }: { page: Page }) => {
@@ -952,7 +982,7 @@ When('a Command Code account backed by a local fake provider is added', async ({
   const saved = await readSavedAccounts(page)
   expect(saved).toHaveLength(1)
   expect(saved[0]).toMatchObject({ enabled: true, kind: 'commandcode', instanceId: 'commandcode_work' })
-  await expect(accountCard(page, 'Command Code 1').getByRole('switch')).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'Show this account', exact: true })).toBeChecked()
 })
 
 Then('existing reference and CLI methods verify against only the loopback provider', async ({ page }: { page: Page }) => {
@@ -1033,10 +1063,10 @@ Then('the account shows the session and weekly windows the provider reports', as
   await recordAssertion(page, 'ai-accounts-quota-windows-follow-the-provider', async () => {
     await expect(page.getByRole('progressbar', { name: 'Current session remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Current session: 75% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
+    await expect(page.getByText(/^Resets in (?:59m|1h 0m)$/u)).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Weekly limit remaining', exact: true })).toBeVisible()
     await expect(page.getByRole('article', { name: 'Weekly limit: 10% left', exact: true })).toBeVisible()
-    await expect(page.getByText(/^Resets in 2 d \d+ h$/u)).toBeVisible()
+    await expect(page.getByText(/^Resets in 2d \d+h$/u)).toBeVisible()
   })
   await recordAssertion(page, 'ai-accounts-sidebar-foot-shows-the-tightest-window', () =>
     expect(page.getByRole('button', { name: /^Command Code 1: Weekly limit: 10% left, resets in 2d \d+h$/ })).toBeVisible(),
@@ -1052,7 +1082,7 @@ Then('failed verification reports a retry error without adding the account', asy
     await expect(page.getByRole('button', { name: /^Command Code 2: Weekly limit/ })).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(savedAccountCards(page)).toHaveCount(1)
-    await expect(accountCard(page, 'Command Code 1').getByRole('switch')).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Show this account', exact: true })).toBeChecked()
     const before = await readSavedAccounts(page)
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     await selectedAccount(page).getByRole('button', { name: 'Reauthenticate', exact: true }).click()
@@ -1377,7 +1407,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     await openAccountsPanel(page)
     await accountCard(page, 'Command Code 1').getByRole('button', { name: 'Select Command Code 1', exact: true }).click()
     await selectedAccount(page).getByRole('tab', { name: 'Models', exact: true }).click()
-    const show = selectedAccount(page).getByRole('switch', { name: 'Show gpt-6-luna in the picker', exact: true })
+    const show = selectedAccount(page).getByRole('checkbox', { name: 'Show gpt-6-luna in the picker', exact: true })
     await expect(show).toBeChecked()
     await show.click()
     await expect(show).not.toBeChecked()
@@ -1524,11 +1554,9 @@ Then('the sidebar tiles follow the shared priority order after reload', async ({
         .getByRole('button', { name: /^Command Code [12]:/ })
         .nth(0),
     ).toHaveAttribute('aria-label', /^Command Code 1:/)
-    expect(
-      await usageStrip(page)
-        .getByRole('button', { name: 'Add AI account', exact: true })
-        .evaluate(element => element.closest('[draggable]') === null),
-    ).toBe(true)
+    // The status strip holds no add tool (it is in the popover); a docked usage strip keeps one outside its draggable meters.
+    const addTool = usageStrip(page).getByRole('button', { name: 'Add AI account', exact: true })
+    if ((await addTool.count()) > 0) expect(await addTool.first().evaluate(element => element.closest('[draggable]') === null)).toBe(true)
     await page.reload()
     await openAccountsPanel(page)
     await expect(providerAccounts(page).getByRole('listitem').nth(0)).toContainText('Command Code 1')
@@ -1619,8 +1647,8 @@ const expectDisabledPopoverQuota = async (page: Page): Promise<void> => {
     await expect(meter).toBeVisible()
     expect(await meter.locator('[data-slot="progress-indicator"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(mutedColor)
   }
-  await expect(card.getByText(/^Resets in (?:59|60) min$/u)).toBeVisible()
-  await expect(card.getByText('Resets in 2 d 23 h', { exact: true })).toBeVisible()
+  await expect(card.getByText(/^Resets in (?:59m|1h 0m)$/u)).toBeVisible()
+  await expect(card.getByText('Resets in 2d 23h', { exact: true })).toBeVisible()
   await expect(card.getByText('Disabled', { exact: true })).toHaveCount(0)
 }
 const expectPreviewOrder = async (page: Page): Promise<void> => {
@@ -2087,9 +2115,9 @@ Then('widening the usage popover from its grip lays the accounts out side by sid
   await expectUsageCards(page, 'stacked')
   await recordAssertion(page, 'ai-accounts-quota-header-shows-provider-plan', async () => {
     const header = usagePopover(page).locator('article header').filter({ hasText: 'Command Code 1' })
-    const plan = header.getByLabel('Subscription plan: individual-pro', { exact: true })
+    const plan = header.getByLabel('Subscription plan: Individual Pro', { exact: true })
     await expect(plan).toBeVisible()
-    await expect(plan).toHaveText('individual-pro')
+    await expect(plan).toHaveText('Individual Pro')
     const bounds = await plan.evaluate(element => {
       const header = element.closest('header')
       if (header === null) throw new Error('The plan badge is not in a quota card header')
@@ -2215,18 +2243,24 @@ const fallbacks = (page: Page) => page.getByRole('region', { name: 'Fallbacks', 
 
 const pickAccountModel = async (page: Page, account: string): Promise<void> => {
   // b:16yr: the list shows one row per model; the detail panel's Account chips choose the account.
-  const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const modelList = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const row = modelList.locator('[data-model-picker-row]').filter({ hasText: 'gpt-6-luna' }).first()
-  await row.getByRole('button', { name: /Details for/iu }).click()
-  const chip = page.getByLabel('Available accounts').getByRole('button', { name: account, exact: true })
+  await row.locator('[data-model-details-trigger]').click()
+  // Council picker C3/S1: accounts are radios; on a model the thread does not use yet, Use commits the draft.
+  const chip = page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: new RegExp(`^${account.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:,|$)`, 'u') })
   await chip.click()
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  const use = page.getByRole('button', { name: /^Use / })
+  if (await use.isVisible()) await use.click()
+  await expect(chip).toHaveAttribute('aria-checked', 'true')
 }
 
 When('a new thread falls back from the first account to the third one in the composer picker', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await composerPicker(page).click()
   await pickAccountModel(page, 'Command Code 3')
+  // Council picker N5: the chain is collapsed to one line until opened.
+  const toggle = fallbacks(page).locator('[data-model-fallbacks-toggle]')
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
   await fallbacks(page).getByRole('button', { name: 'Add fallback', exact: true }).click()
   await expect(fallbacks(page).getByRole('listitem')).toHaveCount(1)
   await page.screenshot({ path: test.info().outputPath('model-fallbacks.png') })
@@ -2262,7 +2296,7 @@ Then('the picker offers to return the thread to its selection', async ({ page }:
   await serving.getByRole('button', { name: 'Return', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-fallback-chain-returns-to-the-selection', async () => {
     await expect(serving).toHaveCount(0)
-    await expect(page.getByLabel('Available accounts').getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })
@@ -2274,6 +2308,8 @@ const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void
   // The inline recovery choice exists only while automatic exhausted-limit failover is off.
   await openSettingsDialog(page)
   await settingsNavEntry(page, 'AI accounts', 'AI Accounts').click()
+  await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
+  await editFailureHandling(page)
   const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
   const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
   await failover.click()
@@ -2371,7 +2407,7 @@ Then('the failed turn explains how to recover from the stall', async ({ page }: 
   await recordAssertion(page, 'ai-accounts-stalled-stream-advice', async () => {
     const advice = page.getByRole('status').filter({ hasText: 'The model sent no data for 2 min' })
     await expect(advice).toBeVisible()
-    await expect(advice).toContainText('Resume to retry it')
+    await expect(advice).toContainText('Retry it, or pick another model')
     await expect(advice).toContainText('Fall back on stalled streams')
   })
   await finishJourneyAssertions(page)

@@ -54,9 +54,53 @@ describe('toasts', () => {
     act(() => void stack.service.show({ title: 'Deleted', tone: 'danger', action: { label: 'Undo', run } }))
     const toast = screen.getByRole('alert')
     expect(toast.dataset.tone).toBe('danger')
-    expect(toast.className).toContain('dshx:border-l-destructive')
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(run).toHaveBeenCalledOnce()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('is a plain bordered card whose icon alone carries the tone: green for success, red for a failure', () => {
+    const iconOf = (toast: HTMLElement): string => toast.querySelector('[data-toast-icon]')?.getAttribute('class') ?? ''
+    act(() => void stack.service.show({ title: 'Draft saved', tone: 'success', duration: 0 }))
+    const saved = screen.getByRole('status')
+    expect(saved.className).not.toMatch(/border-l-/u)
+    expect(saved.className).toContain('dshx:rounded-xl')
+    expect(iconOf(saved)).toContain('dshx:text-success')
+    // Green is the glyph only: the words stay ink.
+    expect(saved.querySelector('p')?.className ?? '').not.toMatch(/text-success/u)
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    for (const tone of ['info', 'warning'] as const) {
+      act(() => void stack.service.show({ title: tone, tone, duration: 0 }))
+      expect(iconOf(screen.getByRole('status'))).toContain('dshx:text-muted-foreground')
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    }
+
+    act(() => void stack.service.show({ title: 'Could not save', tone: 'danger', duration: 0 }))
+    const failed = screen.getByRole('alert')
+    expect(failed.className).not.toMatch(/border-l-/u)
+    expect(iconOf(failed)).toContain('dshx:text-destructive')
+  })
+
+  it('sits above a composer it would cover and returns to the corner without one', () => {
+    const list = (): HTMLElement => screen.getByRole('list', { name: 'Notifications' })
+    act(() => void stack.service.show({ title: 'Saved', duration: 0 }))
+    expect(list().style.bottom).toBe('16px')
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    const card = document.createElement('div')
+    card.setAttribute('data-composer-card', 'true')
+    card.getBoundingClientRect = () => new DOMRect(470, 660, 774, 88)
+    document.body.append(card)
+    // A conversation that is mounted but hidden keeps a composer higher up; it must not lift the toast.
+    const hidden = document.createElement('div')
+    hidden.setAttribute('data-composer-card', 'true')
+    hidden.getBoundingClientRect = () => new DOMRect(470, 500, 774, 88)
+    hidden.checkVisibility = () => false
+    document.body.append(hidden)
+    act(() => void stack.service.show({ title: 'Saved again', duration: 0 }))
+    expect(list().style.bottom).toBe(`${window.innerHeight - 660 + 8}px`)
+    card.remove()
+    hidden.remove()
   })
 })

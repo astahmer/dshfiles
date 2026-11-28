@@ -81,7 +81,9 @@ const context = (messages: Message[]) => normalizeContext({ systemPrompt: 'You a
 const managedProfile = (fake: FakeVibeAcp) => {
   const line = fake.events().find(event => event.startsWith('session/new '))
   if (line === undefined) throw new Error('the fake recorded no session/new')
-  const decoded = Schema.decodeUnknownSync(Schema.Array(Schema.String))(JSON.parse(line.slice('session/new directories='.length, line.indexOf(' mcp='))))
+  const decoded = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Array(Schema.String)))(
+    line.slice('session/new directories='.length, line.indexOf(' mcp=')),
+  )
   const toml = readFileSync(join(decoded[0] ?? '', '.vibe', 'agents', 'dsh.toml'), 'utf8')
   return { roots: decoded, toml }
 }

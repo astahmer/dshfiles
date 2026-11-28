@@ -5,9 +5,6 @@ import type { ToolMetaTranslate } from './locales.js'
 import { WaitTimerIndicator } from './wait-timer-indicator.js'
 
 const templates = new Map([
-  ['seconds', '{n} s'],
-  ['minutes', '{m} min {s} s'],
-  ['hours', '{h} h {m} min'],
   ['waitElapsed', 'Waiting for {duration}'],
   ['waitingForJobOutput', 'Waiting for job output'],
   ['waitingForAllJobs', 'Waiting for all running background jobs to settle'],
@@ -29,9 +26,9 @@ describe('WaitTimerIndicator', () => {
         />
       </TooltipProvider>,
     )
-    expect(screen.getByRole('progressbar', { name: 'Wait timeout countdown: 3 min 30 s remaining of 5 min 0 s' }).getAttribute('aria-valuenow')).toBe('90000')
+    expect(screen.getByRole('progressbar', { name: 'Wait timeout countdown: 3m 30s remaining of 5m 00s' }).getAttribute('aria-valuenow')).toBe('90000')
     expect(screen.getByText('Waiting for 2 background jobs to finish')).toBeTruthy()
-    expect(screen.getByText('3 min 30 s until wait timeout')).toBeTruthy()
+    expect(screen.getByText('3m 30s until wait timeout')).toBeTruthy()
   })
 
   it('shows elapsed time with an indeterminate bar when there is no timeout', () => {
@@ -40,9 +37,9 @@ describe('WaitTimerIndicator', () => {
         <WaitTimerIndicator timer={{ timeoutMs: undefined, elapsedMs: 90_000, remainingMs: undefined, waitingFor: 'job-output' }} t={t} />
       </TooltipProvider>,
     )
-    const bar = screen.getByRole('progressbar', { name: 'Waiting for 1 min 30 s' })
+    const bar = screen.getByRole('progressbar', { name: 'Waiting for 1m 30s' })
     expect(bar.getAttribute('aria-valuenow')).toBeNull()
     expect(screen.getByText('Waiting for job output')).toBeTruthy()
-    expect(screen.getByText('Waiting for 1 min 30 s')).toBeTruthy()
+    expect(screen.getByText('Waiting for 1m 30s')).toBeTruthy()
   })
 })

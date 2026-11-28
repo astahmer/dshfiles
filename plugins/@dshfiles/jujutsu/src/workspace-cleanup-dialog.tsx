@@ -180,7 +180,7 @@ export const WorkspaceCleanupDialog = (props: {
         <DialogHeader className="dshx:px-5 dshx:pb-4 dshx:pt-5">
           <DialogTitle>Clean up workspaces</DialogTitle>
           <DialogDescription className="dshx:sr-only">
-            Select idle workspaces and untracked folders to remove. Active threads and uncommitted changes are always kept; unlanded work is kept unless you
+            Select idle workspaces and untracked folders to remove. Active threads and uncommitted changes are always kept. Unlanded work is kept unless you
             select its Stale work group.
           </DialogDescription>
         </DialogHeader>
@@ -228,7 +228,7 @@ export const WorkspaceCleanupDialog = (props: {
         )}
         <div aria-busy={preview.isFetching} className="dshx:max-h-[min(55vh,28rem)] dshx:overflow-y-auto">
           {preview.isError && (
-            <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>
+            <p className="dshx:px-5 dshx:py-3 dshx:text-sm dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed. Close and reopen this dialog.')}</p>
           )}
           <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-5 dshx:py-3">
             <Checkbox
@@ -313,7 +313,7 @@ export const WorkspaceCleanupDialog = (props: {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-5 dshx:py-4">
           <span className="dshx:text-xs dshx:text-muted-foreground">
             {selectedRows.some(row => row.missing)
-              ? 'Missing checkouts are only forgotten; their paths are never removed. Stale work is abandoned only when selected.'
+              ? 'Missing checkouts are only forgotten. Their paths are never removed. Stale work is abandoned only when selected.'
               : 'Unlanded work is abandoned only when its Stale work group is selected'}
           </span>
           <DialogFooter className="dshx:gap-2">

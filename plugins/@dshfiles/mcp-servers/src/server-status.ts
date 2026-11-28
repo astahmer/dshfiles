@@ -1,3 +1,4 @@
+import type { Health } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import type { ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 
@@ -5,6 +6,8 @@ type LocalProcessState = Exclude<ServerView['localProcess'], 'not-configured'>
 type LifecycleTextInput = { readonly server: ServerView; readonly t: McpServersTranslate }
 type LocalProcessTextInput = { readonly server: ServerView; readonly t: McpServersTranslate }
 type ServerSearchInput = { readonly server: ServerView; readonly search: string }
+/** A server's health (DESIGN.md › Colour roles 4), or `working` while it starts. */
+export type ServerMark = Health | 'working'
 
 export class McpServerStatusModel {
   private static readonly localProcessCopy = {
@@ -24,17 +27,23 @@ export class McpServerStatusModel {
     inactive: 'clientStopped',
   } as const satisfies Record<ServerView['clientLifecycle'], string>
 
-  private static readonly lifecycleDotClassNames = {
-    loaded: 'dshx:bg-success',
-    starting: 'dshx:bg-info dshx:animate-pulse',
-    'start-failed': 'dshx:bg-destructive',
-    'manually-disconnected': 'dshx:bg-muted-foreground/50',
-    inactive: 'dshx:bg-muted-foreground/50',
-  } as const satisfies Record<ServerView['clientLifecycle'], string>
+  /** One health dot: green running, red failed to start, a faint ring stopped or disabled; the working ring while starting. */
+  private static readonly lifecycleMarks = {
+    loaded: 'ok',
+    starting: 'working',
+    'start-failed': 'down',
+    'manually-disconnected': 'off',
+    inactive: 'off',
+  } as const satisfies Record<ServerView['clientLifecycle'], ServerMark>
 
   static readonly lifecycleText = ({ server, t }: LifecycleTextInput): string => t(McpServerStatusModel.lifecycleCopy[server.clientLifecycle])
 
-  static readonly lifecycleDotClassName = (server: ServerView): string => McpServerStatusModel.lifecycleDotClassNames[server.clientLifecycle]
+  /** An enabled server that is not running because it needs a sign-in or credentials is limited (amber), not off. */
+  static readonly lifecycleMark = (server: ServerView): ServerMark => {
+    const mark = McpServerStatusModel.lifecycleMarks[server.clientLifecycle]
+    if (mark !== 'working' && mark !== 'down' && server.enabled && (server.oauth === 'needs-sign-in' || server.configuration !== 'ready')) return 'limited'
+    return mark
+  }
 
   static readonly localProcessText = ({ server, t }: LocalProcessTextInput): string | undefined =>
     server.localProcess === 'not-configured' ? undefined : `${t('localProcess')}: ${t(McpServerStatusModel.localProcessCopy[server.localProcess])}`

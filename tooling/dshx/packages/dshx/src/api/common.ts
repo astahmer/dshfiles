@@ -50,13 +50,43 @@ class InternalApiError extends Error {
     readonly method: string,
     readonly retryable: boolean,
     readonly remoteCode?: string,
-    options?: { readonly cause?: unknown; readonly remoteDetails?: Readonly<Record<string, unknown>> },
+    options?: {
+      readonly cause?: unknown
+      readonly remoteDetails?: Readonly<Record<string, unknown>>
+      readonly status?: number | undefined
+      readonly endpoint?: string | undefined
+    },
   ) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause })
     this.remoteDetails = options?.remoteDetails
+    this.status = options?.status
+    this.endpoint = options?.endpoint
   }
 
   readonly remoteDetails: Readonly<Record<string, unknown>> | undefined
+  readonly status: number | undefined
+  readonly endpoint: string | undefined
+}
+
+/** Where a transport failure went and what answered: the fields an `ApiError` carries so nobody parses its message. */
+export interface ApiTransportFacts {
+  readonly status?: number | undefined
+  readonly endpoint?: string | undefined
+}
+
+const HTTP_STATUS = /\bHTTP (\d{3})\b/u
+
+/**
+ * The HTTP status a rejected Connection call answered with. DSH's Connection rejects with `transport failure for
+ * /api/…: HTTP 500` and carries no field, so this is the one place that reads the text; dshx's own batch error carries
+ * `status` already.
+ */
+const transportStatus = (cause: unknown): number | undefined => {
+  if (!(cause instanceof Object)) return undefined
+  const status = 'status' in cause ? Number(cause.status) : Number.NaN
+  if (Number.isInteger(status)) return status
+  const match = cause instanceof Error ? HTTP_STATUS.exec(cause.message) : null
+  return match?.[1] === undefined ? undefined : Number(match[1])
 }
 
 /** The first few Standard Schema issues as `path: message`, so a caller (often the agent) can fix its input. */
@@ -197,8 +227,22 @@ export class ApiProtocolModel {
     return (result as { readonly value: unknown }).value
   }
 
-  static error(kind: ApiError['kind'], message: string, apiId: string, method: string, retryable: boolean, cause?: unknown, remoteCode?: string): ApiError {
-    return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause })
+  static error(
+    kind: ApiError['kind'],
+    message: string,
+    apiId: string,
+    method: string,
+    retryable: boolean,
+    cause?: unknown,
+    remoteCode?: string,
+    facts?: ApiTransportFacts,
+  ): ApiError {
+    return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined && facts === undefined ? undefined : { cause, ...facts })
+  }
+
+  /** The status and endpoint of a rejected Connection call, for `error(…, facts)`. */
+  static transportFacts(cause: unknown, endpoint: string | undefined): ApiTransportFacts {
+    return { status: transportStatus(cause), endpoint }
   }
 
   /** A failure the remote handler chose to send: its code, message and JSON details. */
@@ -230,8 +274,8 @@ export class ApiProtocolModel {
   }
 
   /** The owner of an API is not loaded in this DSH process (or, from a Client, its routes do not exist). */
-  static ownerMissing(owner: string, apiId: string, method: string, cause?: unknown): ApiError {
-    return ApiProtocolModel.error('unavailable', `${owner} is not loaded, so ${apiId}.${method} is unavailable.`, apiId, method, true, cause, OWNER_MISSING)
+  static ownerMissing(owner: string, apiId: string, method: string, cause?: unknown, facts?: ApiTransportFacts): ApiError {
+    return ApiProtocolModel.error('unavailable', `${owner} is not loaded, so ${apiId}.${method} is unavailable.`, apiId, method, true, cause, OWNER_MISSING, facts)
   }
 
   /**

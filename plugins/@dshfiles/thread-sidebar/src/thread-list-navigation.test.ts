@@ -388,3 +388,13 @@ describe('thread list keyboard navigation', () => {
     expect(acquisitions[3]?.release).toHaveBeenCalledOnce()
   })
 })
+
+describe('focus after a row leaves the list', () => {
+  it('moves to the next listed row, else the previous one at the end', () => {
+    const orderedIds = ['a', 'b', 'c', 'd']
+    expect(ThreadListNavigationModel.afterRemoval({ orderedIds, focusedId: 'b', listed: new Set(['a', 'c', 'd']) })).toBe('c')
+    expect(ThreadListNavigationModel.afterRemoval({ orderedIds, focusedId: 'b', listed: new Set(['a', 'd']) })).toBe('d')
+    expect(ThreadListNavigationModel.afterRemoval({ orderedIds, focusedId: 'd', listed: new Set(['a', 'b', 'c']) })).toBe('c')
+    expect(ThreadListNavigationModel.afterRemoval({ orderedIds, focusedId: 'a', listed: new Set() })).toBeUndefined()
+  })
+})

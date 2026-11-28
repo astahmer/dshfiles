@@ -114,11 +114,12 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
     return (
       <PageSection data-suggestions="error" heading={HEADING}>
         <p className="dshx:text-sm dshx:text-muted-foreground">
-          Suggestions could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH from the bottom of the rail first.
+          Suggestions could not be loaded. Try again; if Getting started was updated since DSH started, restart DSH first (the status bar shows Restart DSH
+          while an update waits).
         </p>
         <div>
           <Button onClick={() => void query.refetch()} size="sm" variant="outline">
-            Try again
+            Retry
           </Button>
         </div>
       </PageSection>
@@ -130,7 +131,7 @@ export const SuggestionsSection = (props: SuggestionsSectionProps): ReactNode =>
         <p className="dshx:text-sm dshx:text-muted-foreground">{value.reason}</p>
         <div>
           <Button onClick={() => void query.refetch()} size="sm" variant="outline">
-            Try again
+            Retry
           </Button>
         </div>
       </PageSection>

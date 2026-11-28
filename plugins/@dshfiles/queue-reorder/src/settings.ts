@@ -9,7 +9,7 @@ export const queueReorderSettings = defineSettings({
     sendLater: Schema.boolean()
       .default(true)
       .description(
-        'Show Send later beside the composer’s Send button and the scheduled messages above the composer. Scheduled messages still go out while it is off.',
+        'Show Send later and the scheduled messages above the composer (scheduled messages send either way).',
       ),
     previewLength: Schema.natural().min(40).max(1000).default(200).description('Characters of each queued message shown before it is truncated.'),
   }),

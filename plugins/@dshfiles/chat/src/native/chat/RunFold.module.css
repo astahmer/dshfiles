@@ -1,5 +1,5 @@
 /* dshfiles (b:7rv2): the summary row of a run of background jobs or subagents. It reads like a tool row: one 24px
-   line in the tertiary label tone, the row's glyph at the end; colour only for Failed and Needs you counts. */
+   line in the tertiary label tone; colour only for Failed and Needs you counts. */
 .row {
   display: flex;
   width: 100%;
@@ -48,8 +48,10 @@
   height: calc(14px + var(--dsh-content-font-delta, 0px));
 }
 
+/* The label takes only its text (council round 22, item 2); a long label still shrinks and truncates first. Its failed
+   clause leads with the kit's ✕ and reads in the failed ink (WorkCountText, council round 23, item 2). */
 .label {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -58,18 +60,6 @@
 
 .elapsed {
   font-variant-numeric: tabular-nums;
-}
-
-.failed {
-  color: var(--dsw-alias-state-error-primary);
-}
-
-.needsYou {
-  color: var(--dsw-alias-state-business-primary);
-}
-
-.glyph {
-  flex: none;
 }
 
 /* A finger needs the 44pt target on a phone; the line stays one line. */

@@ -240,7 +240,15 @@ for (let index = 0; index < rowCount; index += 1) {
   longBefore = await page.evaluate(() => window.__longTasks.length)
   await page.evaluate(() => window.__watch('back', ''))
   if (profileDir !== undefined) await cdp.send('Profiler.start')
-  await openList()
+  // Under CPU throttling the list page can still be on screen while the thread page slides in: wait for the thread
+  // page's Back, or openList() sees the old rows and returns without tapping it.
+  // A subagent thread's Back leads to its parent thread first, so tap until the list shows.
+  for (let step = 0; step < 3; step += 1) {
+    await backButton.or(listButton).first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => undefined)
+    if (await backButton.isVisible().catch(() => false)) await backButton.tap()
+    else await openList()
+    if (await rowsLocator.first().waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false)) break
+  }
   await rowsLocator.first().waitFor({ state: 'visible', timeout: 30_000 })
   await page.waitForFunction(() => window.__result.listMs !== null, null, { timeout: 35_000, polling: 100 }).catch(() => {})
   await page.waitForTimeout(2000)

@@ -48,7 +48,8 @@ const SOURCE_LABEL = { native: 'sourceNative', plugin: 'sourcePlugin', mcp: 'sou
   ToolkitSource,
   AgentToolkitKey
 >
-const SOURCE_VARIANT = { native: 'muted', plugin: 'info', mcp: 'warning', memory: 'success' } as const satisfies Record<ToolkitSource, string>
+// A source is a category, not a status: every badge is muted (DESIGN.md › Colour roles); the label tells them apart.
+const SOURCE_VARIANT = { native: 'muted', plugin: 'muted', mcp: 'muted', memory: 'muted' } as const satisfies Record<ToolkitSource, string>
 const SKILL_ORIGIN_LABEL = {
   'project-dsh': 'skillProjectDsh',
   'project-agents': 'skillProjectAgents',
@@ -295,7 +296,7 @@ export const AgentToolkitPanel = (props: {
                               </Tooltip>
                             )}
                             {tool.owner === undefined ? null : (
-                              <span className="dshx:w-full dshx:text-xs dshx:text-muted-foreground dshx:break-all">{tool.owner}</span>
+                              <span className="dshx:w-full dshx:text-xs dshx:text-muted-foreground">{AgentToolkit.featureName(tool.owner)}</span>
                             )}
                           </div>
                         </TableCell>
@@ -327,7 +328,7 @@ export const AgentToolkitPanel = (props: {
                       <TableCell className="dshx:w-2/5 dshx:align-top dshx:whitespace-normal">
                         <div className="dshx:flex dshx:flex-col dshx:gap-1">
                           <span className="dshx:font-mono dshx:text-xs dshx:break-all">{row.path}</span>
-                          <span className="dshx:text-xs dshx:text-muted-foreground dshx:break-all">{row.owner}</span>
+                          <span className="dshx:text-xs dshx:text-muted-foreground">{AgentToolkit.featureName(row.owner)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="dshx:align-top dshx:whitespace-normal dshx:text-xs dshx:text-muted-foreground">

@@ -4,8 +4,9 @@
   "features": [
     {
       "id": "inventory-read-once",
-      "title": "Cordis panel and cards read the inventory once per connection",
-      "summary": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being discarded and repeated by its first reset, and later resets still drop and reread it.",
+      "title": "Plugin panel loads its list once",
+      "summary": "The dynamic plugin panel and its tool cards load the plugin list once per connection.",
+      "details": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being discarded and repeated by its first reset, and later resets still drop and reread it.",
       "surfaces": ["client"],
       "surface": "statusItem",
       "destination": "threads",

@@ -20,29 +20,32 @@ When('Settings is opened from the sidebar', async ({ page }: { page: Page }) => 
 
 Then('Settings remain usable at narrow and wide widths', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-compact-navigation', async () => {
-    const sections = page.getByRole('combobox', { name: 'Sections', exact: true })
+    // A narrow pane drills down (round five B6): the grouped category list, then one category under Back.
+    const root = page.locator('[data-settings-root]')
+    const back = page.getByRole('button', { name: 'Back to Settings', exact: true })
     const navigation = page.getByRole('navigation', { name: 'Settings', exact: true })
     for (const width of [360, 480, 768, 1024]) {
       await page.setViewportSize({ width, height: 900 })
       await expect(settingsView(page)).toBeVisible()
+      if (await back.isVisible()) await back.click()
       expect(await settingsView(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
       expect(await searchField(page).evaluate(element => element.clientWidth)).toBeGreaterThan(60)
       await expect(page.getByRole('button', { name: 'Open configuration file', exact: true })).toBeVisible()
       if (width <= 480) {
         await expect(navigation).toBeHidden()
-        await expect(sections).toBeVisible()
-        await sections.click()
-        await page.getByRole('option', { name: 'Models', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
-        await expect(sections).toHaveText('Models')
+        await expect(root).toBeVisible()
+        await root.getByRole('button', { name: 'Models', exact: true }).click()
+        await expect(back).toBeVisible()
+        await expect(page.locator('[data-settings-back-row] h2')).toHaveText('Models')
         await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeHidden()
-        await sections.click()
-        await page.getByRole('option', { name: 'General', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        await back.click()
+        await root.getByRole('button', { name: 'General', exact: true }).click()
         await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
+        await back.click()
+        await expect(root).toBeVisible()
       } else {
         await expect(navigation).toBeVisible()
-        await expect(sections).toBeHidden()
+        await expect(root).toBeHidden()
       }
       if (width === 360) await page.screenshot({ path: test.info().outputPath('settings-shell-compact-navigation.png') })
     }
@@ -94,6 +97,8 @@ Then('Settings fills the main view under its own tab', async ({ page }: { page: 
     await expect(settingsView(page)).toHaveAttribute('data-settings-view', 'tab')
     await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
     await expect(page.locator('[data-slot="main"] [data-settings-panel-host] [data-settings-view="tab"]')).toBeVisible()
+    // The tab closes Settings: the header draws no second close button beside it.
+    await expect(settingsView(page).getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -104,7 +109,7 @@ Then('the page lists its task groups with human page titles and no dialog', asyn
     await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
     for (const group of ['General', 'Models & accounts', 'Plugins']) await expect(navigation.getByRole('group', { name: group, exact: true })).toBeVisible()
     // Plugin pages sit in their task group under a person's name, never a package id.
-    await expect(navigation.getByRole('group', { name: 'General', exact: true }).getByRole('button', { name: 'Main tabs', exact: true })).toBeVisible()
+    await expect(navigation.getByRole('group', { name: 'General', exact: true }).getByRole('button', { name: 'Layout', exact: true })).toBeVisible()
     const names = await navigation.getByRole('button').allTextContents()
     for (const name of names) expect(name).not.toMatch(/^[a-z0-9@][a-z0-9@/._-]*$/u)
   })
@@ -126,11 +131,11 @@ When('Settings are searched for {string}', async ({ page }: { page: Page }, quer
 Then('the Main tabs settings are listed with highlights, a count and a tree count', async ({ page }: { page: Page }) => {
   const results = page.locator('[data-settings-results]')
   await recordAssertion(page, 'settings-shell-search-lists-grouped-matches', async () => {
-    await expect(page.getByRole('status').filter({ hasText: /\d+ Settings? Found/ })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: /\d+ settings? found/ })).toBeVisible()
     await expect(results.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"]')).toBeVisible()
     await expect(results.locator('[data-setting-path="maxTabs"] mark').first()).toHaveText(/tabs/i)
-    await expect(page.getByRole('group', { name: 'General' }).getByRole('button', { name: /^Main tabs \d+$/ })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'General' }).getByRole('button', { name: /^Layout \d+$/ })).toBeVisible()
   })
 })
 
@@ -171,7 +176,8 @@ Then('the General section shows with the coding view switch focused', async ({ p
 
 When('the Main tabs page is opened in Settings', async ({ page }: { page: Page }) => {
   await openSettings(page)
-  await settingsNavEntry(page, 'Main tabs').click()
+  // Main tabs is one block of General › Layout.
+  await settingsNavEntry(page, 'Layout').click()
   await expect(page.getByRole('region', { name: 'Main tabs', exact: true })).toBeVisible()
 })
 
@@ -237,16 +243,24 @@ Then('Max tabs is back to {int} and no longer marked modified', async ({ page }:
 
 const mainTabsPage = (page: Page) => page.getByRole('region', { name: 'Main tabs', exact: true })
 const jsonEditor = (page: Page) => mainTabsPage(page).locator('[data-settings-json] textarea')
+/** The page's Advanced fold holds its JSON view switch and Plugin details, after the advanced settings. */
+const mainTabsAdvanced = (page: Page) => mainTabsPage(page).getByRole('button', { name: 'Advanced: Main tabs', exact: true })
+const openMainTabsAdvanced = async (page: Page): Promise<void> => {
+  if ((await mainTabsAdvanced(page).getAttribute('aria-expanded')) !== 'true') await mainTabsAdvanced(page).click()
+}
 const jsonDocumentSchema = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 
 Then('the Max tabs row says it is an override that inherits {int}', async ({ page }: { page: Page }, value: number) => {
   await recordAssertion(page, 'settings-shell-row-source', async () => {
     await expect(settingRow(page, 'maxTabs').locator('[data-setting-source="user"]')).toHaveText(`Override · inherits ${String(value)}`)
-    await expect(settingRow(page, 'enabled').locator('[data-setting-source]')).toHaveText('Default')
+    // A value that is the default carries no source line and no config key: only rows that differ say why.
+    await expect(settingRow(page, 'enabled').locator('[data-setting-source]')).toHaveCount(0)
+    await expect(settingRow(page, 'enabled').locator('code')).toHaveCount(0)
   })
 })
 
 When('the Main tabs page is shown as JSON', async ({ page }: { page: Page }) => {
+  await openMainTabsAdvanced(page)
   await mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true }).click()
   await expect(jsonEditor(page)).toBeVisible()
 })
@@ -288,6 +302,9 @@ Then('the form shows Max tabs {int} marked modified', async ({ page }: { page: P
 Then('the page names its plugin entry, its bundle and a plugin switch', async ({ page }: { page: Page }) => {
   const entry = mainTabsPage(page).locator('[data-plugin-entry$=":dshfiles-main-tabs"]')
   await recordAssertion(page, 'settings-shell-plugin-entry-card', async () => {
+    // The entry is plumbing: it sits behind Advanced › Plugin details, after the page's settings.
+    await openMainTabsAdvanced(page)
+    await mainTabsPage(page).getByRole('button', { name: 'Plugin details: Main tabs', exact: true }).click()
     await expect(entry).toContainText('dshfiles-main-tabs')
     await expect(entry).toContainText('from @dshfiles/main-tabs')
     await expect(entry.getByRole('switch', { name: 'Plugin enabled', exact: true })).toBeChecked()
@@ -354,6 +371,8 @@ When('the Main tabs page is found and opened with the keyboard', async ({ page }
 })
 
 When('the JSON view is chosen and an override is saved with the keyboard', async ({ page }: { page: Page }) => {
+  await tabTo(page, mainTabsAdvanced(page))
+  await page.keyboard.press('Enter')
   await tabTo(page, mainTabsPage(page).getByRole('radio', { name: 'Form', exact: true }))
   await page.keyboard.press('ArrowRight')
   // Radix roving focus moves focus on the next task: Enter before it lands would press Form again.
@@ -384,7 +403,7 @@ Then('the page fits the phone width and the form shows the saved override', asyn
 
 Then('only the Max tabs setting is listed', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-modified-filter', async () => {
-    await expect(settingsView(page).getByText('1 Setting Found', { exact: true })).toBeVisible()
+    await expect(settingsView(page).getByText('1 setting found', { exact: true })).toBeVisible()
     await expect(settingRow(page, 'maxTabs')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Modified', exact: true })).toHaveAttribute('aria-pressed', 'true')
   })
@@ -510,14 +529,17 @@ Then('the Models section renders the owned fork instead of a placeholder', async
 
 When('the Web search plugin page is opened in Settings', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Plugins')
-  await page.getByRole('button', { name: 'View Web search', exact: true }).click()
+  // The fork titles its Plugins row "Web search and fetch" (settings-web-search/src/native/locales.ts).
+  await page.getByRole('button', { name: 'View Web search and fetch', exact: true }).click()
 })
 
 Then('the Web search page renders the owned fork instead of a placeholder', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-web-search-page-renders-the-fork', async () => {
-    await expect(page.getByRole('heading', { name: 'Web search', exact: true }).first()).toBeVisible()
-    await expect(page.getByText('Set up the DeepSeek search provider.')).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'API key' })).toBeVisible()
+    // The fork's page as it renders today: its own title and description, then one provider choice per capability.
+    await expect(page.getByRole('heading', { name: 'Web search and fetch', exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Choose the providers web search and web fetch use.')).toBeVisible()
+    await expect(page.getByText('Web search provider', { exact: true })).toBeVisible()
+    await expect(page.getByText('Web fetch provider', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -535,18 +557,20 @@ Then('the Subagent page renders the owned fork instead of a placeholder', async 
   await finishJourneyAssertions(page)
 })
 
+// Without the thread sidebar's column the page lists its own categories, headed by the filter; Main tabs is one block of
+// Layout.
 Then('default DSH and plugin categories are marked and filterable in the sidebar', async ({ page }: { page: Page }) => {
   const nav = settingsView(page).getByRole('navigation', { name: 'Settings', exact: true })
-  const filter = settingsView(page).locator('aside [data-settings-origin-filter]')
+  const filter = nav.locator('[data-settings-origin-filter]')
   await recordAssertion(page, 'settings-shell-origin-distinction', async () => {
     await expect(settingsView(page).locator('[data-origin-badge="dsh"]')).toBeVisible()
     await expect(nav.locator('[data-nav-id="general"]')).toHaveAttribute('data-entry-origin', 'dsh')
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveAttribute('data-entry-origin', 'plugin')
+    await expect(nav.locator('[data-nav-id="layout"]')).toHaveAttribute('data-entry-origin', 'plugin')
     await filter.locator('[data-origin-option="dsh"]').click()
     await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveCount(0)
+    await expect(nav.locator('[data-nav-id="layout"]')).toHaveCount(0)
     await filter.locator('[data-origin-option="plugin"]').click()
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toBeVisible()
+    await expect(nav.locator('[data-nav-id="layout"]')).toBeVisible()
     await expect(nav.locator('[data-nav-id="general"]')).toHaveCount(0)
     await filter.locator('[data-origin-option="all"]').click()
     await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()

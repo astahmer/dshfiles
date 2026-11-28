@@ -1,8 +1,9 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,10 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ActionHint } from './panel-primitives.js'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ModelMark, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, InfoIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import { AccountsRules, type AccountDraft, type AccountsCatalog } from './api.js'
@@ -36,6 +40,14 @@ export type CurationPatch = Partial<
 const PROVIDER_DEFAULT = '__provider-default__'
 const WINDOW_DEFAULT = '__window-default__'
 
+/**
+ * An inherited effort at rest (council round 11, D2): 13 px secondary text with a 12 px chevron beside it (the cell hugs
+ * its value), no fill and no edge, so a column of "Auto" reads as values, not four settings. Hover, focus and open bring back the kit trigger: its fill, the
+ * ink and the edges `triggerLook` keeps for those states.
+ */
+const INHERITED_EFFORT =
+  'dshx:min-w-0 dshx:text-xs dshx:border-transparent dshx:bg-transparent dshx:text-muted-foreground dshx:[&>svg]:size-3 dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:focus-visible:bg-trigger-fill dshx:focus-visible:text-foreground dshx:aria-expanded:bg-trigger-fill dshx:aria-expanded:text-foreground'
+
 /** The model's window: a picker up to the provider maximum when it disclosed one, else the window as text. */
 const ContextWindowCell = (props: {
   readonly model: CatalogModel
@@ -45,8 +57,9 @@ const ContextWindowCell = (props: {
   const { model } = props
   const choices = AccountModelSettingsModel.contextWindowChoices(model)
   if (choices.length === 0 && props.override === undefined) {
+    // Plain text starts where a trigger's value would: its 1 px edge and 8 px inset.
     return (
-      <span className="dshx:text-xs dshx:text-muted-foreground">
+      <span className="dshx:px-[9px] dshx:text-xs dshx:text-muted-foreground">
         {model.contextWindow === undefined ? '—' : AccountsRules.formatTokens(model.contextWindow)}
       </span>
     )
@@ -55,16 +68,18 @@ const ContextWindowCell = (props: {
     .filter(value => value !== model.contextWindow)
     .sort((left, right) => left - right)
   const label = (value: number): string => `${AccountsRules.formatTokens(value)}${value === model.maxContextWindow ? ' (max)' : ''}`
+  const value = props.override === undefined || props.override === model.contextWindow ? WINDOW_DEFAULT : String(props.override)
   return (
     <Combobox
       label={`Context window for ${model.name}`}
-      value={props.override === undefined || props.override === model.contextWindow ? WINDOW_DEFAULT : String(props.override)}
+      value={value}
       options={[
         { value: WINDOW_DEFAULT, label: model.contextWindow === undefined ? 'Default' : `Default (${AccountsRules.formatTokens(model.contextWindow)})` },
         ...values.map(value => ({ value: String(value), label: label(value) })),
       ]}
       onValueChange={props.onChange}
-      triggerClassName="dshx:h-8 dshx:w-full dshx:text-xs"
+      // The effort column's look: sized to its value, and the default at rest is quiet text with a small chevron.
+      triggerClassName={cn('dshx:w-fit dshx:min-w-24 dshx:max-w-full dshx:px-2', value === WINDOW_DEFAULT && INHERITED_EFFORT)}
     />
   )
 }
@@ -94,6 +109,29 @@ export const ModelCuration = (props: {
   const customModelId = ModelCurationModel.parseAdditionalModelId(current.modelId, account)
   const duplicate = catalog.some(model => model.id === customModelId)
   const customize = (patch: CurationPatch): void => props.onChange({ ...patch, inheritModelSettings: false })
+  const isCustom = (model: CatalogModel): boolean => model.accountAdditional ?? account.additionalModelIds.includes(model.id)
+  const isOverridden = (model: CatalogModel): boolean => {
+    const localEffort = effective.reasoningDefaults[model.id]
+    return (
+      !inherited &&
+      (model.efforts.some(effort => effort.id === localEffort) ||
+        model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ||
+        hidden.has(model.id) ||
+        favorites.has(model.id) ||
+        effective.modelOrder.includes(model.id) ||
+        isCustom(model))
+    )
+  }
+  // When every row inherits, one caption above the table says so instead of an Inherited label on each row, and the
+  // Source column goes (council round 10, D2).
+  const allInherit = shown.every(model => !isOverridden(model))
+  // Inherited rows read "Auto"; the column header says once where Auto comes from (council round 17, D1).
+  const autoSources = new Set(
+    shown
+      .filter(model => model.efforts.length > 0 && !model.efforts.some(effort => effort.id === effective.reasoningDefaults[model.id]))
+      .map(model => (model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ? 'account' : 'provider')),
+  )
+  const autoNote = autoSources.size > 1 ? 'Auto: account or provider' : autoSources.has('account') ? 'Auto: account default' : 'Auto: provider default'
   const addModel = (): void => {
     if (customModelId === null || duplicate) return
     customize({ additionalModelIds: [...new Set([...account.additionalModelIds, customModelId])] })
@@ -143,50 +181,73 @@ export const ModelCuration = (props: {
     customize({ reasoningDefaults: next })
   }
   return (
-    <section
-      className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-background dshx:p-4"
-      aria-label="Models"
+    <PageSection
+      // The Models tab names this section; its heading stays for assistive tech only (council round 4, D2).
+      className="dshx-root dshx:@container dshx:gap-3 dshx:[&>div:first-child]:sr-only"
+      description={`Choose which models from ${KIND_LABEL[account.kind]} are available for this account.`}
+      heading="Models"
     >
-      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-4 dshx:@max-pane-compact:flex-wrap">
-        <div className="dshx:min-w-0 dshx:flex-1">
-          <h3 className="dshx:text-base dshx:font-semibold">Models</h3>
-          <p className="dshx:mt-0.5 dshx:text-xs dshx:text-muted-foreground">
-            Choose which models from {KIND_LABEL[account.kind]} are available for this account.
-          </p>
-        </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:flex-wrap">
-          <Combobox
-            label="Model settings mode"
-            value={inherited ? 'inherit' : 'customize'}
-            options={[
-              { value: 'inherit', label: 'Inherit from provider defaults' },
-              { value: 'customize', label: 'Customize for this account' },
-            ]}
-            onValueChange={value => props.onChange({ inheritModelSettings: value === 'inherit' })}
-            triggerClassName="dshx:h-8 dshx:w-56 dshx:text-xs dshx:@max-pane-narrow:w-full"
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-narrow:flex-wrap">
+        <Combobox
+          label="Model settings mode"
+          value={inherited ? 'inherit' : 'customize'}
+          options={[
+            { value: 'inherit', label: 'Inherit from provider defaults' },
+            { value: 'customize', label: 'Customize for this account' },
+          ]}
+          onValueChange={value => props.onChange({ inheritModelSettings: value === 'inherit' })}
+          triggerClassName="dshx:w-56 dshx:@max-pane-narrow:w-full"
+        />
+        <div className="dshx:relative dshx:w-48 dshx:min-w-0 dshx:@max-pane-narrow:w-full">
+          <SearchIcon
+            aria-hidden
+            className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
           />
-          <div className="dshx:relative dshx:w-48 dshx:min-w-0 dshx:@max-pane-narrow:w-full">
-            <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-2 dshx:size-4 dshx:text-muted-foreground" />
-            <Input
-              aria-label="Search models"
-              type="search"
-              placeholder="Search models…"
-              value={current.search}
-              onChange={event => updateView({ search: event.target.value, expanded: false })}
-              className="dshx:h-8 dshx:pl-8 dshx:text-xs"
-            />
-          </div>
+          <Input
+            aria-label="Search models"
+            type="search"
+            placeholder="Search models…"
+            value={current.search}
+            onChange={event => updateView({ search: event.target.value, expanded: false })}
+            className="dshx:pl-8"
+          />
         </div>
       </div>
-      <div className="dshx:overflow-x-auto dshx:rounded-md dshx:border">
+      {/* The header's account switch overrides every row's "Show model": say so where the rows are (council round 9, D3). */}
+      {account.enabled ? null : (
+        <p className="dshx:text-xs dshx:text-muted-foreground" data-account-hidden-note>
+          This account is hidden, so none of its models show in the model picker. Turn on Show this account to use them.
+        </p>
+      )}
+      {/* Rows separate by hairlines; the detail pane is the only frame. */}
+      <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[740px] dshx:border-collapse dshx:text-sm">
-          <thead className="dshx:border-b dshx:bg-muted/20 dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-            <tr>
-              <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
-              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
-              <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Context window</th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show in picker</th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
+          <thead className="dshx:border-b dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            <tr className="dshx:align-top">
+              {/* Starts on the names: the cell's 8 px, the 24 px star, the 16 px mark and two 8 px gaps (council round 10, D2). */}
+              <th className="dshx:py-2 dshx:pr-3 dshx:pl-16 dshx:font-normal">Model</th>
+              {/* One line, starting on the values: the cell's 12 px, the trigger's 1 px edge and 8 px inset; Auto's source is
+                  the ⓘ's tooltip (council round 18, D1). */}
+              <th className="dshx:w-48 dshx:py-2 dshx:pr-3 dshx:pl-[21px] dshx:font-normal dshx:whitespace-nowrap">
+                <span className="dshx:inline-flex dshx:items-center dshx:gap-1">
+                  Reasoning effort
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="dshx:inline-flex dshx:rounded-sm dshx:text-muted-foreground dshx:hover:text-foreground">
+                        <InfoIcon aria-hidden className="dshx:size-3" />
+                        <span data-effort-auto-note className="dshx:sr-only">
+                          {autoNote}
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{autoNote}</TooltipContent>
+                  </Tooltip>
+                </span>
+              </th>
+              {/* Starts on the values like Reasoning effort: the cell's 12 px, the trigger's 1 px edge and 8 px inset. */}
+              <th className="dshx:w-36 dshx:py-2 dshx:pr-3 dshx:pl-[21px] dshx:font-normal dshx:whitespace-nowrap">Context window</th>
+              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:text-center dshx:font-normal">Show model</th>
+              {allInherit ? null : <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>}
               <th className="dshx:w-10">
                 <span className="dshx:sr-only">Actions</span>
               </th>
@@ -197,20 +258,23 @@ export const ModelCuration = (props: {
               const favorite = favorites.has(model.id)
               const localEffort = effective.reasoningDefaults[model.id]
               const validEffort = model.efforts.some(effort => effort.id === localEffort) ? localEffort : undefined
-              const custom = model.accountAdditional ?? account.additionalModelIds.includes(model.id)
-              const overridden =
-                !inherited &&
-                (validEffort !== undefined ||
-                  model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ||
-                  hidden.has(model.id) ||
-                  favorite ||
-                  effective.modelOrder.includes(model.id) ||
-                  custom)
+              const custom = isCustom(model)
+              const overridden = isOverridden(model)
               const fullOrder = ModelCurationModel.curationRows(activeCatalog, effective.modelOrder, '')
               const index = fullOrder.findIndex(candidate => candidate.id === model.id)
               const accountEffort = model.efforts.find(effort => effort.id === effective.defaultReasoningEffort)
               const nativeEffort = model.efforts.find(effort => effort.id === model.defaultEffort)
-              const defaultLabel = accountEffort === undefined ? (nativeEffort?.name ?? 'Auto') : `Account default (${accountEffort.name})`
+              // Each row says where its effort comes from, so no caption above the table repeats it (council round 12, D3).
+              const defaultSource = accountEffort === undefined ? 'Provider' : 'Account'
+              const defaultValue = accountEffort?.name ?? nativeEffort?.name ?? 'Auto'
+              const defaultLabel = `${defaultSource} default · ${defaultValue}`
+              // An inherited cell reads "Auto" with its chevron; the menu and the name keep the full provenance (council round 17, D1).
+              const autoLabel = defaultValue === 'Auto' ? `Auto (${defaultSource} default)` : `Auto (${defaultLabel})`
+              const inheritedEffort = validEffort === undefined && model.efforts.length > 0
+              // The name every subagent surface shows (council round 25, item 4): a same-family vendor prefix drops; the
+              // tooltip, screen readers, the row's controls and the search keep the full id.
+              const shownName = modelIdentity(account.instanceId, model.name)?.name ?? model.name
+              const droppedPrefix = model.name.endsWith(shownName) ? model.name.slice(0, model.name.length - shownName.length) : ''
               return (
                 <tr key={model.id} className="dshx:border-b dshx:last:border-b-0 dshx:hover:bg-muted/20">
                   <td className="dshx:px-2 dshx:py-2">
@@ -226,10 +290,13 @@ export const ModelCuration = (props: {
                       >
                         <StarIcon className={cn(favorite && 'dshx:fill-current')} />
                       </Button>
+                      <ModelMark modelId={model.id} />
                       <ActionHint label={model.id}>
-                        <strong tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
-                          {model.name}
-                        </strong>
+                        {/* A span at 500: the Host's unlayered strong weight would outrank the utility (council round 10, D2). */}
+                        <span tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
+                          {droppedPrefix === '' ? null : <span className="dshx:sr-only">{droppedPrefix}</span>}
+                          {shownName}
+                        </span>
                       </ActionHint>
                       {custom ? (
                         <span className="dshx:rounded-full dshx:bg-muted dshx:px-2 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground">Custom</span>
@@ -238,43 +305,63 @@ export const ModelCuration = (props: {
                   </td>
                   <td className="dshx:px-3 dshx:py-1.5">
                     <Combobox
-                      label={`Default reasoning effort for ${model.name}`}
+                      label={`Default reasoning effort for ${model.name}${inheritedEffort ? `, ${autoLabel}` : ''}`}
+                      searchLabel={`Default reasoning effort for ${model.name} search`}
+                      trigger={
+                        inheritedEffort ? (
+                          <span data-effort-value className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">
+                            Auto
+                          </span>
+                        ) : undefined
+                      }
                       value={validEffort ?? PROVIDER_DEFAULT}
                       disabled={model.efforts.length === 0}
                       options={[
-                        { value: PROVIDER_DEFAULT, label: model.efforts.length === 0 ? 'Not supported' : defaultLabel },
+                        { value: PROVIDER_DEFAULT, label: model.efforts.length === 0 ? 'Not supported' : autoLabel },
                         ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
                       ]}
                       onValueChange={value => setEffort(model, value)}
-                      triggerClassName="dshx:h-8 dshx:w-full dshx:text-xs"
+                      // The table's one field look, the same as the mode and search fields above it (council round 5, D2),
+                      // sized to its value so the width goes to model names (council round 7, D2). An inherited value is
+                      // quiet text with a small chevron; the chip shows on hover, focus and open, and on an overridden row
+                      // (council round 11, D2).
+                      triggerClassName={cn(
+                        'dshx:w-fit dshx:min-w-24 dshx:max-w-full dshx:px-2 dshx:disabled:[&>svg]:hidden',
+                        validEffort === undefined && INHERITED_EFFORT,
+                      )}
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-1.5">
                     <ContextWindowCell model={model} override={account.contextWindowOverrides?.[model.id]} onChange={value => setContextWindow(model, value)} />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
-                    <Switch
-                      className="dshx:data-[state=checked]:bg-info"
-                      aria-label={`Show ${model.name} in the picker`}
-                      checked={!hidden.has(model.id)}
-                      onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, !checked) })}
-                    />
+                    {/* Centred under its header (council round 18, D1). */}
+                    <div className="dshx:flex dshx:justify-center">
+                      <Checkbox
+                        size="sm"
+                        aria-label={`Show ${model.name} in the picker`}
+                        checked={!hidden.has(model.id)}
+                        onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
+                      />
+                    </div>
                   </td>
-                  <td className="dshx:px-3 dshx:py-2">
-                    <span
-                      className={cn(
-                        'dshx:rounded-full dshx:px-2 dshx:py-1 dshx:text-xs',
-                        overridden ? 'dshx:bg-accent dshx:text-accent-foreground' : 'dshx:bg-muted dshx:text-muted-foreground',
-                      )}
-                    >
-                      {overridden ? 'Overridden' : 'Inherited'}
-                    </span>
-                  </td>
+                  {allInherit ? null : (
+                    <td className="dshx:px-3 dshx:py-2">
+                      <span
+                        className={cn(
+                          'dshx:text-xs',
+                          overridden ? 'dshx:rounded-full dshx:bg-accent dshx:px-2 dshx:py-1 dshx:text-accent-foreground' : 'dshx:text-muted-foreground',
+                        )}
+                      >
+                        {overridden ? 'Overridden' : 'Inherited'}
+                      </span>
+                    </td>
+                  )}
                   <td className="dshx:pr-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button aria-label={`Actions for ${model.name}`} size="icon-xs" type="button" variant="ghost">
-                          <MoreHorizontalIcon />
+                          <OverflowGlyph />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -337,26 +424,33 @@ export const ModelCuration = (props: {
           <span className="dshx:text-xs dshx:text-muted-foreground">
             {activeCatalog.filter(model => !hidden.has(model.id)).length} shown · {activeCatalog.length} available
           </span>
-          <Button
-            size="xs"
-            variant="ghost"
-            type="button"
-            disabled={activeCatalog.length === 0}
-            onClick={() => {
-              const allHidden = activeCatalog.every(model => hidden.has(model.id))
-              customize({
-                hiddenModelIds: allHidden
-                  ? account.hiddenModelIds.filter(id => !activeCatalog.some(model => model.id === id))
-                  : [...new Set([...account.hiddenModelIds, ...activeCatalog.map(model => model.id)])],
-              })
-            }}
-          >
-            {activeCatalog.length > 0 && activeCatalog.every(model => hidden.has(model.id)) ? 'Enable all' : 'Disable all'}
-          </Button>
+          {/* The bulk verb sits in a menu at the table's end, in ink, not a bare button (council round 18, D1). */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="xs" variant="ghost" type="button" disabled={activeCatalog.length === 0}>
+                Model actions
+                <ChevronDownIcon aria-hidden className="dshx:opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => {
+                  const allHidden = activeCatalog.every(model => hidden.has(model.id))
+                  customize({
+                    hiddenModelIds: allHidden
+                      ? account.hiddenModelIds.filter(id => !activeCatalog.some(model => model.id === id))
+                      : [...new Set([...account.hiddenModelIds, ...activeCatalog.map(model => model.id)])],
+                  })
+                }}
+              >
+                {activeCatalog.length > 0 && activeCatalog.every(model => hidden.has(model.id)) ? 'Enable all' : 'Disable all'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {current.adding ? (
-        <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
+        <div className="dshx:flex dshx:flex-col dshx:gap-2">
           <div className="dshx:flex dshx:gap-2">
             <Input
               aria-label="Additional model ID"
@@ -379,6 +473,6 @@ export const ModelCuration = (props: {
           <p className="dshx:text-xs dshx:text-muted-foreground">Add an ID the provider catalog does not return. The account/provider prefix is optional.</p>
         </div>
       ) : null}
-    </section>
+    </PageSection>
   )
 }

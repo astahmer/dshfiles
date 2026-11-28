@@ -13,6 +13,7 @@ import { handlePwaTabShortcut } from './pwa-tab-shortcuts.js'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
+import { useThreadWorkStatuses } from '@dshfiles/thread-sidebar/thread-status-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { DestinationSections, KNOWN_SECTIONS } from '@dshfiles/thread-sidebar/destinations'
 import { threadSidebarThreadDirectoriesApi, useThreadDirectories, WorkspacePaths, type ThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
@@ -31,10 +32,12 @@ import { PanelIcon, StartPage, type StartSection } from './start-page.js'
 import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { PanelTitlesModel } from './panel-titles.js'
+import { PanelDestinationsModel } from './panel-destinations.js'
 import { TabMenuItems } from './tab-menu-items.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
+import { useFailedThreadIds } from './failed-threads.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent } from './tabs-machine.js'
 import { DEFAULT_CLOSE_BUTTON_POSITION, type HostTarget } from '@dshfiles/workbench/tabs'
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
@@ -47,6 +50,7 @@ import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
 import { createMissingThreads } from './missing-threads.js'
 import './client.css'
+import { ThreadTabTitle } from './thread-tab-title.js'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
@@ -461,6 +465,9 @@ export default defineClient({
             }
           }, [attentionRecords, clearAttention])
           const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
+          const failedSessionIds = useFailedThreadIds(attention.views)
+          // The list's one status per thread, rolled up; null while no list publishes, and the tab keeps its own facts.
+          const listedStatuses = useThreadWorkStatuses()
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
 
@@ -474,7 +481,9 @@ export default defineClient({
                 ...base,
                 kind: 'panel',
                 panelId,
-                title: tab.title ?? panelLabels.get(panelId) ?? panelTitleFallback(panelId),
+                // The page's rail destination: both strips draw its glyph in its nav tone (round five B4).
+                destination: PanelDestinationsModel.of(panelId, contributedSections),
+                title: PanelTitlesModel.tabTitleOf(tab.title, panelLabels.get(panelId), panelTitleFallback(panelId)),
                 available: registeredPanels.has(panelId),
                 status: null,
               }
@@ -485,9 +494,11 @@ export default defineClient({
             const tabStatus = threadTabStatus({
               needsYou: status?.pendingInteraction !== undefined,
               running: status?.running ?? session?.running ?? false,
+              failed: session !== undefined && failedSessionIds.has(session.id),
               unread: session !== undefined && attentionSessionIds.has(session.id),
+              listed: session === undefined ? undefined : listedStatuses?.get(session.id)?.status,
             })
-            const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)
+            const title = ThreadTabTitle.of(session, translate('untitledThread'))
             const workspaceId = workspaceForThread(sessionId)
             const threadTab = {
               ...base,
@@ -665,7 +676,7 @@ export default defineClient({
           window.removeEventListener('keydown', onKeyDown, true)
           display.dispose()
         }
-      }, 'main-tabs: PWA shortcuts')
+      }, 'main-tabs: install shortcuts for the PWA')
 
     interface TabCommand {
       readonly id: string

@@ -4,7 +4,10 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
 import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
   AlertDialog,
@@ -23,6 +26,7 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowLeftIcon,
@@ -33,13 +37,11 @@ import {
   ChevronUpIcon,
   CircleCheckIcon,
   CommandIcon,
-  EllipsisIcon,
   GripVerticalIcon,
   LinkIcon,
   MessageSquareIcon,
   PanelLeftIcon,
   PanelRightOpenIcon,
-  PauseIcon,
   PinIcon,
   QrCodeIcon,
   RefreshCwIcon,
@@ -52,6 +54,7 @@ import {
   TextCursorInputIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -69,12 +72,23 @@ import {
   type Ref,
 } from 'react'
 import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
+import { PhoneThreadMeta, type PhoneStageMeta } from './phone-thread-meta.js'
+import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
+import { useSubagentFailedTurns } from './subagent-provenance/subagent-failed-turns.js'
+import { SubagentFeedModel } from './subagent-provenance/subagent-feed.js'
+import { STATUS_WORD_KEYS } from './palette-thread-statuses.js'
+import { useSavedProjectChip } from './project-colors.js'
+import { HostSnapshotsModel } from './snapshots.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { useThreadDirectories } from './use-thread-directories.js'
 import { pageLoadThreadRoute } from './thread-url.js'
 import { StageCover } from './stage-cover.js'
 import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences, type ThreadRowAction } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { usePaletteActions } from './palette-registration.js'
+import { FanOutChosen, FanOutSummary, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
 import { FAN_OUT_REQUEST_EVENT, fanOutRoutesOf } from './fan-out-request.js'
 import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -83,6 +97,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { RailActionsModel } from './rail-actions-model.js'
 import { RestartBridge } from './restart-bridge.js'
 import { useAutoRestart } from './restart-status-item.js'
 import { useRestartMachine } from './use-restart-machine.js'
@@ -91,11 +106,13 @@ import { SidebarContentSeat } from './sidebar-content-seat.js'
 import { DestinationShell, NEW_FOLDER_EVENT, SHOW_DESTINATION_EVENT, usePhoneLayout } from './destination-shell.js'
 import type { RailAction } from './rail-actions.js'
 import { DESTINATIONS, DestinationSections, Destinations } from './destinations.js'
+import { HOST_TOGGLE_SIDEBAR_COMMAND, SIDEBAR_VERB_GROUP, SidebarPaletteRows } from './sidebar-palette-rows.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { decodeClientRevisions } from './client-revisions.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
 import { LayoutMerge, SidebarDockHost } from './sidebar-dock-host.js'
+import { SidebarFold } from './sidebar-fold.js'
 import { SidebarCatalog } from './sidebar-catalog.js'
 import { useSidebarFolders } from './sidebar-folders.js'
 import { threadSidebarTreeApi } from './sidebar-tree-api.js'
@@ -168,7 +185,7 @@ const rowActionIcons = {
   resumeDismiss: <XIcon size={14} />,
   aside: <PanelRightOpenIcon size={14} />,
   pin: <PinIcon strokeWidth={1.5} size={14} />,
-  park: <PauseIcon strokeWidth={1.5} size={14} />,
+  park: <AlarmClockIcon strokeWidth={1.5} size={14} />,
   settle: <CircleCheckIcon strokeWidth={1.5} size={14} />,
   mute: <BellIcon size={14} />,
   archive: <ArchiveIcon strokeWidth={1.5} size={14} />,
@@ -238,14 +255,19 @@ const withRowActionHidden = (actions: readonly ThreadRowAction[], action: Thread
 const sameIds = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((id, index) => id === right[index])
 
 /** Commands that only reopen this palette are left out of its command list. */
-const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
+// Commands the sidebar already lists a row for: the palette itself, and the left-sidebar toggle (its own Toggle sidebar).
+const SELF_COMMAND_IDS = new Set(['commandPalette.open', HOST_TOGGLE_SIDEBAR_COMMAND])
 
 const SETTINGS_COMMAND_ID = 'settings.open'
 /** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
 const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
+/**
+ * Open Settings, never close it: settings-shell's open request comes first, because its `settings.open` command toggles
+ * (pressing "All settings" a second time used to close the page). The command is the fallback for a shell without the
+ * request.
+ */
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
-  // Open Settings without toggling it closed when already active; `settings.open` is the Mod+, toggle shortcut.
   if (dispatchOpenSettings()) return
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
   // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.
@@ -266,6 +288,119 @@ const focusComposer = (): void => {
   const selection = window.getSelection()
   selection?.removeAllRanges()
   selection?.addRange(range)
+}
+
+/**
+ * The phone thread header's meta line (council round 17 B2.2, phone-thread-meta.ts): the stage thread's project, its
+ * list status word and its children in the one count formula, `6 working · 2 failed` (round 22 items 2 and 3). Every
+ * read is a primitive or a stable snapshot, so a streaming Session list does not re-render the shell.
+ */
+const usePhoneStageMeta = (
+  props: SidebarShellProps,
+  stageThread: string | undefined,
+  preferences: Pick<SidebarPreferences, 'projectColorPalette' | 'threadRowProjectColor'>,
+): PhoneStageMeta | undefined => {
+  const lineageKey = props.useSessions(state => {
+    const ids: string[] = []
+    for (let cursor = stageThread; cursor !== undefined && ids.length < 64; cursor = Object.values(state.byId).find(session => session.id === cursor)?.parentId)
+      ids.push(cursor)
+    return ids.join('\n')
+  })
+  const running = props.useSessions(
+    state => stageThread !== undefined && Object.values(state.byId).some(session => session.id === stageThread && session.running),
+  )
+  const subagents = props.useSessions(state =>
+    stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread && session.running).length,
+  )
+  // The children that are not working, as one key: those with a failed-turn record are the summary's `2 failed`.
+  const settledChildren = props.useSessions(state =>
+    stageThread === undefined
+      ? ''
+      : Object.values(state.byId)
+          .filter(session => session.parentId === stageThread && !session.running)
+          .map(session => session.id)
+          .join('\n'),
+  )
+  const workspaces = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
+  const threadDirectories = useThreadDirectories(workspaces)
+  const savedChipOf = useSavedProjectChip()
+  const status = useSyncExternalStore(threadWorkStatusStore.subscribe, () =>
+    stageThread === undefined ? undefined : threadWorkStatusStore.getSnapshot()?.get(stageThread),
+  )
+  // A subagent's header (round 21 D3): its parent's title, the name its call gave it and its model, each a string.
+  const parentId = lineageKey.split('\n')[1]
+  const parentTitle = props.useSessions(state =>
+    parentId === undefined ? undefined : Object.values(state.byId).find(session => session.id === parentId)?.displayTitle,
+  )
+  const childLabel = props.useSessions(state => {
+    if (parentId === undefined || stageThread === undefined) return undefined
+    const own = Object.values(state.byId).find(session => session.id === stageThread)?.projectionValues?.subagent?.label
+    return own ?? state.projectionsBySession[SessionId(parentId)]?.values.subagentCatalog?.find(entry => entry.id === stageThread)?.label
+  })
+  const routeKey = props.useSessions(state => {
+    if (parentId === undefined || stageThread === undefined) return undefined
+    const values = Object.values(state.byId).find(session => session.id === stageThread)?.projectionValues
+    const route = SubagentRouteLabelModel.subagentRoute({ route: values?.threadSidebarModelRoute, identity: values?.subagent })
+    return route === undefined ? undefined : `${route.provider}\n${route.model}`
+  })
+  // How its last turn ended (round 21 D4): the Host's failed-turn record and the child's timing, as the list reads them.
+  const failedTurns = useSubagentFailedTurns()
+  const failedSubagents = settledChildren === '' ? 0 : settledChildren.split('\n').filter(id => failedTurns.has(id)).length
+  const lastTurnCompleted = props.useSessions(state =>
+    parentId === undefined || stageThread === undefined ? undefined : state.byId[SessionId(stageThread)]?.projectionValues?.subagentTiming?.lastTurnCompleted,
+  )
+  const terminal =
+    parentId === undefined || stageThread === undefined
+      ? undefined
+      : SubagentFeedModel.terminalOf({ running, failedTurn: failedTurns.has(stageThread), lastTurnCompleted })
+  const t = props.t
+  return useMemo(
+    () =>
+      lineageKey === ''
+        ? undefined
+        : PhoneThreadMeta.resolve({
+            lineage: lineageKey.split('\n'),
+            workspaces,
+            threadDirectories,
+            status,
+            running,
+            subagents,
+            failedSubagents,
+            wordOf: word => t(STATUS_WORD_KEYS[word]),
+            countWords: {
+              working: count => t('threadSidebarWorkingCount', { count }),
+              failed: count => t('threadSidebarFailedCount', { count }),
+            },
+            savedChipOf,
+            palette: preferences.projectColorPalette,
+            coloured: preferences.threadRowProjectColor,
+            child: {
+              parentTitle,
+              label: childLabel,
+              route:
+                routeKey === undefined ? undefined : { provider: routeKey.slice(0, routeKey.indexOf('\n')), model: routeKey.slice(routeKey.indexOf('\n') + 1) },
+              terminal,
+              failedLabel: t('threadSidebarFailed'),
+            },
+          }),
+    [
+      lineageKey,
+      workspaces,
+      threadDirectories,
+      status,
+      running,
+      subagents,
+      failedSubagents,
+      t,
+      savedChipOf,
+      preferences.projectColorPalette,
+      preferences.threadRowProjectColor,
+      parentTitle,
+      childLabel,
+      routeKey,
+      terminal,
+    ],
+  )
 }
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
@@ -289,6 +424,13 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
+  // The phone thread bar's glyph (council round 13 B6): whether the thread or one of its subagents works.
+  const stageWorking = props.useSessions(
+    state =>
+      stageThread !== undefined &&
+      Object.values(state.byId).some(session => (session.id === stageThread || session.parentId === stageThread) && session.running),
+  )
+  const stageMeta = usePhoneStageMeta(props, stageThread, preferences)
   // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
   const [pickSeen, setPickSeen] = useState({ pick: pickedThread, stage: stageSession })
   if (pickSeen.pick !== pickedThread) setPickSeen({ pick: pickedThread, stage: stageSession })
@@ -402,9 +544,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   })
   const [fanOutText, setFanOutText] = useState('')
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
+  // Round 5 U2: the chips draw each account's dot, by the rule the model picker uses (ai-accounts' account-color module).
+  const fanOutProfiles = useApiQuery(aiAccountsApi, 'read', { enabled: fanOutOpen })
+  const fanOutPromptRef = useRef<HTMLTextAreaElement>(null)
+  const fanOutAccents = useMemo(() => AccountColor.accents(fanOutProfiles.data?.accounts ?? []), [fanOutProfiles.data])
+  // Round 3 R2: the checklist opens on its own only when no model is chosen yet; with chosen models it waits behind Edit.
+  const [fanOutPicking, setFanOutPicking] = useState(false)
   useEffect(() => {
     if (!fanOutOpen) return
     setFanOutModels(fanOutPreset ?? [])
+    setFanOutPicking((fanOutPreset ?? []).length === 0)
   }, [fanOutOpen, fanOutPreset])
   useEffect(() => {
     const onRequest = (event: Event): void => {
@@ -415,6 +564,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     window.addEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
     return () => window.removeEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
   }, [])
+  const fanOutSend = fanOutSendState({ count: fanOutModels.length, prompt: fanOutText, pending: false })
   const sendFanOut = useMutation({
     mutationFn: async () => {
       const result = await fanOutApi.fanOut({
@@ -476,6 +626,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // phone-pairing's QR (upstream): the rail's Pair a phone (b:kgcc), ⌘K → Pair a phone and, with the rail actions off,
   // a footer button all open it; the rail and ⌘K show it in a dialog.
   const pairingQr = useContract(PhonePairingQr)
+  // Settings' categories, drawn in the Settings column (council round 4 B1).
+  const settingsNavigation = useContract(SettingsNavigation)
   const pairingAvailable = pairingQr.status === 'active'
   const [pairingOpen, setPairingOpen] = useState(false)
   const [footerSnapshot, setFooterSnapshot] = useState(props.readFooterSnapshot)
@@ -490,6 +642,32 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const footerItemRefs = useRef(new Map<string, HTMLDivElement>())
   const headerRegionId = `thread-sidebar-header-${useId()}`
   const wide = !props.collapsed
+  // One chrome (round five B1): folded beside the stage on a desktop, the column keeps the header row it has open
+  // (wordmark, Back, Forward, New thread, ⌘K) at its open width, drawn over the top of the stage; main-tabs pads its
+  // strip by the overhang. Only the list below it folds away, and the rail stays as it is open.
+  const folded = SidebarFold.overhangs({ collapsed: props.collapsed, phone: phoneLayout, width: props.width })
+  const openWidth = useRef(SidebarFold.OPEN_FALLBACK)
+  if (!props.collapsed && props.width > SidebarFold.TRACK_MAX) openWidth.current = props.width
+  const overhangWidth = openWidth.current
+  const [overhangAt, setOverhangAt] = useState<{ readonly left: number; readonly top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!folded) return
+    const root = document.documentElement
+    const place = (): void => {
+      const rect = shellRef.current?.getBoundingClientRect()
+      if (rect === undefined) return
+      setOverhangAt(current => (current?.left === rect.left && current.top === rect.top ? current : { left: rect.left, top: rect.top }))
+    }
+    place()
+    root.setAttribute(SidebarFold.ROOT_ATTRIBUTE, '')
+    root.style.setProperty(SidebarFold.OVERHANG_VARIABLE, `${String(SidebarFold.overhang(overhangWidth, props.width))}px`)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('resize', place)
+      root.removeAttribute(SidebarFold.ROOT_ATTRIBUTE)
+      root.style.removeProperty(SidebarFold.OVERHANG_VARIABLE)
+    }
+  }, [folded, overhangWidth, props.width])
   const mac = KeyboardShortcutModel.isMacPlatform(navigator.platform)
 
   // Rebuilds happen in another window, so check on return to this one and now and then while it stays visible.
@@ -758,7 +936,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // its confirmation dialog, so the status strip draws no second control while that Restart is on the rail.
   const autoRestart = useAutoRestart()
   const autoRestartPhase = autoRestart.status?.phase
-  const restartOnRail = preferences.showRailActions && restartAvailable
+  const restartOnRail = RailActionsModel.restartOnRail({ preferences, restartAvailable })
   useEffect(() => {
     RestartBridge.publish({ hostPlugins: pendingPlugins, available: restartAvailable, waitingLabel: restartPendingLabel, onRail: restartOnRail })
   }, [pendingPlugins, restartAvailable, restartPendingLabel, restartOnRail])
@@ -798,6 +976,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       : `${text(props.t, 'threadSidebarReloadPending')} (${String(staleClientPlugins.length)} ${text(props.t, staleClientPlugins.length === 1 ? 'threadSidebarUpdatesPlugin' : 'threadSidebarUpdatesPlugins')})`
   const applyPageReload = (): void => globalThis.location.reload()
   const runCommand = props.runCommand
+  const goToDestinations = useMemo(
+    () =>
+      SidebarPaletteRows.destinationsWithGoTo({
+        destinations,
+        listedPageIds: new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [String(entry.panelId)] : []))),
+      }),
+    [destinations, orderedHeaderEntries],
+  )
   const paletteActions = useMemo<PaletteAction[]>(
     () => [
       ...orderedHeaderEntries
@@ -809,7 +995,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             id: `@dshfiles/thread-sidebar/header/${entry.id}`,
             group: 'destination',
             // "Observe › Usage"; the old "Usage: Analytics" label stays searchable.
-            label: owner === undefined || section === undefined ? entry.label : `${owner.label} › ${section.label}`,
+            label: owner === undefined || section === undefined ? entry.label : SidebarPaletteRows.pageLabel(owner.label, section.label),
             aliases: owner === undefined ? [] : [entry.label, ...(section?.formerLabels ?? [])],
             icon: headerIconFor(entry, 16),
             run: () => {
@@ -818,7 +1004,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             },
           }
         }),
-      ...DESTINATIONS.map((destination): PaletteAction => ({
+      // One row per page: a destination whose list is a single page (the Inbox) has that page's row, not a second one.
+      ...DESTINATIONS.filter(destination => goToDestinations.has(destination.id)).map((destination): PaletteAction => ({
         id: `@dshfiles/thread-sidebar/destination/${destination.id}`,
         group: 'destination',
         label: `Go to ${destination.label}`,
@@ -837,20 +1024,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           window.setTimeout(() => window.dispatchEvent(new CustomEvent(NEW_FOLDER_EVENT)), 0)
         },
       },
-      // Sidebar folders (b:952m): file any panel in one of the person's own folders from ⌘K.
-      ...folderUi.folders
-        .filter(folder => !folder.builtIn)
-        .flatMap(folder =>
-          folderUi.panels
-            .filter(panel => !folder.entries.some(entry => entry.viewId === panel.id))
-            .map((panel): PaletteAction => ({
-              id: `@dshfiles/thread-sidebar/sidebar-add/${folder.id}/${panel.id}`,
-              group: 'command',
-              label: `Add ${panel.title} to ${folder.title}`,
-              aliases: ['sidebar', 'folder', 'add panel'],
-              run: () => folderUi.actions.addPanel(panel.id, folder.id),
-            })),
-        ),
+      // Filing a panel in a folder is the folder's own verb (its + Add panel and each row's menu): one palette row per
+      // folder and panel pair was the largest block of the list and grew with every folder.
       {
         id: '@dshfiles/thread-sidebar/action/toggle-footer',
         group: 'command',
@@ -870,21 +1045,21 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       },
       {
         id: '@dshfiles/thread-sidebar/action/toggle-sidebar',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarToggleSidebar'),
         icon: <PanelLeftIcon className="dshx:size-4" />,
         run: toggleSidebar,
       },
       {
         id: '@dshfiles/thread-sidebar/action/focus-composer',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarFocusComposer'),
         icon: <TextCursorInputIcon className="dshx:size-4" />,
         run: () => window.setTimeout(focusComposer, 0),
       },
       {
         id: '@dshfiles/thread-sidebar/action/customize-sidebar',
-        group: 'destination',
+        group: SIDEBAR_VERB_GROUP,
         label: text(props.t, 'threadSidebarCustomize'),
         icon: <SlidersHorizontalIcon className="dshx:size-4" />,
         run: openCustomize,
@@ -911,7 +1086,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         ? [
             {
               id: '@dshfiles/thread-sidebar/action/restart-dsh',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart'),
               aliases: ['restart', 'reload host', 'apply updates'],
               icon: <RefreshCwIcon className="dshx:size-4" />,
@@ -924,7 +1099,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         : [
             {
               id: '@dshfiles/thread-sidebar/action/pair-phone',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: 'Pair a phone',
               aliases: ['qr', 'qr code', 'phone', 'pairing', 'mobile'],
               icon: <QrCodeIcon className="dshx:size-4" />,
@@ -936,7 +1111,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         : [
             {
               id: '@dshfiles/thread-sidebar/action/copy-dsh-url',
-              group: 'destination' as const,
+              group: SIDEBAR_VERB_GROUP,
               label: text(props.t, 'threadSidebarCopyLaunchUrl'),
               aliases: ['token', 'url', 'dshx', 'agent access'],
               icon: <LinkIcon className="dshx:size-4" />,
@@ -976,10 +1151,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       destinations,
       recordNavigation,
       preferences.showFooter,
-      folderUi.folders,
-      folderUi.panels,
-      folderUi.actions,
       updatePreferences,
+      goToDestinations,
     ],
   )
   // b:kgcc: Restart, a pending page reload, Copy DSH URL and Pair a phone sit on the rail above Settings (More › DSH on a
@@ -987,7 +1160,15 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const railActionsShown = preferences.showRailActions
   const autoCountdownLabel = autoRestart.secondsLeft === null ? null : props.t('threadSidebarAutoRestartCountdown', { seconds: autoRestart.secondsLeft })
   const restartLabel = autoCountdownLabel ?? restartPendingLabel ?? pendingUpdatesLabel ?? text(props.t, 'threadSidebarRestart')
-  const railActions: readonly RailAction[] = !railActionsShown
+  // Which of them the rail draws is one rule (rail-actions-model): Restart only for someone who asked for it.
+  const railActionIds = RailActionsModel.shown({
+    preferences,
+    restartAvailable,
+    reloadPending: reloadPendingLabel !== null,
+    launchUrl: launchUrl !== null,
+    pairingAvailable,
+  })
+  const railCandidates: readonly RailAction[] = !railActionsShown
     ? []
     : [
         ...(restartAvailable
@@ -1042,10 +1223,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             ]
           : []),
       ]
+  const railActions = railCandidates.filter(action => railActionIds.some(id => id === action.id))
   // With the actions on the rail, nothing pending forces the row under the list back (b:kgcc).
   const footerHidden = !preferences.showFooter && (railActionsShown || (restartPendingLabel === null && reloadPendingLabel === null))
 
-  useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])
+  // By content, not identity (performance P1): a thread switch rebuilt these rows and re-added every one of them.
+  usePaletteActions(paletteActions, PaletteBridge.addActions)
   useEffect(() => {
     const registry = workbenchPanels()
     const existingMainPanelIds = new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [entry.panelId] : [])))
@@ -1136,8 +1319,180 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     return chord === null ? label : `${label} (${KeyboardShortcutModel.formatChord(chord, mac).join('')})`
   }
 
+  /** The header row: the mark (it folds and unfolds the column), and open, the wordmark and Back, Forward, New thread, ⌘K. */
+  const brandContent = (open: boolean): JSX.Element => (
+    <>
+      <Button
+        variant="ghost"
+        size={open ? 'icon-sm' : 'icon'}
+        aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
+        onClick={props.toggleSidebar}
+      >
+        {preferences.hideBrandLogo ? (
+          <PanelLeftIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />
+        ) : (
+          (props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>)
+        )}
+      </Button>
+      {open && !preferences.hideBrandLogo ? (
+        // The wordmark never truncates (T1.2): it is drawn at a 20px height (the native SVG is 24px) so it fits whole
+        // beside Back, Forward, New thread and the palette at the default 280px; below 20rem only the history chevron
+        // folds away (right-click or hold Back/Forward opens the same menu).
+        <span
+          data-sidebar-wordmark=""
+          className="dshx:flex dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:text-sm dshx:font-semibold dshx:[&_svg]:h-5 dshx:[&_svg]:w-auto"
+        >
+          {props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}
+        </span>
+      ) : null}
+      {open ? (
+        <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-px dshx:overflow-hidden">
+          <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+            <PopoverAnchor asChild>
+              <div ref={historyGroupRef} className="dshx:flex dshx:items-center">
+                {([-1, 1] as const).map(direction => {
+                  const label = text(props.t, direction === -1 ? 'threadSidebarBack' : 'threadSidebarForward')
+                  return (
+                    <Button
+                      key={direction}
+                      variant="ghost"
+                      size="icon-xs"
+                      className="dshx:text-muted-foreground"
+                      aria-label={label}
+                      title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
+                      disabled={!ThreadNavigationHistoryModel.canStep(history, direction)}
+                      onPointerDown={event => {
+                        if (event.button !== 0) return
+                        window.clearTimeout(historyHold.current.timer)
+                        historyHold.current = {
+                          opened: false,
+                          timer: window.setTimeout(() => {
+                            historyHold.current.opened = true
+                            setHistoryOpen(true)
+                          }, HISTORY_HOLD_MS),
+                        }
+                      }}
+                      onPointerUp={() => window.clearTimeout(historyHold.current.timer)}
+                      onPointerLeave={() => window.clearTimeout(historyHold.current.timer)}
+                      onContextMenu={event => {
+                        event.preventDefault()
+                        setHistoryOpen(true)
+                      }}
+                      onClick={() => {
+                        if (historyHold.current.opened) {
+                          historyHold.current.opened = false
+                          return
+                        }
+                        stepNavigation(direction)
+                      }}
+                    >
+                      {direction === -1 ? (
+                        <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
+                      ) : (
+                        <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
+                      )}
+                    </Button>
+                  )
+                })}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="dshx:w-4 dshx:text-muted-foreground dshx:@max-[20rem]/brand:hidden"
+                  aria-label={text(props.t, 'threadSidebarHistory')}
+                  aria-expanded={historyOpen}
+                  title={text(props.t, 'threadSidebarHistory')}
+                  disabled={history.entries.length < 2}
+                  onClick={() => setHistoryOpen(open => !open)}
+                >
+                  <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
+                </Button>
+              </div>
+            </PopoverAnchor>
+            <PopoverContent
+              align="start"
+              sideOffset={6}
+              className="dshx-root dshx:flex dshx:max-h-[min(420px,calc(100vh-96px))] dshx:w-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
+              aria-label={text(props.t, 'threadSidebarHistory')}
+              onInteractOutside={event => {
+                if (event.target instanceof Node && historyGroupRef.current?.contains(event.target) === true) event.preventDefault()
+              }}
+            >
+              {history.entries
+                .map((entry, index) => ({ entry, index }))
+                .reverse()
+                .map(({ entry, index }) => {
+                  const current = index === history.index
+                  const label =
+                    entry.kind === 'thread'
+                      ? (threadTitle.current(entry.id) ?? text(props.t, 'threadSidebarHistoryThread'))
+                      : (panels.find(panel => panel.id === entry.id)?.label ?? entry.id)
+                  return (
+                    <Button
+                      key={`${String(index)}:${entry.kind}:${entry.id}`}
+                      variant="ghost"
+                      size="sm"
+                      className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-normal', current && 'dshx:bg-accent dshx:font-medium')}
+                      aria-current={current ? 'page' : undefined}
+                      onClick={() => {
+                        setHistoryOpen(false)
+                        goToHistoryEntry(index)
+                      }}
+                    >
+                      <span
+                        className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        {entry.kind === 'thread' ? (
+                          <MessageSquareIcon className="dshx:size-3.5" />
+                        ) : (
+                          props.renderSlot('sidebar.panellist', { size: 14, active: false }, { only: entry.id })
+                        )}
+                      </span>
+                      <span className="dshx:truncate">{label}</span>
+                    </Button>
+                  )
+                })}
+            </PopoverContent>
+          </Popover>
+          {preferences.hiddenHeaderIds.includes('new-thread') ? null : (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="dshx:text-muted-foreground"
+              aria-label={text(props.t, 'threadSidebarNewThread')}
+              title={text(props.t, 'threadSidebarNewThread')}
+              onClick={() => startSession()}
+            >
+              <SquarePenIcon className="dshx:size-4" aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="dshx:text-muted-foreground"
+            aria-label={text(props.t, 'threadSidebarCommandPalette')}
+            title={
+              paletteHint === null
+                ? text(props.t, 'threadSidebarCommandPalette')
+                : `${text(props.t, 'threadSidebarCommandPalette')} (${KeyboardShortcutModel.formatChord(paletteHint, mac).join('')})`
+            }
+            onClick={() => openPalette('all')}
+          >
+            <CommandIcon className="dshx:size-4" aria-hidden="true" />
+          </Button>
+          <SidebarCustomizationFallback
+            contentOverridden
+            label={text(props.t, 'threadSidebarSettings')}
+            expanded={customizeOpen}
+            onClick={() => setCustomizeOpen(value => !value)}
+          />
+        </div>
+      ) : null}
+    </>
+  )
+
   return (
-    <TooltipProvider delayDuration={350}>
+    <TooltipProvider>
       <div
         ref={shellRef}
         className={cn(
@@ -1148,180 +1503,34 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       >
         <div
           ref={brandRef}
-          // A named container: the brand row decides what collapses from its own width (T1.2), not the viewport's.
+          // A named container: the brand row decides what collapses from its own width (T1.2), not the viewport's. It is
+          // the tab strip's height with the strip's hairline (council round 18 B2.1): one top bar across column and stage.
           className={cn(
-            'dshx:@container/brand dshx:flex dshx:h-12 dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-1',
+            'dshx:@container/brand dshx:flex dshx:h-bar dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:shadow-[inset_0_-1px_0_var(--dshx-tone-line,var(--dsw-alias-border-l2))]',
             props.collapsed ? 'dshx:justify-center' : 'dshx:px-1.5',
           )}
+          // Folded, the open row drawn over the stage replaces this one wherever main-tabs makes room for it (client.css).
+          data-sidebar-brand-fallback={folded ? '' : undefined}
         >
-          <Button
-            variant="ghost"
-            size={props.collapsed ? 'icon' : 'icon-sm'}
-            aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
-            onClick={props.toggleSidebar}
-          >
-            {preferences.hideBrandLogo ? (
-              <PanelLeftIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />
-            ) : (
-              (props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>)
-            )}
-          </Button>
-          {wide && !preferences.hideBrandLogo ? (
-            // The wordmark never truncates (T1.2): it is drawn at a 20px height (the native SVG is 24px) so it fits whole
-            // beside Back, Forward, New thread and the palette at the default 280px; below 20rem only the history chevron
-            // folds away (right-click or hold Back/Forward opens the same menu).
-            <span
-              data-sidebar-wordmark=""
-              className="dshx:flex dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:text-sm dshx:font-semibold dshx:[&_svg]:h-5 dshx:[&_svg]:w-auto"
-            >
-              {props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}
-            </span>
-          ) : null}
-          {wide ? (
-            <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-px dshx:overflow-hidden">
-              <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-                <PopoverAnchor asChild>
-                  <div ref={historyGroupRef} className="dshx:flex dshx:items-center">
-                    {([-1, 1] as const).map(direction => {
-                      const label = text(props.t, direction === -1 ? 'threadSidebarBack' : 'threadSidebarForward')
-                      return (
-                        <Button
-                          key={direction}
-                          variant="ghost"
-                          size="icon-xs"
-                          className="dshx:text-muted-foreground"
-                          aria-label={label}
-                          title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
-                          disabled={!ThreadNavigationHistoryModel.canStep(history, direction)}
-                          onPointerDown={event => {
-                            if (event.button !== 0) return
-                            window.clearTimeout(historyHold.current.timer)
-                            historyHold.current = {
-                              opened: false,
-                              timer: window.setTimeout(() => {
-                                historyHold.current.opened = true
-                                setHistoryOpen(true)
-                              }, HISTORY_HOLD_MS),
-                            }
-                          }}
-                          onPointerUp={() => window.clearTimeout(historyHold.current.timer)}
-                          onPointerLeave={() => window.clearTimeout(historyHold.current.timer)}
-                          onContextMenu={event => {
-                            event.preventDefault()
-                            setHistoryOpen(true)
-                          }}
-                          onClick={() => {
-                            if (historyHold.current.opened) {
-                              historyHold.current.opened = false
-                              return
-                            }
-                            stepNavigation(direction)
-                          }}
-                        >
-                          {direction === -1 ? (
-                            <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
-                          ) : (
-                            <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
-                          )}
-                        </Button>
-                      )
-                    })}
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="dshx:w-4 dshx:text-muted-foreground dshx:@max-[20rem]/brand:hidden"
-                      aria-label={text(props.t, 'threadSidebarHistory')}
-                      aria-expanded={historyOpen}
-                      title={text(props.t, 'threadSidebarHistory')}
-                      disabled={history.entries.length < 2}
-                      onClick={() => setHistoryOpen(open => !open)}
-                    >
-                      <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
-                    </Button>
-                  </div>
-                </PopoverAnchor>
-                <PopoverContent
-                  align="start"
-                  sideOffset={6}
-                  className="dshx-root dshx:flex dshx:max-h-[min(420px,calc(100vh-96px))] dshx:w-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
-                  aria-label={text(props.t, 'threadSidebarHistory')}
-                  onInteractOutside={event => {
-                    if (event.target instanceof Node && historyGroupRef.current?.contains(event.target) === true) event.preventDefault()
-                  }}
-                >
-                  {history.entries
-                    .map((entry, index) => ({ entry, index }))
-                    .reverse()
-                    .map(({ entry, index }) => {
-                      const current = index === history.index
-                      const label =
-                        entry.kind === 'thread'
-                          ? (threadTitle.current(entry.id) ?? text(props.t, 'threadSidebarHistoryThread'))
-                          : (panels.find(panel => panel.id === entry.id)?.label ?? entry.id)
-                      return (
-                        <Button
-                          key={`${String(index)}:${entry.kind}:${entry.id}`}
-                          variant="ghost"
-                          size="sm"
-                          className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-normal', current && 'dshx:bg-accent dshx:font-medium')}
-                          aria-current={current ? 'page' : undefined}
-                          onClick={() => {
-                            setHistoryOpen(false)
-                            goToHistoryEntry(index)
-                          }}
-                        >
-                          <span
-                            className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
-                            aria-hidden="true"
-                          >
-                            {entry.kind === 'thread' ? (
-                              <MessageSquareIcon className="dshx:size-3.5" />
-                            ) : (
-                              props.renderSlot('sidebar.panellist', { size: 14, active: false }, { only: entry.id })
-                            )}
-                          </span>
-                          <span className="dshx:truncate">{label}</span>
-                        </Button>
-                      )
-                    })}
-                </PopoverContent>
-              </Popover>
-              {preferences.hiddenHeaderIds.includes('new-thread') ? null : (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="dshx:text-muted-foreground"
-                  aria-label={text(props.t, 'threadSidebarNewThread')}
-                  title={text(props.t, 'threadSidebarNewThread')}
-                  onClick={() => startSession()}
-                >
-                  <SquarePenIcon className="dshx:size-4" aria-hidden="true" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:text-muted-foreground"
-                aria-label={text(props.t, 'threadSidebarCommandPalette')}
-                title={
-                  paletteHint === null
-                    ? text(props.t, 'threadSidebarCommandPalette')
-                    : `${text(props.t, 'threadSidebarCommandPalette')} (${KeyboardShortcutModel.formatChord(paletteHint, mac).join('')})`
-                }
-                onClick={() => openPalette('all')}
-              >
-                <CommandIcon className="dshx:size-4" aria-hidden="true" />
-              </Button>
-              <SidebarCustomizationFallback
-                contentOverridden
-                label={text(props.t, 'threadSidebarSettings')}
-                expanded={customizeOpen}
-                onClick={() => setCustomizeOpen(value => !value)}
-              />
-            </div>
-          ) : null}
+          {brandContent(wide)}
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
+        {folded && overhangAt !== null
+          ? createPortal(
+              <div
+                data-sidebar-brand-overhang=""
+                // The open brand row's height and hairline (council round 19 B2): the logo and controls sit where every
+                // other page has them, on the strip's centre line, and the row ends on the strip's rule. main-tabs' own
+                // 38px strip keeps its line (client.css).
+                className="dshx-root dshx:@container/brand dshx:fixed dshx:z-[16] dshx:flex dshx:h-bar dshx:items-center dshx:gap-1 dshx:border-r-[0.5px] dshx:border-(--dsw-alias-border-l3) dshx:bg-(--dsw-specific-sidebar-fill) dshx:px-1.5 dshx:text-foreground dshx:shadow-[inset_0_-1px_0_var(--dshx-tone-line,var(--dsw-alias-border-l2))]"
+                style={{ left: overhangAt.left, top: overhangAt.top, width: overhangWidth }}
+              >
+                {brandContent(true)}
+                {props.renderSlot('sidebar.toggle.badge', {})}
+              </div>,
+              document.body,
+            )
+          : null}
 
         {/* One sidebar layout (b:952m): the rail and its list render here, and live in the Workbench's Sidebar pane once
             it lends its element; collapsed, on a phone and without the Workbench they stay inline (the rail). */}
@@ -1356,15 +1565,20 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             customizeThreads={{ label: text(props.t, 'threadSidebarSettings'), expanded: customizeOpen, toggle: () => setCustomizeOpen(value => !value) }}
             labels={{ newThread: text(props.t, 'threadSidebarNewThread'), searchThreads: text(props.t, 'threadSidebarSearch') }}
             openSettings={footerSnapshot.settingsId === null ? null : () => requestSettings(props.runCommand)}
+            settingsNavigation={settingsNavigation.status === 'active' ? settingsNavigation.value : undefined}
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
             folderUi={folderUi}
             stageTitle={stageTitle}
+            stageWorking={stageWorking}
+            stageMeta={stageMeta}
+            openThread={sessionId => props.openSession(SessionId(sessionId))}
             pendingTitle={pendingTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
             edgeSwipePanels={preferences.phoneEdgeSwipePanels}
             phoneNavigation={preferences.phoneNavigation}
+            showDeveloperPages={preferences.showDeveloperPages}
             railActions={railActions}
           />,
           columnElement,
@@ -1406,6 +1620,18 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
                 <Checkbox checked={preferences.showRailActions} onCheckedChange={checked => updatePreferences({ showRailActions: checked === true })} />
                 {text(props.t, 'threadSidebarShowRailActions')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:pl-6 dshx:text-sm">
+                <Checkbox
+                  checked={preferences.showRailRestart}
+                  disabled={!preferences.showRailActions}
+                  onCheckedChange={checked => updatePreferences({ showRailRestart: checked === true })}
+                />
+                {text(props.t, 'threadSidebarShowRailRestart')}
+              </label>
+              <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:pt-1 dshx:text-sm">
+                <Checkbox checked={preferences.showDeveloperPages} onCheckedChange={checked => updatePreferences({ showDeveloperPages: checked === true })} />
+                {text(props.t, 'threadSidebarShowDeveloperPages')}
               </label>
             </div>
             <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-rows`}>
@@ -1655,7 +1881,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                       className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
                       aria-label={text(props.t, 'threadSidebarMore')}
                     >
-                      <EllipsisIcon strokeWidth={1.5} size={16} />
+                      <OverflowGlyph />
                     </Button>
                   </PopoverTrigger>
                 </TooltipTrigger>
@@ -1831,63 +2057,182 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           if (!open) PaletteBridge.closeFanOut()
         }}
       >
-        <DialogContent className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:max-w-xl">
-          <DialogHeader>
+        {/* Council picker N7, round 3 R2: under the phone shell a bottom sheet that sits on the software keyboard
+            (--dsh-keyboard-inset, phone-shell.ts). One scroller between the header and a footer that never scrolls away,
+            so Send stays in view while the prompt is focused. */}
+        <DialogContent
+          className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0! dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]:not([data-phone-keyboard])]:max-h-[85dvh] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl dshx:[&>[data-slot=dialog-close]]:flex dshx:[&>[data-slot=dialog-close]]:size-6 dshx:[&>[data-slot=dialog-close]]:items-center dshx:[&>[data-slot=dialog-close]]:justify-center dshx:pointer-coarse:[&>[data-slot=dialog-close]]:size-11 dshx:in-[html[data-shell-phone-nav]]:[&>[data-slot=dialog-close]]:top-4.5 dshx:in-[html[data-phone-keyboard]]:[&>[data-slot=dialog-close]]:top-0! dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)] dshx:in-[html[data-phone-keyboard]]:max-h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]"
+          data-fan-out-dialog
+          // Round 6 V3: with a pointer the prompt takes focus on open (one ring, the search field's pattern); on touch the
+          // dialog keeps the default, so the keyboard comes up only when the user taps the prompt.
+          onOpenAutoFocus={event => {
+            if (window.matchMedia('(pointer: coarse)').matches) return
+            event.preventDefault()
+            fanOutPromptRef.current?.focus()
+          }}
+        >
+          {/* Round 5 U2: the picker sheet's pattern on the phone: a grab handle, its 16 px radius, a left-aligned title on
+              one 56 px line with Close (the kit's corner Close, placed on the title's centre line). */}
+          <div
+            aria-hidden="true"
+            className="dshx:hidden dshx:shrink-0 dshx:pt-2 dshx:in-[html[data-shell-phone-nav]]:block dshx:in-[html[data-phone-keyboard]]:hidden!"
+            data-fan-out-handle
+          >
+            <div className="dshx:mx-auto dshx:h-1 dshx:w-9 dshx:rounded-full dshx:bg-muted-foreground/40" />
+          </div>
+          <DialogHeader className="dshx:h-14 dshx:shrink-0 dshx:in-[html[data-phone-keyboard]]:h-11 dshx:flex-row dshx:items-center dshx:px-4 dshx:pr-14 dshx:text-left">
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>
-          <Textarea aria-label={text(props.t, 'threadSidebarFanOutPrompt')} value={fanOutText} onChange={event => setFanOutText(event.target.value)} />
-          <div className="dshx:max-h-64 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2">
-            {fanOutCatalog.data?.groups.map(group => (
-              <section key={group.id} className="dshx:mb-2">
-                <h3 className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
-                {group.models.map(model => {
-                  const checked = fanOutModels.some(route => route.provider === group.id && route.model === model.id)
-                  return (
-                    <label
-                      key={`${group.id}/${model.id}`}
-                      className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:hover:bg-accent dshx:pointer-coarse:min-h-11"
+          <div
+            className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:overscroll-contain dshx:px-4 dshx:pb-3"
+            data-fan-out-body
+          >
+            {/* Round 4 T3: with the keyboard up (phone-shell.ts sets data-phone-keyboard) the chips fold into one summary row,
+                so the prompt keeps its lines; the full chips return when the keyboard goes. */}
+            {fanOutModels.length === 0 ? null : (
+              <>
+                <FanOutChosen
+                  accentOf={provider => fanOutAccents.get(provider)}
+                  accountOf={provider => accountTagOf(fanOutCatalog.data?.groups.find(group => group.id === provider)?.name ?? provider)}
+                  className="dshx:in-[html[data-phone-keyboard]]:hidden"
+                  label={text(props.t, 'threadSidebarFanOutChosen')}
+                  onRemove={route => toggleFanOutModel(route.provider, route.model)}
+                  removeLabel={model => text(props.t, 'threadSidebarFanOutRemove').replace('{model}', model)}
+                  routes={fanOutModels}
+                  trailing={
+                    <Button
+                      aria-controls="thread-sidebar-fan-out-models"
+                      aria-expanded={fanOutPicking}
+                      className="dshx:h-8 dshx:rounded-lg dshx:border-dashed dshx:px-2.5 dshx:pointer-coarse:h-11"
+                      data-fan-out-edit
+                      onClick={() => setFanOutPicking(!fanOutPicking)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
                     >
-                      <Checkbox
-                        checked={checked}
-                        disabled={!checked && fanOutModels.length >= 6}
-                        onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
-                      />
-                      {/* b:ysaj: the model's name, not its account-prefixed route (the picker's displayName rule). */}
-                      <span>{model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name}</span>
-                    </label>
-                  )
-                })}
-              </section>
-            ))}
-            {fanOutCatalog.isPending ? <p role="status">{text(props.t, 'threadSidebarFanOutLoading')}</p> : null}
-            {fanOutCatalog.data !== undefined && fanOutCatalog.data.groups.length === 0 && fanOutCatalog.error === null ? (
-              <p role="status" className="dshx:p-2 dshx:text-sm dshx:text-muted-foreground">
-                {text(props.t, 'threadSidebarFanOutEmpty')}
-              </p>
+                      {text(props.t, 'threadSidebarFanOutEditModels')}
+                    </Button>
+                  }
+                />
+                <FanOutSummary
+                  className="dshx:hidden dshx:in-[html[data-phone-keyboard]]:flex"
+                  countLabel={text(props.t, 'threadSidebarFanOutModelsCount').replace('{count}', String(fanOutModels.length))}
+                  editLabel={text(props.t, 'threadSidebarFanOutEdit')}
+                  onEdit={() => {
+                    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+                    setFanOutPicking(true)
+                  }}
+                  routes={fanOutModels}
+                />
+              </>
+            )}
+            <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium dshx:in-[html[data-phone-keyboard]]:min-h-0 dshx:in-[html[data-phone-keyboard]]:flex-1">
+              {text(props.t, 'threadSidebarFanOutPrompt')}
+              <Textarea
+                ref={fanOutPromptRef}
+                aria-describedby="thread-sidebar-fan-out-reason"
+                // Round 5 U2: at least four lines (the kit field sizes to its content). Round 6 V3: one focus ring, the
+                // search field's pattern: the kit outline, with the edge transparent while focused.
+                className="dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-transparent dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1"
+                data-fan-out-prompt
+                onChange={event => setFanOutText(event.target.value)}
+                placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
+                rows={6}
+                value={fanOutText}
+              />
+            </label>
+            {/* Round 5 U2: what Send does, under the prompt it describes, or why it waits. */}
+            <p
+              className={cn(
+                'dshx:-mt-2 dshx:text-xs dshx:text-muted-foreground',
+                fanOutSend.reason !== 'needs-two' && 'dshx:in-[html[data-phone-keyboard]]:sr-only',
+              )}
+              data-fan-out-reason
+              id="thread-sidebar-fan-out-reason"
+            >
+              {/* Round 6 V3: the help says what to do and what happens, so it also stands for a missing prompt. */}
+              {text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutHelp')}
+            </p>
+            {/* The full checklist is behind Add models (no chips yet) or the Edit models chip above. */}
+            {fanOutModels.length > 0 ? null : (
+              <Button
+                aria-controls="thread-sidebar-fan-out-models"
+                aria-expanded={fanOutPicking}
+                className="dshx:self-start dshx:pointer-coarse:h-11"
+                data-fan-out-edit
+                onClick={() => setFanOutPicking(!fanOutPicking)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {text(props.t, 'threadSidebarFanOutAddModels')}
+              </Button>
+            )}
+            {fanOutPicking ? (
+              <div className="dshx:flex dshx:flex-col dshx:gap-2" data-fan-out-models id="thread-sidebar-fan-out-models">
+                {fanOutCatalog.data?.groups.map(group => (
+                  <section key={group.id}>
+                    <h3 className="dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
+                    {group.models.map(model => {
+                      const checked = fanOutModels.some(route => route.provider === group.id && route.model === model.id)
+                      return (
+                        <label
+                          key={`${group.id}/${model.id}`}
+                          className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:hover:bg-accent dshx:pointer-coarse:min-h-11"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            disabled={!checked && fanOutModels.length >= 6}
+                            onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
+                          />
+                          {/* b:ysaj, council picker N1: the kit's display name, as the chips above and the picker name it. */}
+                          <span>{fanOutModelName(group.id, model.id, model.name)}</span>
+                        </label>
+                      )
+                    })}
+                  </section>
+                ))}
+                {fanOutCatalog.isPending ? <p role="status">{text(props.t, 'threadSidebarFanOutLoading')}</p> : null}
+                {fanOutCatalog.data !== undefined && fanOutCatalog.data.groups.length === 0 && fanOutCatalog.error === null ? (
+                  <p role="status" className="dshx:text-sm dshx:text-muted-foreground">
+                    {text(props.t, 'threadSidebarFanOutEmpty')}
+                  </p>
+                ) : null}
+                {fanOutCatalog.error === null ? null : (
+                  <p role="alert" className="dshx:text-sm dshx:text-destructive">
+                    {errorMessage(fanOutCatalog.error, 'Could not load models. Reopen this dialog to retry.')}
+                  </p>
+                )}
+              </div>
             ) : null}
-            {fanOutCatalog.error === null ? null : (
+            {sendFanOut.error === null ? null : (
               <p role="alert" className="dshx:text-sm dshx:text-destructive">
-                {errorMessage(fanOutCatalog.error, 'Could not load model catalog.')}
+                {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
               </p>
             )}
           </div>
-          {sendFanOut.error === null ? null : (
-            <p role="alert" className="dshx:text-sm dshx:text-destructive">
-              {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={sendFanOut.isPending || fanOutModels.length < 2 || fanOutText.trim().length === 0}
-              onClick={() => sendFanOut.mutate()}
-            >
-              {text(props.t, sendFanOut.isPending ? 'threadSidebarFanOutSending' : 'threadSidebarFanOutSend')}
-            </Button>
-          </DialogFooter>
+          <div
+            className="dshx:flex dshx:shrink-0 dshx:flex-row dshx:items-center dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:pt-3 dshx:pb-4 dshx:in-[html[data-shell-phone-nav]]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] dshx:in-[html[data-phone-keyboard]]:pb-3"
+            data-fan-out-footer
+          >
+            {/* Round 5 U2: actions only; on the phone Cancel takes one part and Send two. */}
+            <DialogFooter className="dshx:w-full dshx:shrink-0 dshx:flex-row dshx:justify-end dshx:in-[html[data-shell-phone-nav]]:grid dshx:in-[html[data-shell-phone-nav]]:grid-cols-[1fr_2fr]">
+              <Button className="dshx:pointer-coarse:h-11" type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
+                Cancel
+              </Button>
+              <Button
+                aria-describedby="thread-sidebar-fan-out-reason"
+                className="dshx:pointer-coarse:h-11"
+                type="button"
+                disabled={fanOutSend.disabled || sendFanOut.isPending}
+                onClick={() => sendFanOut.mutate()}
+              >
+                {sendFanOut.isPending
+                  ? text(props.t, 'threadSidebarFanOutSending')
+                  : text(props.t, 'threadSidebarFanOutSendTo').replace('{count}', String(fanOutModels.length))}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </TooltipProvider>

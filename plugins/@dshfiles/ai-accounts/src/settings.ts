@@ -74,8 +74,8 @@ export const aiAccountsSettings = defineSettings({
     showQuotaRetryChoice: Schema.boolean().default(true),
     vibe: Schema.object({
       acpApprovalPolicy: Schema.union([
-        Schema.const('session').description('Follow the calling session: reads and full access run, other writes ask'),
-        Schema.const('ask').description('Ask the calling DSH session before every Vibe builtin, reads included'),
+        Schema.const('session').description('Follow the calling thread: reads and full access run, other writes ask'),
+        Schema.const('ask').description('Ask the calling DSH thread before every Vibe builtin, reads included'),
       ])
         .default('session')
         .description('Vibe builtin approvals'),

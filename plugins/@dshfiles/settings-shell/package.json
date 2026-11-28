@@ -22,6 +22,14 @@
     "./open-settings": {
       "types": "./src/open-settings.ts",
       "default": "./dist/open-settings.js"
+    },
+    "./settings-navigation": {
+      "types": "./src/settings-navigation.ts",
+      "default": "./dist/settings-navigation.js"
+    },
+    "./settings-icons": {
+      "types": "./src/settings-icons.tsx",
+      "default": "./dist/settings-icons.js"
     }
   },
   "scripts": {

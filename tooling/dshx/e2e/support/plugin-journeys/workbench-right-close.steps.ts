@@ -49,19 +49,19 @@ Then('right-pane controls preserve the lone draft and discard only the empty cho
     }
   })
   await recordAssertion(page, 'workbench-right-toggle-retires-chooser', async () => {
+    // A chooser the pane holds alone is retired by the toggle; the reopen then restores the pane's last view (F20).
+    await right(page).getByRole('button', { name: 'New tab', exact: true }).first().click()
     await closeTab(page, 'Workbench: Scratchpad')
-    await openRight(page)
     const chooser = right(page).getByRole('tab', { name: 'New tab', exact: true })
-    const originalId = await chooser.getAttribute('data-tab-panel-id')
+    await expect(chooser).toBeVisible()
     await toggleRight(page)
     await expect(right(page)).toBeHidden()
     await expect(right(page).getByRole('tab', { includeHidden: true })).toHaveCount(0)
     await toggleRight(page)
-    await expect(chooser).toBeVisible()
-    expect(await chooser.getAttribute('data-tab-panel-id')).not.toBe(originalId)
+    await expect(right(page).getByRole('tab', { name: 'Workbench: Scratchpad', exact: true })).toBeVisible()
+    await expect(chooser).toHaveCount(0)
     await right(page).getByRole('button', { name: 'Close pane', exact: true }).click()
     await expect(right(page)).toBeHidden()
-    await expect(right(page).getByRole('tab', { includeHidden: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -86,13 +86,14 @@ Then('closing one of two right tabs keeps the other view and closing the last hi
     await page.screenshot({ path: test.info().outputPath('right-last-tab-auto-closed.png'), animations: 'disabled' })
   })
 })
-Then('manual right-pane reopen offers one stable chooser that can close the pane again', async ({ page }: { page: Page }) => {
+Then('manual right-pane reopen restores the last view in one click and can close the pane again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-right-empty-manual-reopen', async () => {
+    // Reopening an emptied pane brings back the view it last showed, not the chooser (F20).
     await openRight(page)
-    await expect(right(page).getByRole('region', { name: 'Choose a view', exact: true })).toBeVisible()
     await expect(right(page).getByRole('tab')).toHaveCount(1)
-    await expect(right(page).getByRole('tab', { name: 'New tab', exact: true })).toBeVisible()
-    await closeTab(page, 'New tab')
+    await expect(right(page).getByRole('tab', { name: 'Workbench: Ticker', exact: true })).toBeVisible()
+    await expect(right(page).getByRole('region', { name: 'Choose a view', exact: true })).toHaveCount(0)
+    await closeTab(page, 'Workbench: Ticker')
     await expect(right(page)).toBeHidden()
   })
 })

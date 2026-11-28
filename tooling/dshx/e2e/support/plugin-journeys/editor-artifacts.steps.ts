@@ -75,7 +75,7 @@ Then('the saved artifact can be reopened after a Host restart', async ({ page }:
 Then('the artifact can be deleted from the thread', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'More artifact actions', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
-  await page.getByRole('alertdialog', { name: 'Delete artifact?', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click()
+  await page.getByRole('alertdialog', { name: /^Delete “.*”\?$/ }).getByRole('button', { name: 'Delete artifact', exact: true }).click()
   await recordAssertion(page, 'artifact-deletion-survives-reload', async () => {
     await expect(page.getByRole('button', { name: title, exact: true })).toHaveCount(0)
     await page.reload()

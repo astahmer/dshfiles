@@ -652,6 +652,8 @@ async function resolveOptions(options: BuildClientOptions) {
 interface LazyChunkTarget {
   readonly input: string
   readonly fileName: string
+  /** Filled with the chunk's own import() targets, which load as sibling chunks. */
+  readonly nested: Map<string, string>
 }
 
 async function clientConfig(
@@ -713,7 +715,9 @@ async function clientConfig(
     output,
     cssCodeSplit: false,
   })
-  const providedModuleGuard = ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies })
+  /** Workspace source files the shared runtime provides (file → specifier), filled by its consumer plugin at build start. */
+  const providedFiles = new Map<string, string>()
+  const providedModuleGuard = ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies, providedFiles })
   const consumer =
     supplier === undefined || options.shared === undefined
       ? []
@@ -721,10 +725,11 @@ async function clientConfig(
           ...(runtime?.snapshot === undefined
             ? []
             : [ClientRuntimeStore.consumerPlugin({ snapshot: runtime.snapshot, runtimeRoot: RUNTIME_ROOT, facade: SharedRuntime.facadeId })]),
-          SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies }),
+          SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies, root: paths.root, byFile: providedFiles }),
         ]
   const dshxRuntimeStore = options.sharedRuntime !== undefined && options.sharedDshxRuntime === true ? await realpath(resolve(RUNTIME_ROOT, '..')) : undefined
   // A lazy chunk keeps only module transforms and guards: the entry owns CSS, capabilities, declarations and manifests.
+  // Modules the entry also bundles resolve to facades over the entry's shared table (ClientLazyChunks.chunkPlugin).
   const plugins =
     lazy === undefined
       ? [
@@ -740,12 +745,14 @@ async function clientConfig(
                   state: lazyState,
                   sourcemap: sourcemap !== false,
                   watch,
+                  entryId: VIRTUAL_CLIENT_ENTRY,
                   buildChunk: async (chunkInput, fileName) => {
-                    const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName })
+                    const nested = new Map<string, string>()
+                    const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName, nested })
                     const result = await build({ ...config, build: { ...config.build, write: false, watch: null } })
                     const completed = Array.isArray(result) ? result[0] : result
                     if (completed === undefined || !('output' in completed)) throw new DshxError('DSHX1103', `Lazy chunk ${fileName} produced no output.`)
-                    return ClientLazyChunks.chunkBuild(completed.output, fileName)
+                    return ClientLazyChunks.chunkBuild(completed.output, fileName, nested)
                   },
                 }),
               ]
@@ -796,6 +803,8 @@ async function clientConfig(
           ClientCompilerGuards.singleClientChunkPlugin(lazyState.emitted),
         ]
       : [
+          // First, so it also sees the specifiers the entry plugin resolves to virtual modules (@dshfiles/dshx/client).
+          ClientLazyChunks.chunkPlugin({ root: paths.root, state: lazyState, packageId: options.packageId, nested: lazy.nested }),
           clientEntryPlugin(paths, options),
           ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
           ...userPlugins,

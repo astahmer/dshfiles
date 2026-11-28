@@ -6,7 +6,7 @@ import { HeightReveal } from '@dshfiles/plugin-ui/components/motion/height-revea
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { animate, motionSafe, springs, staggers } from '@dshfiles/plugin-ui/motion'
@@ -32,6 +32,17 @@ const matchesFilter = (test: TestCase, filter: Filter): boolean => {
   if (filter === 'slow') return VitestReport.isSlow(test)
   return true
 }
+
+/**
+ * A passed file keeps the circled check, muted: the card's own status is the one green check of a verified all-pass run
+ * (DESIGN.md colour rule 3), so a list of passed files never repeats it.
+ */
+const FileStatusIcon = (props: { readonly status: TestFile['status'] }) =>
+  props.status === 'passed' ? <CircleCheckIcon aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" /> : <StatusIcon status={props.status} variant="group" />
+
+/** A passed test inside the card is a muted check for the same reason, whatever colour the kit gives a lone passed step. */
+const TestStatusIcon = (props: { readonly status: TestCase['status'] }) =>
+  props.status === 'passed' ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" /> : <StatusIcon status={props.status} />
 
 /** ToolCard's `title` is the card's visible label, not hover help: it rides a props object so the native-title rule stays about hover help. */
 const cardLabel = (title: string) => ({ title })
@@ -130,7 +141,7 @@ const TestRow = (props: {
         onClick={() => setOpen(value => !value)}
         type="button"
       >
-        <StatusIcon status={props.test.status} />
+        <TestStatusIcon status={props.test.status} />
         <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', !failing && 'dshx:text-muted-foreground')}>
           {props.suitePrefix !== undefined && props.suitePrefix !== '' && <span className="dshx:text-muted-foreground">{props.suitePrefix} › </span>}
           {props.test.title}
@@ -178,7 +189,7 @@ const FileRow = (props: {
         onClick={() => setOpen(value => !value)}
         type="button"
       >
-        <StatusIcon status={props.file.status} variant="group" />
+        <FileStatusIcon status={props.file.status} />
         <FilePath path={props.file.path} />
         <span className="dshx:ml-auto dshx:shrink-0 dshx:text-xs dshx:text-foreground dshx:@max-pane-narrow:hidden">{meta.join(' · ')}</span>
         <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.file.durationMs)}</span>
@@ -250,7 +261,10 @@ const TallyBar = (props: { readonly tally: TestRun['testTally'] }) => {
 
 const FILTERS = ['all', 'failed', 'skipped', 'slow'] as const satisfies readonly Filter[]
 
-/** A filter over one list, so a toggle group (one Tab stop, arrow keys) whose highlight slides to the selected filter. */
+/**
+ * A filter over one list, so a toggle group (one Tab stop, arrow keys) whose highlight slides to the selected filter.
+ * A filter that would match nothing ("Skipped 0", "Slow 0") is not offered.
+ */
 const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<Record<Filter, number>>; readonly onChange: (filter: Filter) => void }) => {
   const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(props.value)
   return (
@@ -267,12 +281,11 @@ const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<R
         type="single"
         value={props.value}
       >
-        {FILTERS.map(candidate => (
+        {VitestReport.shownFilters(FILTERS, props.counts, props.value).map(candidate => (
           <ToggleGroupItem
             className={cn(
               'dshx:relative dshx:h-auto dshx:min-w-0 dshx:px-2 dshx:py-0.5 dshx:font-normal dshx:capitalize dshx:transition-colors dshx:hover:bg-transparent dshx:data-[state=on]:bg-transparent dshx:data-[state=on]:text-foreground dshx:motion-reduce:transition-none',
               props.value === candidate ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
-              props.counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
             )}
             data-indicator-key={candidate}
             key={candidate}
@@ -307,7 +320,7 @@ export const TestRunCard = (props: {
   const files = props.run.files.filter(
     file => filter === 'all' || (filter === 'failed' && file.error !== undefined) || file.tests.some(test => matchesFilter(test, filter)),
   )
-  const headline = VitestReport.summaryLabel(props.run)
+  const headline = VitestReport.summaryParts(props.run)
   return (
     <ToolCard
       {...cardLabel('Ran tests')}
@@ -316,7 +329,19 @@ export const TestRunCard = (props: {
       onToggle={() => setOpen(value => !value)}
       open={open}
       status={failing ? 'failed' : 'passed'}
-      summary={headline}
+      // The card prints the run's own duration, so the tool-call timing label stays off it (tool-meta reads this mark).
+      // Only the failed count takes the failure colour: "4 passed" in red reads as four more failures. The other counts are
+      // ink; the status icon before them is the run's one green check when everything passed.
+      summary={
+        <span data-tool-card-timing="own">
+          {headline.map((part, index) => (
+            <span className={part.failed ? 'dshx:text-destructive' : 'dshx:text-foreground'} key={part.text}>
+              {index > 0 && ' · '}
+              {part.text}
+            </span>
+          ))}
+        </span>
+      }
     >
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
         <TallyBar tally={tally} />
@@ -328,7 +353,7 @@ export const TestRunCard = (props: {
         </ul>
         {props.run.unlistedFiles > 0 && filter === 'all' && (
           <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-            <CircleCheckIcon className="dshx:size-4 dshx:text-success" />
+            <CircleCheckIcon aria-hidden className="dshx:size-4" />
             {props.run.unlistedFiles} more {props.run.unlistedFiles === 1 ? 'file' : 'files'} passed
           </span>
         )}

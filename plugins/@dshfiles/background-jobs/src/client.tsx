@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, MenuItem, useRegistry } from '@dshfiles/dshx/client'
+import { defineClient, MenuItem, observeSettings, useRegistry } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { ToolCallSections, type ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
@@ -19,6 +19,7 @@ import { ThreadJobsFacet } from './thread-jobs-facet.js'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PROCESSES_JOBS_TAB, ProcessesNavigation, ProcessViews } from './process-views.js'
 import { BACKGROUND_JOBS_LOCALE_NAMESPACE, backgroundJobsLocale } from './locales.js'
+import { backgroundJobsSettings } from './settings.js'
 
 const PANEL_ID = 'dshfiles-background-jobs'
 /** The thread panel's Jobs facet (docs/ade-ux §4.4): a page tab type of the right pane. */
@@ -40,6 +41,9 @@ const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element 
     <circle cx="19" cy="18" r="1.4" />
   </svg>
 )
+
+/** Core's header job chip, withdrawn: the dock row and the transcript card already show every job. */
+const NoHeaderChip = (): null => null
 
 export default defineClient({
   name: '@dshfiles/background-jobs',
@@ -104,6 +108,31 @@ export default defineClient({
           )),
         ),
       )
+      // A running job has one home, the dock row above (unslop r3 item 25): core's header chip `job-list` is replaced by
+      // an entry that renders nothing, the way thread-sidebar replaces `subagent-catalog`, unless the user turns
+      // Settings › Background jobs › headerJobChip on.
+      const headerChip = observeSettings(ctx, backgroundJobsSettings)
+      // Through `inject`: the entry waits for the header's slot, so a composition without it does not stop this setup.
+      ctx.slots.inject('conversation.session.header.actions', () => {
+        let withdraw: (() => void) | undefined
+        const sync = (): void => {
+          if (headerChip.getSnapshot()?.headerJobChip === true) {
+            withdraw?.()
+            withdraw = undefined
+            return
+          }
+          withdraw ??= ctx.slots.register(
+            { name: 'conversation.session.header.actions', id: 'job-list', registrant: '@dshfiles/background-jobs', priority: -1000, order: 20 },
+            NoHeaderChip,
+          )
+        }
+        sync()
+        const stop = headerChip.subscribe(sync)
+        return () => {
+          stop()
+          withdraw?.()
+        }
+      })
       const rows = [
         { id: 'processes', label: 'Observe › Processes', aliases: ['Processes', 'Jobs', 'Background jobs'], tab: PROCESSES_JOBS_TAB },
         { id: 'processes-dev-servers', label: 'Observe › Processes › Dev servers', aliases: ['Dev servers', 'Preview servers', 'Ports'], tab: 'dev-servers' },

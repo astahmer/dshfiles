@@ -28,6 +28,21 @@ function subagentTitle(reason: unknown): ChatKey {
 }
 
 /**
+ * dshfiles (council round 22, item 2): the reason a subagent's run failed, for a notice that names the child. A stop
+ * (`aborted`) and a finish are no failure; a missing reason is not known to be one. A failed turn reads "Turn failed",
+ * the words its transcript row, dock row and the list use (council round 23, item 7).
+ */
+function subagentFailureReason(reason: unknown): ChatKey | undefined {
+  switch (reason) {
+    case undefined: case '': case 'completed': case 'aborted': return undefined
+    case 'error': return 'message.turnProcess.turnFailed'
+    case 'max-tokens': return 'message.trigger.subagent.reason.maxTokens'
+    case 'refusal': return 'message.trigger.subagent.reason.refusal'
+    default: return typeof reason === 'string' ? 'message.trigger.subagent.reason.unknown' : undefined
+  }
+}
+
+/**
  * Describe a waking message using its recorded source.
  * @param node - durable context, including the original notification body.
  * @returns localized title, source-family icon, and compact presentation for continuation receipts.
@@ -36,6 +51,8 @@ export function turnTriggerDetails(node: ContextMessageNode): {
   title: ChatKey
   icon: TurnTriggerIcon
   compact?: true
+  /** dshfiles: a subagent run that failed, with the child to name and why it failed. */
+  failure?: { readonly childSessionId: string; readonly reason: ChatKey }
 } {
   const source = record(node.source)
   const kind = field(source, 'kind')
@@ -58,10 +75,14 @@ export function turnTriggerDetails(node: ContextMessageNode): {
       title = 'message.trigger.team'
       icon = 'team'
       break
-    case 'subagent-settled':
+    case 'subagent-settled': {
       title = subagentTitle(source.stopReason)
       icon = 'subagent'
+      const reason = subagentFailureReason(source.stopReason)
+      const childSessionId = field(source, 'senderSessionId')
+      if (reason !== undefined) return { title, icon, failure: { childSessionId, reason } }
       break
+    }
     case 'webhook': {
       const github = field(source, 'provider') === 'github'
       title = github ? 'message.trigger.github' : 'message.trigger.webhook'

@@ -48,6 +48,10 @@
       "types": "./src/usage-overview-model.ts",
       "default": "./dist/usage-overview-model.js"
     },
+    "./account-color": {
+      "types": "./src/account-color.tsx",
+      "default": "./dist/account-color.js"
+    },
     "./codex-credential": {
       "types": "./src/codex-credential.ts",
       "default": "./dist/codex-credential.js"

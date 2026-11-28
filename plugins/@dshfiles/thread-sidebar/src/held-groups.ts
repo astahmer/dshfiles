@@ -58,4 +58,18 @@ const pending = <Thread>(groups: readonly Grouped<Thread>[], held: HeldGroups | 
   return count
 }
 
-export const HeldGroupsModel = { capture, apply, pending } as const
+/**
+ * Focus holds the list only when it came from the keyboard (`:focus-visible`, J/K or Tab). A click also leaves focus on
+ * the clicked row, and a hold that followed it never let go after the pointer left (F4): a Needs-you row sat under Idle
+ * behind "1 update". An engine without the pseudo-class keeps the old rule.
+ */
+const holdsOnFocus = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false
+  try {
+    return target.matches(':focus-visible')
+  } catch {
+    return true
+  }
+}
+
+export const HeldGroupsModel = { capture, apply, pending, holdsOnFocus } as const

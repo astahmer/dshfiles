@@ -135,6 +135,7 @@ describe('API read batcher', () => {
     batch?.write({ id: batch.entries[1]?.id, status: 503 })
     batch?.end()
     await expect(missingResult).rejects.toThrow(/HTTP 404$/u)
+    await expect(missingResult).rejects.toMatchObject({ status: 404, endpoint: 'dshx-gone/read' })
     expect(await refusedResult).toEqual(ok('alone dshx-a/read'))
     expect(refused.send).toHaveBeenCalledTimes(1)
     expect(missing.send).not.toHaveBeenCalled()

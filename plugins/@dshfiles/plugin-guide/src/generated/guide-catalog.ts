@@ -571,6 +571,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/ai-accounts/account-color",
+      "kind": "module",
+      "title": "@dshfiles/ai-accounts/account-color",
+      "summary": "Account dots (council picker round 3, R9; shared from ai-accounts since round 5 so the fan-out chips draw them too). A dot tells accounts apart, so within one service the dots sit at least 60° apart in hue, and each holds 3:1 against the selected wash in both schemes. No single colour reaches 3:1 on both the light was…",
+      "publicSymbol": "AccountAccent, AccountColor, AccountDot",
+      "importFrom": "@dshfiles/ai-accounts/account-color",
+      "owner": "@dshfiles/ai-accounts",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/ai-accounts/src/account-color.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "threadAccountApi",
       "importFrom": "@dshfiles/ai-accounts/thread-account-api",
       "owner": "@dshfiles/ai-accounts",
@@ -724,10 +744,30 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/background-jobs/running-threads",
+      "kind": "module",
+      "title": "@dshfiles/background-jobs/running-threads",
+      "summary": "Which threads run a background job now. A turn can end while its job keeps running, so a thread list that wants to show such a thread as working reads this on an interval (docs/ade-ux §4.7). Published as the `@dshfiles/background-jobs/running-threads` dshx module: the reader depends on background-jobs, never the rever…",
+      "publicSymbol": "RunningThreads",
+      "importFrom": "@dshfiles/background-jobs/running-threads",
+      "owner": "@dshfiles/background-jobs",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/background-jobs/src/running-threads.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:747",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:754",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -740,8 +780,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, regenerateImageTitle, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_regenerate_title, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, regenerateImageTitle, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, setTagColor, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_regenerate_title, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_set_tag_color, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -814,8 +854,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/turn-error-action",
       "kind": "module",
       "title": "@dshfiles/chat/turn-error-action",
-      "summary": "The seat the owned Chat fork adds beside Resume on a terminal turn error. Published as its own contract module (`@dshfiles/chat/turn-error-action`) so a feature plugin can fill it without importing the whole Chat contract.",
-      "publicSymbol": "TurnErrorActionOwnerProps",
+      "summary": "The seat the owned Chat fork adds beside Retry on a terminal turn error: the one row of recovery actions. Published as its own contract module (`@dshfiles/chat/turn-error-action`) so a feature plugin can fill it without importing the whole Chat contract.",
+      "publicSymbol": "TurnErrorActionOwnerProps, TurnFailure",
       "importFrom": "@dshfiles/chat/turn-error-action",
       "owner": "@dshfiles/chat",
       "scope": "client or host",
@@ -916,7 +956,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "TranscriptRunFolds",
       "importFrom": "@dshfiles/chat/run-folds",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/run-folds.ts:78",
+      "source": "plugins/@dshfiles/chat/src/run-folds.ts:107",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.transcript-run-fold",
@@ -1081,10 +1121,54 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "PaletteProjectColors",
+      "importFrom": "@dshfiles/command-palette/palette-contract",
+      "owner": "@dshfiles/command-palette",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:90",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/command-palette.project-color",
+      "kind": "registry",
+      "title": "PaletteProjectColors",
+      "summary": "The plugin that owns project colours adds one source; the latest wins. Without one, project marks stay neutral ink.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(PaletteProjectColors, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/command-palette renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/command-palette.project-color"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "PaletteThreadStatuses",
+      "importFrom": "@dshfiles/command-palette/palette-contract",
+      "owner": "@dshfiles/command-palette",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:112",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/command-palette.thread-status",
+      "kind": "registry",
+      "title": "PaletteThreadStatuses",
+      "summary": "The plugin that owns thread statuses adds one source; the latest wins.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(PaletteThreadStatuses, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/command-palette renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/command-palette.thread-status"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PaletteActions",
       "importFrom": "@dshfiles/command-palette/palette-contract",
       "owner": "@dshfiles/command-palette",
-      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:73",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:115",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/command-palette.action",
@@ -1106,7 +1190,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "CommandPalette",
       "importFrom": "@dshfiles/command-palette/palette-contract",
       "owner": "@dshfiles/command-palette",
-      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:75",
+      "source": "plugins/@dshfiles/command-palette/src/palette-contract.ts:117",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/command-palette.palette",
@@ -1317,6 +1401,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Additive: each contribution adds an entry; @dshfiles/frame-layout renders nothing for it when absent.",
       "details": [
         "Registry id: @dshfiles/frame-layout.status-item"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "PhoneStatus",
+      "importFrom": "@dshfiles/frame-layout/status-strip",
+      "owner": "@dshfiles/frame-layout",
+      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:61",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/frame-layout.phone-status",
+      "kind": "contract",
+      "title": "PhoneStatus",
+      "summary": "Provided by frame-layout; `useContract(PhoneStatus)` is not active without it, and the bar shows no status control.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhoneStatus) to consume; only @dshfiles/frame-layout provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/frame-layout's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/frame-layout.phone-status"
       ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
@@ -1589,6 +1695,50 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/jj-integration/src/repository-change.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "WorkspaceMenuSections",
+      "importFrom": "@dshfiles/jj-integration/workspace-menu-sections",
+      "owner": "@dshfiles/jj-integration",
+      "source": "plugins/@dshfiles/jj-integration/src/workspace-menu-sections.ts:26",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/jj-integration.workspace-menu-section",
+      "kind": "registry",
+      "title": "WorkspaceMenuSections",
+      "summary": "Contribution registry owned by @dshfiles/jj-integration.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(WorkspaceMenuSections, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/jj-integration renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/jj-integration.workspace-menu-section"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ThreadHeaderLand",
+      "importFrom": "@dshfiles/jj-integration/thread-header-land",
+      "owner": "@dshfiles/jj-integration",
+      "source": "plugins/@dshfiles/jj-integration/src/thread-header-land.ts:27",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/jj-integration.thread-header-land",
+      "kind": "contract",
+      "title": "ThreadHeaderLand",
+      "summary": "Client service contract provided by @dshfiles/jj-integration.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(ThreadHeaderLand) to consume; only @dshfiles/jj-integration provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/jj-integration's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/jj-integration.thread-header-land"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2072,7 +2222,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/rich-composer/thread-views",
       "summary": "The thread's secondary views (Trajectory, Traces, Requests…) as thread-panel facets, published as the `@dshfiles/rich-composer/thread-views` dshx module. Importing it loads none of the composer's runtime. Productivity pass Q5 (E5): the stage always shows Chat; every other `conversation.view` opens as a facet of the th…",
-      "publicSymbol": "ThreadView, ThreadViewOpenRequest, ThreadViewsModel",
+      "publicSymbol": "ThreadView, ThreadViewOpenRequest, ThreadHeaderMenuAction, ThreadHeaderMenu, ThreadHeaderMenuResolver, ThreadViewsModel",
       "importFrom": "@dshfiles/rich-composer/thread-views",
       "owner": "@dshfiles/rich-composer",
       "scope": "client or host",
@@ -2154,10 +2304,32 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "AgentMentionTones",
+      "importFrom": "@dshfiles/rich-composer/agent-mention-tones",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/agent-mention-tones.ts:17",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/rich-composer.agent-mention-tones",
+      "kind": "registry",
+      "title": "AgentMentionTones",
+      "summary": "Contribution registry owned by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(AgentMentionTones, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/rich-composer renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/rich-composer.agent-mention-tones"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PhoneThreadMenu",
       "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
       "owner": "@dshfiles/rich-composer",
-      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:38",
+      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:51",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/rich-composer.phone-thread-menu",
@@ -2432,6 +2604,48 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "SettingsNavigation",
+      "importFrom": "@dshfiles/settings-shell/settings-navigation",
+      "owner": "@dshfiles/settings-shell",
+      "source": "plugins/@dshfiles/settings-shell/src/settings-navigation.ts:57",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/settings-shell.navigation",
+      "kind": "contract",
+      "title": "SettingsNavigation",
+      "summary": "Client service contract provided by @dshfiles/settings-shell.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(SettingsNavigation) to consume; only @dshfiles/settings-shell provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/settings-shell's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/settings-shell.navigation"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/settings-shell/settings-icons",
+      "kind": "module",
+      "title": "@dshfiles/settings-shell/settings-icons",
+      "summary": "One glyph per Settings category (round five B5, B6): the desktop column draws it at 16px beside each row, the phone root list as a 28px identity tile. Published as the `@dshfiles/settings-shell/settings-icons` dshx module, so the thread sidebar's Settings column draws the same glyph the page does without restating the…",
+      "publicSymbol": "SettingsIconGroup, SettingsEntryGlyph, SettingsEntryTile, SettingsToneMark, SettingsIcons",
+      "importFrom": "@dshfiles/settings-shell/settings-icons",
+      "owner": "@dshfiles/settings-shell",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/settings-shell/src/settings-icons.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/sidebar-right/resource-panels",
       "kind": "module",
       "title": "@dshfiles/sidebar-right/resource-panels",
@@ -2455,7 +2669,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAttentionApi",
       "importFrom": "@dshfiles/thread-sidebar/attention-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:117",
+      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:139",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-attention",
@@ -2468,8 +2682,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/thread-sidebar owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: state, changesSince, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate, writeDelta, writeCapabilities",
-        "Agent tools: thread_attention_state (read-only), thread_attention_write_capabilities (read-only)"
+        "Methods: state, changesSince, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate, writeDelta, failedTurns, writeCapabilities",
+        "Agent tools: thread_attention_state (read-only), thread_failed_turns (read-only), thread_attention_write_capabilities (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2478,7 +2692,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAutoSettleApi",
       "importFrom": "@dshfiles/thread-sidebar/auto-settle-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:100",
+      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:102",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-auto-settle",
@@ -2537,6 +2751,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/thread-sidebar/src/attention-client.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "ThreadWorkStatusSources",
+      "importFrom": "@dshfiles/thread-sidebar/thread-status-client",
+      "owner": "@dshfiles/thread-sidebar",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-status-client.ts:36",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/thread-sidebar.thread-work-status",
+      "kind": "registry",
+      "title": "ThreadWorkStatusSources",
+      "summary": "Contribution registry owned by @dshfiles/thread-sidebar.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ThreadWorkStatusSources, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/thread-sidebar renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/thread-sidebar.thread-work-status"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2609,7 +2845,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:50",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:51",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2631,7 +2867,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "ThreadRowActions",
       "importFrom": "@dshfiles/thread-sidebar/thread-row-actions",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-row-actions.ts:25",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-row-actions.ts:28",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.row-action",
@@ -2750,6 +2986,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/thread-sidebar/src/project-colors.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/thread-sidebar/failed-turns-client",
+      "kind": "module",
+      "title": "@dshfiles/thread-sidebar/failed-turns-client",
+      "summary": "Which threads show Failed, for every surface that marks one (the thread list, a tab strip). Published as the `@dshfiles/thread-sidebar/failed-turns-client` dshx module, so a surface reads the Host's failed-turn record through this hook instead of restating the read, its cache times and the old-Host fallback.",
+      "publicSymbol": "FailedThreadsModel, useFailedTurns, useFailedThreadIds",
+      "importFrom": "@dshfiles/thread-sidebar/failed-turns-client",
+      "owner": "@dshfiles/thread-sidebar",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/thread-sidebar/src/failed-turns-client.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -3038,7 +3294,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/workbench/tabs",
       "summary": "Public module of @dshfiles/workbench.",
-      "publicSymbol": "HostTarget, TabTarget, TabStatus, TabView, WorkbenchTab, WorkbenchTabsSnapshot",
+      "publicSymbol": "HostTarget, TabTarget, TabStatus, TabDestinationId, TabDestinationIcon, TabDestination",
       "importFrom": "@dshfiles/workbench/tabs",
       "owner": "@dshfiles/workbench",
       "scope": "client or host",
@@ -3049,9 +3305,31 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking"
+        "Also exports: TabView, WorkbenchTab, WorkbenchTabsSnapshot, WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking, TabProjectChip, TabProjectMarkPaint, TabProjectMark"
       ],
       "source": "plugins/@dshfiles/workbench/src/tabs.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "TabPlaceGlyphs",
+      "importFrom": "@dshfiles/workbench/tab-status",
+      "owner": "@dshfiles/workbench",
+      "source": "plugins/@dshfiles/workbench/src/tab-status.tsx:82",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/workbench.tab-place-glyph",
+      "kind": "registry",
+      "title": "TabPlaceGlyphs",
+      "summary": "Contribution registry owned by @dshfiles/workbench.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(TabPlaceGlyphs, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/workbench renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/workbench.tab-place-glyph"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -3518,7 +3796,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 85 catalog feature(s)",
+        "Used by 86 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3628,7 +3906,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 35 catalog feature(s)",
+        "Used by 36 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3650,13 +3928,13 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
+        "@dshfiles/activity-timeline › thread-question-strip",
         "@dshfiles/agent-plan › plan-card",
         "@dshfiles/agent-plan › failure-card",
-        "@dshfiles/agent-questions › root-timed-questions",
-        "@dshfiles/agent-questions › question-card-layout"
+        "@dshfiles/agent-questions › root-timed-questions"
       ],
       "details": [
-        "Used by 42 catalog feature(s)",
+        "Used by 44 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3852,7 +4130,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 138 catalog feature(s)",
+        "Used by 139 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

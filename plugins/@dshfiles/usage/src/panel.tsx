@@ -1,81 +1,70 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { Page } from '@dshfiles/plugin-ui/components/page'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
+import { CalendarIcon, ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
-import { Effect, Option } from 'effect'
-import type * as SchemaTypes from 'effect/Schema'
+import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
 import { useState, useSyncExternalStore } from 'react'
-import { purposeSchema, usageApi } from './api.js'
+import { purposeSchema, usageApi, type ChartQuery } from './api.js'
 import { UsageCharts } from './charts.js'
+import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
+import { reindexAction } from './reindex-action.js'
+import { UsageGlyph } from './usage-glyph.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
 import { UsageToolsTab } from './tools-tab.js'
 import { UsageQuota } from './quota-tab.js'
+import { panelState, PRESETS, USAGE_TABS, type Preferences } from './panel-state.js'
 
-const PRESETS = ['today', '7d', '30d', '365d', 'custom'] as const
+export { UsageTabs } from './panel-state.js'
 
-/** A stored view preference keeps the value it had when one field is stale, the rule `.catch(...)` carried. */
-const withFallback = <ValueSchema extends SchemaTypes.Top>(schema: ValueSchema, fallback: ValueSchema['Type']) =>
-  schema.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback))))
+/** Four preset segments; Custom opens its own date popover, so range, granularity, grouping and purpose fit one row. */
+const PRESET_OPTIONS: readonly SlidingSegmentOption<Exclude<(typeof PRESETS)[number], 'custom'>>[] = [
+  { value: 'today', label: 'Today' },
+  { value: '7d', label: '7 d' },
+  { value: '30d', label: '30 d' },
+  { value: '365d', label: '1 y' },
+]
 
-const preferencesSchema = Schema.Struct({
-  // Stored names predate the tab labels: charts is Cost, log is Requests, activity is Tools.
-  tab: withFallback(Schema.Literals(['log', 'charts', 'quota', 'activity']), 'charts'),
-  preset: withFallback(Schema.Literals(PRESETS), '7d'),
-  customFrom: withFallback(Schema.String, ''),
-  customTo: withFallback(Schema.String, ''),
-  bucket: withFallback(Schema.Literals(['hour', 'day']), 'day'),
-  groupBy: withFallback(Schema.Literals(['model', 'provider', 'project', 'purpose']), 'model'),
-  purposes: withFallback(Schema.Array(purposeSchema), []),
-})
+const GROUP_BY_OPTIONS: readonly { readonly value: ChartQuery['groupBy']; readonly label: string }[] = [
+  { value: 'model', label: 'Model' },
+  { value: 'provider', label: 'Provider / account' },
+  { value: 'project', label: 'Project' },
+  { value: 'purpose', label: 'Purpose' },
+]
 
-type Preferences = typeof preferencesSchema.Type
+const formatShortDay = (at: number): string => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
-const DEFAULT_PREFERENCES: Preferences = { tab: 'charts', preset: '7d', customFrom: '', customTo: '', bucket: 'day', groupBy: 'model', purposes: [] }
+const BUCKETS = ['hour', 'day'] as const
+const BUCKET_LABELS = { hour: 'Hourly', day: 'Daily' } satisfies Record<(typeof BUCKETS)[number], string>
+
+/** The page's sections: underline tabs, so the range control below is the page's one segmented track. */
+const USAGE_TAB_ITEMS: readonly { readonly value: Preferences['tab']; readonly label: string }[] = [
+  { value: 'charts', label: 'Overview' },
+  { value: 'quota', label: 'Quota' },
+  { value: 'log', label: 'Requests' },
+  { value: 'activity', label: 'Tools' },
+]
+
 type UsageDateRange = { readonly from: number; readonly to: number }
-
-const createPanelState = (key: string | undefined) => {
-  const preferences = createStoredValue({
-    key: key === undefined ? 'dshfiles-usage:view.v1' : `dshfiles-usage:view.v1/panel/${encodeURIComponent(key)}`,
-    schema: preferencesSchema,
-    fallback: DEFAULT_PREFERENCES,
-  })
-  let thread: ThreadFilter | null = null
-  const listeners = new Set<() => void>()
-  return {
-    preferences,
-    thread: () => thread,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    setThread: (next: ThreadFilter | null) => {
-      thread = next
-      for (const listener of listeners) listener()
-    },
-  }
-}
-const panelStates = new Map<string | undefined, ReturnType<typeof createPanelState>>()
-const panelState = (panelId?: string, scopeKey?: string) => {
-  const key = panelId === undefined ? undefined : panelOccurrence({ panelId, scopeKey })
-  const existing = panelStates.get(key)
-  if (existing !== undefined) return existing
-  const state = createPanelState(key)
-  panelStates.set(key, state)
-  return state
-}
 
 const startOfDay = (at: number): number => {
   const date = new Date(at)
@@ -116,32 +105,6 @@ const rangeOf = (preferences: Preferences, now: number): UsageDateRange => {
 
 const statusKey = ['dshfiles-usage', 'status'] as const
 
-type UsageTab = Preferences['tab']
-const USAGE_TABS: readonly UsageTab[] = ['charts', 'quota', 'log', 'activity']
-
-/** Select a tab of the Usage page from outside it (the Quota navigation contract, palette rows). */
-const showTab = (tab: UsageTab, panelId?: string): void => {
-  const store = panelState(panelId).preferences
-  store.set({ ...store.get(), tab })
-}
-
-/** Requests narrowed to one thread, set by its Cost facet; a session detail, so not stored. */
-interface ThreadFilter {
-  readonly sessionId: string
-  readonly label: string
-}
-
-export class UsageTabs {
-  static readonly show = showTab
-  /** Requests of one thread: the Requests tab with that thread's filter on. */
-  static readonly showRequestsFor = (filter: ThreadFilter, panelId?: string): void => {
-    const state = panelState(panelId)
-    state.setThread(filter)
-    // A thread's requests can be older than the current preset; the year preset holds its whole history.
-    state.preferences.set({ ...state.preferences.get(), tab: 'log', preset: '365d', bucket: 'day' })
-  }
-}
-
 export const UsagePanel = (props: { readonly openThread: OpenThread; readonly panelId?: string }): JSX.Element => {
   const state = panelState(props.panelId, useWorkbenchScopeKey())
   const storedPreferences = state.preferences
@@ -152,6 +115,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
     storedPreferences.set({ ...storedPreferences.get(), ...patch })
   }
   const [logSearch, setLogSearch] = useState('')
+  const [customOpen, setCustomOpen] = useState(false)
   const thread = useSyncExternalStore(state.subscribe, state.thread, state.thread)
   const [mountedAt] = useState(() => Date.now())
 
@@ -172,199 +136,262 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   const range = rangeOf(preferences, now)
   const purposes = preferences.purposes.length === 0 ? undefined : preferences.purposes
   const status = statusQuery.data
-  const togglePurpose = (purpose: RequestPurpose): void => {
-    const current = new Set(preferences.purposes)
-    if (current.has(purpose)) current.delete(purpose)
-    else current.add(purpose)
-    update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter(item => current.has(item)) })
+  /** Toggles one purpose in the Purpose menu; an empty choice is "All". */
+  const togglePurpose = (purpose: RequestPurpose, on: boolean): void => {
+    const chosen = new Set(preferences.purposes)
+    if (on) chosen.add(purpose)
+    else chosen.delete(purpose)
+    update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter((item: RequestPurpose) => chosen.has(item)) })
   }
+  const onlyPurpose = purposes?.length === 1 ? purposes[0] : undefined
+  const purposeSummary =
+    purposes === undefined ? 'All' : onlyPurpose === undefined ? `${String(purposes.length)} selected` : UsageFormattingModel.purposeLabels[onlyPurpose]
+  const groupByLabel = GROUP_BY_OPTIONS.find(option => option.value === preferences.groupBy)?.label ?? 'Model'
 
   const indexState =
     status === undefined
       ? 'Connecting…'
       : status.indexing
         ? 'Indexing thread logs…'
-        : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
-  const indexError = status?.lastError == null ? null : `Indexing failed: ${status.lastError}`
-  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed.') : null
+        : `${indexedLogsLabel(status.indexedFiles)}${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, now, relativeTime)}`}`
+  const indexError = status?.lastError == null ? null : `Indexing failed. Re-index to retry. ${status.lastError}`
+  const refreshError = refresh.isError ? errorMessage(refresh.error, 'Re-indexing failed. Retry.') : null
 
   return (
     <Page
       scroll
+      // A data page sits on the wide frame, min(100%, 1200px): charts and tables share the header's edges (round 5 A2).
+      width="wide"
       className="dshx:bg-background dshx:text-foreground"
+      // Usage's own bar-chart glyph, the left column entry's, in the Observe tone before the h1 (council round 18, D2).
+      mark={<UsageGlyph />}
+      markTone="observe"
       heading="Usage"
-      description={
-        <>
-          Cost and requests from thread logs, side calls included, beside each account's quota. Costs are list-price estimates from the models.dev price catalog
-          {status?.pricingFetchedAt == null
-            ? ' (no catalog cached yet)'
-            : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)})`}
-          ; subscription traffic is priced as if it were metered.
-        </>
-      }
+      description={USAGE_PAGE_DESCRIPTION}
       meta={
         <span aria-live="polite" className="dshx:text-xs dshx:text-muted-foreground">
           {indexState}
         </span>
       }
-      actions={[
-        { id: 'reindex', label: 'Re-index thread logs', icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() },
-      ]}
-      tabs={{
-        label: 'Usage views',
-        value: preferences.tab,
-        onValueChange: value => update({ tab: USAGE_TABS.find(tab => tab === value) ?? 'charts' }),
-        items: [
-          { value: 'charts', label: 'Cost' },
-          { value: 'quota', label: 'Quota' },
-          { value: 'log', label: 'Requests' },
-          { value: 'activity', label: 'Tools' },
-        ],
-      }}
+      actions={[reindexAction({ healthy: indexError === null && refreshError === null, pending: refresh.isPending, onSelect: () => refresh.mutate() })]}
     >
-      {[indexError, refreshError].map(message =>
-        message === null ? null : (
-          <Alert key={message} variant="destructive">
-            <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
-              <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ),
-      )}
-
-      {preferences.tab === 'quota' ? (
-        <UsageQuota.Tab panelId={props.panelId} />
-      ) : (
-        <>
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" role="group" aria-label="Date range">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              value={preferences.preset}
-              onValueChange={value => {
-                const preset = Schema.decodeUnknownOption(Schema.Literals(PRESETS))(value)
-                if (Option.isNone(preset)) return
-                update({
-                  preset: preset.value,
-                  bucket: preset.value === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                  ...(preset.value === 'custom' &&
-                    preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
-                })
-              }}
-            >
-              <ToggleGroupItem value="today">Today</ToggleGroupItem>
-              <ToggleGroupItem value="7d">7 d</ToggleGroupItem>
-              <ToggleGroupItem value="30d">30 d</ToggleGroupItem>
-              <ToggleGroupItem value="365d">1 y</ToggleGroupItem>
-              <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
-            </ToggleGroup>
-            {preferences.preset === 'custom' ? (
-              <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
-                <Input
-                  type="date"
-                  aria-label="From date"
-                  className="dshx:h-7 dshx:w-36"
-                  value={preferences.customFrom}
-                  onChange={event => update({ customFrom: event.target.value })}
-                />
-                <span aria-hidden>→</span>
-                <Input
-                  type="date"
-                  aria-label="To date"
-                  className="dshx:h-7 dshx:w-36"
-                  value={preferences.customTo}
-                  onChange={event => update({ customTo: event.target.value })}
-                />
-              </span>
-            ) : null}
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              aria-label="Group by time"
-              value={preferences.bucket}
-              onValueChange={value => {
-                if (value === 'hour' || value === 'day') update({ bucket: value })
-              }}
-            >
-              <ToggleGroupItem value="hour">Hourly</ToggleGroupItem>
-              <ToggleGroupItem value="day">Daily</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5" role="group" aria-label="Purpose">
-            <span className="dshx:text-xs dshx:text-muted-foreground">Purpose</span>
-            <Button
-              size="xs"
-              variant={purposes === undefined ? 'secondary' : 'ghost'}
-              aria-pressed={purposes === undefined}
-              onClick={() => update({ purposes: [] })}
-            >
-              All
-            </Button>
-            {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
-              <Button
-                key={purpose}
-                size="xs"
-                variant={preferences.purposes.includes(purpose) ? 'secondary' : 'ghost'}
-                aria-pressed={preferences.purposes.includes(purpose)}
-                onClick={() => togglePurpose(purpose)}
+      <Tabs
+        value={preferences.tab}
+        onValueChange={value => update({ tab: USAGE_TABS.find(tab => tab === value) ?? 'charts' })}
+        className="dshx:min-w-0 dshx:gap-4"
+      >
+        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:border-b dshx:border-border">
+          <TabsList variant="line" aria-label="Usage views" className="dshx:h-9 dshx:gap-5 dshx:p-0">
+            {USAGE_TAB_ITEMS.map(tab => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-foreground"
               >
-                {UsageFormattingModel.purposeLabels[purpose]}
-              </Button>
+                {tab.label}
+              </TabsTrigger>
             ))}
-          </div>
-
-          {preferences.tab === 'log' ? (
-            <>
-              {thread === null ? null : (
-                <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" role="status">
-                  <span className="dshx:min-w-0 dshx:truncate">
-                    Thread: <span className="dshx:font-medium">{thread.label}</span>
-                  </span>
-                  <Button size="xs" variant="ghost" onClick={() => state.setThread(null)}>
-                    Show every thread
+          </TabsList>
+        </div>
+        <TabsContent value={preferences.tab} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
+          {[indexError, refreshError].map(message =>
+            message === null ? null : (
+              <Alert key={message} variant="destructive">
+                <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                  <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+                  <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+                    Retry
                   </Button>
-                </div>
-              )}
-              <RequestLog
-                range={range}
-                purposes={purposes}
-                search={logSearch}
-                onSearch={setLogSearch}
-                openThread={props.openThread}
-                {...(thread === null ? {} : { sessionId: thread.sessionId })}
-              />
-            </>
-          ) : preferences.tab === 'charts' ? (
-            <UsageCharts
-              range={range}
-              purposes={purposes}
-              bucket={preferences.bucket}
-              groupBy={preferences.groupBy}
-              onGroupBy={groupBy => update({ groupBy })}
-              onShowRequests={(search, groupBy) => {
-                if (groupBy === 'purpose') {
-                  const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
-                  if (Option.isNone(purpose)) return
-                  setLogSearch('')
-                  update({ tab: 'log', purposes: [purpose.value] })
-                  return
-                }
-                setLogSearch(search)
-                update({ tab: 'log' })
-              }}
-              openThread={props.openThread}
-            />
-          ) : (
-            <UsageToolsTab range={range} bucket={preferences.bucket} />
+                </AlertDescription>
+              </Alert>
+            ),
           )}
-        </>
-      )}
+
+          {preferences.tab === 'quota' ? (
+            <UsageQuota.Tab panelId={props.panelId} />
+          ) : (
+            <>
+              {/* Two groups, 16 px apart: the range (segments and Custom), then the view triggers, each named in one
+                  grammar ("Grain: Daily", "Group: Model", "Purpose: All") (council round 11, D1). */}
+              <div
+                className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5"
+                role="group"
+                aria-label="Filters"
+              >
+                <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2" data-usage-filter-group="range">
+                  <SlidingSegments<(typeof PRESETS)[number]>
+                    aria-label="Time range"
+                    // A custom range checks no preset: remount without the pill instead of leaving it on the last preset.
+                    key={preferences.preset === 'custom' ? 'custom' : 'preset'}
+                    className={preferences.preset === 'custom' ? 'dshx:[&>span[aria-hidden]]:hidden' : undefined}
+                    options={PRESET_OPTIONS}
+                    value={preferences.preset}
+                    onValueChange={preset =>
+                      update({
+                        preset,
+                        bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                      })
+                    }
+                  />
+                  {/* A trigger that shows a value (the range) takes the field look of the selects beside it; the range
+                    replacing "Custom" is the pressed cue (council round 7, D3 / A4). It ends with the chevron the triggers
+                    beside it end with, so it reads as one of them, not as an outlined action (council round 14, D1). */}
+                  <Popover open={customOpen} onOpenChange={setCustomOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="field"
+                        aria-pressed={preferences.preset === 'custom'}
+                        onClick={() => {
+                          if (preferences.preset === 'custom') return
+                          update({
+                            preset: 'custom',
+                            bucket: preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                            ...(preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
+                          })
+                        }}
+                      >
+                        <CalendarIcon aria-hidden />
+                        {preferences.preset === 'custom' ? `${formatShortDay(range.from)} – ${formatShortDay(range.to - 1)}` : 'Custom'}
+                        <ChevronDownIcon aria-hidden />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-auto dshx:items-center dshx:gap-2 dshx:p-3 dshx:text-xs">
+                      <Input
+                        type="date"
+                        aria-label="From date"
+                        className="dshx:h-8 dshx:w-36"
+                        value={preferences.customFrom}
+                        onChange={event => update({ preset: 'custom', customFrom: event.target.value })}
+                      />
+                      <span aria-hidden>→</span>
+                      <Input
+                        type="date"
+                        aria-label="To date"
+                        className="dshx:h-8 dshx:w-36"
+                        value={preferences.customTo}
+                        onChange={event => update({ preset: 'custom', customTo: event.target.value })}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2" data-usage-filter-group="view">
+                  <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
+                    <SelectTrigger aria-label={`Grain: ${BUCKET_LABELS[preferences.bucket]}`} className="dshx:justify-start dshx:gap-1.5">
+                      <span className="dshx:text-muted-foreground">Grain:</span>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="dshx-root">
+                      {BUCKETS.map(bucket => (
+                        <SelectItem key={bucket} value={bucket}>
+                          {BUCKET_LABELS[bucket]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {preferences.tab === 'charts' ? (
+                    <Select
+                      value={preferences.groupBy}
+                      onValueChange={value => update({ groupBy: GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model' })}
+                    >
+                      <SelectTrigger aria-label={`Group: ${groupByLabel}`} className="dshx:justify-start dshx:gap-1.5">
+                        <span className="dshx:text-muted-foreground">Group:</span>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="dshx-root">
+                        {GROUP_BY_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="field" aria-label={`Purpose: ${purposeSummary}`}>
+                        <span className="dshx:text-muted-foreground">Purpose:</span>
+                        {purposeSummary}
+                        <ChevronDownIcon aria-hidden />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="dshx-root">
+                      <DropdownMenuCheckboxItem
+                        checked={purposes === undefined}
+                        onSelect={event => event.preventDefault()}
+                        onCheckedChange={() => update({ purposes: [] })}
+                      >
+                        All
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuSeparator />
+                      {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                        <DropdownMenuCheckboxItem
+                          key={purpose}
+                          checked={purposes?.includes(purpose) ?? false}
+                          onSelect={event => event.preventDefault()}
+                          onCheckedChange={checked => togglePurpose(purpose, checked)}
+                        >
+                          {UsageFormattingModel.purposeLabels[purpose]}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              {preferences.tab === 'log' ? (
+                <>
+                  {thread === null ? null : (
+                    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" role="status">
+                      <span className="dshx:min-w-0 dshx:truncate">
+                        Thread: <span className="dshx:font-medium">{thread.label}</span>
+                      </span>
+                      <Button size="xs" variant="ghost" onClick={() => state.setThread(null)}>
+                        Show every thread
+                      </Button>
+                    </div>
+                  )}
+                  <RequestLog
+                    range={range}
+                    purposes={purposes}
+                    search={logSearch}
+                    onSearch={setLogSearch}
+                    openThread={props.openThread}
+                    {...(thread === null ? {} : { sessionId: thread.sessionId })}
+                  />
+                </>
+              ) : preferences.tab === 'charts' ? (
+                <UsageCharts
+                  range={range}
+                  purposes={purposes}
+                  bucket={preferences.bucket}
+                  groupBy={preferences.groupBy}
+                  onGroupBy={groupBy => update({ groupBy })}
+                  pricingNote={`List-price estimate from the models.dev price catalog (${
+                    status?.pricingFetchedAt == null
+                      ? 'no catalog cached yet'
+                      : `updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)}`
+                  }). Subscription traffic is priced as if it were metered.`}
+                  onShowRequests={(search, groupBy) => {
+                    if (groupBy === 'purpose') {
+                      const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
+                      if (Option.isNone(purpose)) return
+                      setLogSearch('')
+                      update({ tab: 'log', purposes: [purpose.value] })
+                      return
+                    }
+                    setLogSearch(search)
+                    update({ tab: 'log' })
+                  }}
+                  openThread={props.openThread}
+                />
+              ) : (
+                <UsageToolsTab range={range} bucket={preferences.bucket} />
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </Page>
   )
 }

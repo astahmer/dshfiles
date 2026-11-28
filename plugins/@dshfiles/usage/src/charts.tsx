@@ -1,51 +1,51 @@
-import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, tooltip } from '@dshfiles/plugin-ui/chart'
+import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, text, tooltip } from '@dshfiles/plugin-ui/chart'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, TrendChart, trendRows as buildTrendRows } from './chart-geometry.js'
+import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ChartQuery } from './api.js'
+import { trendCaption } from './trend-caption.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
+import { CostSummary, usageIsEmpty } from './cost-summary.js'
 import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { UsageBreakdownTable, UsageCalendar } from './usage-history.js'
 import { UsageSpendMap } from './usage-spend-map.js'
+import { TrendKey } from './trend-key.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
+
 const TOKEN_KINDS = ['Input', 'Cache read', 'Cache write', 'Output'] as const
+
+const TREND_METRICS: readonly SlidingSegmentOption<'cost' | 'tokens' | 'requests'>[] = [
+  { value: 'cost', label: 'Cost' },
+  { value: 'tokens', label: 'Tokens' },
+  { value: 'requests', label: 'Requests' },
+]
 
 /** Purpose ids arrive as series keys; the legend and tooltips show their product names. */
 const purposeLabelsByKey = new Map(Object.entries(UsageFormattingModel.purposeLabels))
 
-const Panel = (props: { readonly title: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
+/**
+ * The trend chart's card: the hairline card the numbers above and "Where it went" below take (8 px radius, 16 px sides,
+ * the title 14 px from the top edge), so the three read as one rhythm. Its foot is 6 px: the chart already leaves room
+ * under its legend (council round 6, D1).
+ */
+export const TREND_CARD = 'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:pt-3.5 dshx:pb-1.5 dshx:@max-pane-narrow:px-3'
+
+const Panel = (props: { readonly title?: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <ChartFrame title={props.title} description={props.description} className={cn('dshx:border-t dshx:border-border dshx:pt-4', props.className)}>
     {props.children}
   </ChartFrame>
 )
-
-const Tile = (props: { readonly label: string; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:py-1">
-    <span className="dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
-    <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
-    {props.detail === undefined ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
-  </div>
-)
-
-const Change = (props: { readonly current: number; readonly previous: number }): JSX.Element => {
-  const ratio = UsageFormattingModel.changeRatio(props.current, props.previous)
-  if (ratio === null) return <>no earlier usage to compare</>
-  const up = ratio >= 0
-  return (
-    <span className={up ? 'dshx:text-warning' : 'dshx:text-success'}>
-      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : UsageFormattingModel.formatPercent(Math.abs(ratio))} vs previous period
-    </span>
-  )
-}
 
 export const UsageCharts = (props: {
   readonly range: { readonly from: number; readonly to: number }
@@ -55,6 +55,8 @@ export const UsageCharts = (props: {
   readonly onGroupBy: (groupBy: ChartQuery['groupBy']) => void
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
   readonly openThread: OpenThread
+  /** The estimate's caveat, shown as a tooltip on the cost number. */
+  readonly pricingNote: string
 }): JSX.Element => {
   const api = useApi(usageApi)
   const [now] = useState(() => Date.now())
@@ -106,8 +108,8 @@ export const UsageCharts = (props: {
       const present = new Set(rows.map(row => row.label))
       return labels.filter(label => !present.has(label))
     }
-    const cost = buckets.filter(row => row.cost > 0).map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), cost: row.cost }))
-    cost.push(...missing(cost).map(label => ({ label, key: firstKey, cost: 0 })))
+    const trend = (metric: 'cost' | 'tokens' | 'requests') =>
+      buildTrendRows({ labels, buckets, labelOf: start => labelOf.get(start) ?? '', keyOf, firstKey, metric })
     const totals = new Map<number, { input: number; cacheRead: number; cacheWrite: number; output: number; requests: number; failed: number }>()
     for (const row of buckets) {
       const total = totals.get(row.start) ?? { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, requests: 0, failed: 0 }
@@ -119,12 +121,6 @@ export const UsageCharts = (props: {
       total.failed += row.failed
       totals.set(row.start, total)
     }
-    const groupedTokens = buckets.map(row => ({
-      label: labelOf.get(row.start) ?? '',
-      key: keyOf(row.key),
-      value: row.input + row.cacheRead + row.cacheWrite + row.output,
-    }))
-    const groupedRequests = buckets.map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), value: row.requests }))
     const tokens = [...totals.entries()].flatMap(([start, total]) => {
       const label = labelOf.get(start) ?? ''
       return [
@@ -157,9 +153,9 @@ export const UsageCharts = (props: {
     const byTime = (left: { readonly label: string }, right: { readonly label: string }): number => (order.get(left.label) ?? 0) - (order.get(right.label) ?? 0)
     return {
       labels,
-      cost: cost.sort(byTime),
-      groupedTokens: groupedTokens.sort(byTime),
-      groupedRequests: groupedRequests.sort(byTime),
+      cost: trend('cost'),
+      groupedTokens: trend('tokens'),
+      groupedRequests: trend('requests'),
       tokens: tokens.sort(byTime),
       cache,
       requests: requests.sort(byTime),
@@ -169,7 +165,7 @@ export const UsageCharts = (props: {
 
   const xAxis = useMemo(
     () => ({
-      scale: () => scaleBand<string>().domain(series.labels).padding(0.2),
+      scale: () => scaleBand<string>().domain(series.labels).padding(BAND_PADDING),
       axis: {
         ticks: {
           format: (value: string) =>
@@ -196,50 +192,63 @@ export const UsageCharts = (props: {
     [series.labels, props.bucket, props.range.from, props.range.to],
   )
 
-  const trendRows =
-    trendMetric === 'cost'
-      ? series.cost.map(row => ({ label: row.label, key: row.key, value: row.cost }))
-      : trendMetric === 'tokens'
-        ? series.groupedTokens
-        : series.groupedRequests
-  const trendChart = useMemo(
-    () =>
-      defineChart({
-        marks: [barY(trendRows, { x: 'label', y: 'value', color: 'key' })],
-        scales: {
-          x: xAxis,
-          y: {
-            scale: scaleLinear,
-            grid: true,
-            axis: {
-              ticks: {
-                count: 4,
-                format: value => (trendMetric === 'cost' ? UsageFormattingModel.formatCost(Number(value)) : UsageFormattingModel.formatCount(Number(value))),
-              },
+  const trendRows = trendMetric === 'cost' ? series.cost : trendMetric === 'tokens' ? series.groupedTokens : series.groupedRequests
+  const trendKeys = useMemo(
+    () => (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
+    [view?.keys, props.groupBy],
+  )
+  // One series: its name moves into the header and the chart draws no legend (council round 10, D1).
+  const singleSeries = trendKeys.length === 1
+  const trendChart = useMemo(() => {
+    const formatTrend = (value: number): string => (trendMetric === 'cost' ? UsageFormattingModel.formatCost(value) : UsageFormattingModel.formatCount(value))
+    const trendTotal = singleBucketTotal(trendRows, row => row.value)
+    const trendLabel = trendTotal === null ? [] : [{ label: trendTotal.label, value: trendTotal.total, text: formatTrend(trendTotal.total) }]
+    return defineChart({
+      marks: [
+        barY(trendRows, { x: 'label', y: 'value', color: 'key', ...BAR_GEOMETRY }),
+        text(trendLabel, {
+          x: 'label',
+          y: 'value',
+          text: 'text',
+          dy: -8,
+          anchor: 'middle',
+          fontSize: 11,
+          fontWeight: 600,
+          fill: 'var(--dsw-alias-label-primary)',
+        }),
+      ],
+      scales: {
+        x: xAxis,
+        y: {
+          ...VALUE_SCALE,
+          axis: {
+            ticks: {
+              count: 4,
+              format: value => formatTrend(Number(value)),
             },
           },
         },
-        color: {
-          domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
-          legend: colorLegend({ placement: 'bottom' }),
-        },
-        tooltip: {
-          use: tooltip,
-          format: point =>
-            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${point.datum.key}: ${trendMetric === 'cost' ? UsageFormattingModel.formatCost(point.datum.value) : UsageFormattingModel.formatCount(point.datum.value)}`,
-        },
-      }),
-    [trendRows, trendMetric, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to],
-  )
+      },
+      // One series draws no legend: its name sits in the header (council round 10, D1).
+      color: singleSeries
+        ? { domain: trendKeys, range: [...DATA_SERIES] }
+        : { domain: trendKeys, range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
+      tooltip: {
+        use: tooltip,
+        format: point =>
+          `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${'key' in point.datum ? `${point.datum.key}: ` : ''}${formatTrend(point.datum.value)}`,
+      },
+    })
+  }, [trendRows, trendMetric, xAxis, trendKeys, singleSeries, props.bucket, props.range.from, props.range.to])
   const tokenChart = useMemo(
     () =>
       defineChart({
-        marks: [barY(series.tokens, { x: 'label', y: 'tokens', color: 'kind' })],
+        marks: [barY(series.tokens, { x: 'label', y: 'tokens', color: 'kind', ...BAR_GEOMETRY })],
         scales: {
           x: xAxis,
-          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
         },
-        color: { domain: [...TOKEN_KINDS], legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: [...TOKEN_KINDS], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -252,7 +261,10 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [lineY(series.cache, { x: 'label', y: 'percent', points: true, strokeWidth: 1.5 })],
-        scales: { x: pointAxis, y: { scale: scaleLinear().domain([0, 100]), grid: true, axis: { ticks: { count: 5, format: value => `${String(value)}%` } } } },
+        scales: {
+          x: pointAxis,
+          y: { scale: scaleLinear().domain([0, 100]), grid: CHART_GRID, axis: { ticks: { count: 5, format: value => `${String(value)}%` } } },
+        },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -264,9 +276,9 @@ export const UsageCharts = (props: {
   const requestChart = useMemo(
     () =>
       defineChart({
-        marks: [barY(series.requests, { x: 'label', y: 'count', color: 'outcome' })],
-        scales: { x: xAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } } },
-        color: { domain: ['Succeeded or aborted', 'Failed'], range: ['var(--ts-chart-1)', 'var(--ts-chart-4)'], legend: colorLegend({ placement: 'bottom' }) },
+        marks: [barY(series.requests, { x: 'label', y: 'count', color: 'outcome', ...BAR_GEOMETRY })],
+        scales: { x: xAxis, y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } } },
+        color: { domain: ['Succeeded or aborted', 'Failed'], range: [DATA_SERIES[0], FAILED_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -281,9 +293,9 @@ export const UsageCharts = (props: {
         marks: [lineY(series.latency, { x: 'label', y: 'ms', z: 'metric', color: 'metric', points: true, strokeWidth: 1.5 })],
         scales: {
           x: pointAxis,
-          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
         },
-        color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -298,109 +310,74 @@ export const UsageCharts = (props: {
       <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
         {errorMessage(charts.error, 'Charts could not be loaded.')}
         <Button variant="outline" size="xs" disabled={charts.isFetching} onClick={() => void charts.refetch()}>
-          Try again
+          Retry
         </Button>
       </p>
     )
   if (view === undefined) return <p className="dshx:text-xs dshx:text-muted-foreground">Loading…</p>
 
   const summary = view.summary
-  const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
   const days = Math.max(1, (Math.min(now, props.range.to) - props.range.from) / DAY_MS)
-  const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
+  // The Jev block is month to date, whatever range is selected, and draws nothing until a Jev call is recorded.
+  const jevCard = (
+    // Empty until a Jev call is recorded: hidden then, so it takes no slot in the page's 12 px stack (council round 6, D1).
+    <div className="dshx:empty:hidden" data-usage-jev-card>
+      <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
+    </div>
+  )
+  if (usageIsEmpty(summary))
+    return (
+      <div className="dshx:flex dshx:flex-col dshx:gap-3">
+        <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">
+          {props.purposes === undefined ? 'No usage in this range.' : 'No usage for these purposes in this range.'}
+        </EmptyState>
+        {jevCard}
+      </div>
+    )
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
-      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[48rem]:grid-cols-3 dshx:@min-[80rem]:grid-cols-4">
-        <Tile
-          label="Cost (estimate)"
-          value={UsageFormattingModel.formatCost(summary.cost)}
-          detail={<Change current={summary.cost} previous={summary.previous.cost} />}
-        />
-        <Tile
-          label="Per day"
-          value={UsageFormattingModel.formatCost(summary.cost / days)}
-          detail={summary.unpriced === 0 ? 'all routes priced' : `${summary.unpriced.toLocaleString()} requests unpriced`}
-        />
-        <Tile label="Requests" value={summary.requests.toLocaleString()} detail={<Change current={summary.requests} previous={summary.previous.requests} />} />
-        <Tile
-          label="Failed / aborted"
-          value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
-          detail={UsageFormattingModel.formatPercent(summary.requests === 0 ? null : summary.failed / summary.requests)}
-        />
-        <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={<Change current={tokens} previous={summary.previous.tokens} />} />
-        <Tile
-          label="Cache hit"
-          value={UsageFormattingModel.formatPercent(cacheHit)}
-          detail={`${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
-        />
-        <Tile
-          label="Cache savings (estimate)"
-          value={UsageFormattingModel.formatCost(summary.cacheSavings)}
-          detail={
-            cacheHit === null
-              ? 'no prompt token read from cache'
-              : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
-          }
-        />
-        <Tile
-          label="Cost per turn"
-          value={summary.turns === 0 ? '–' : UsageFormattingModel.formatCost(summary.cost / summary.turns)}
-          detail={summary.turns === 0 ? 'no turn recorded' : `${summary.turns.toLocaleString()} turns · ${summary.requests.toLocaleString()} requests`}
-        />
-      </div>
+      <CostSummary days={days} pricingNote={props.pricingNote} summary={summary} />
 
-      <div data-usage-jev-card>
-        <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
-      </div>
+      {jevCard}
 
-      <Panel
-        title={`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
-        description={trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
-      >
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            aria-label="Usage measure"
-            value={trendMetric}
-            onValueChange={value => {
-              if (value === 'cost' || value === 'tokens' || value === 'requests') setTrendMetric(value)
-            }}
-          >
-            <ToggleGroupItem value="cost">Cost</ToggleGroupItem>
-            <ToggleGroupItem value="tokens">Tokens</ToggleGroupItem>
-            <ToggleGroupItem value="requests">Requests</ToggleGroupItem>
-          </ToggleGroup>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            aria-label="Stack cost by"
-            value={props.groupBy}
-            onValueChange={value => {
-              if (value === 'model' || value === 'provider' || value === 'project' || value === 'purpose') props.onGroupBy(value)
-            }}
-            className="dshx:self-start"
-          >
-            <ToggleGroupItem value="model">Model</ToggleGroupItem>
-            <ToggleGroupItem value="provider">Provider / account</ToggleGroupItem>
-            <ToggleGroupItem value="project">Project</ToggleGroupItem>
-            <ToggleGroupItem value="purpose">Purpose</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
+      <ChartFrame className={TREND_CARD}>
+        {/*
+         * The page's one metric switch, beside the card's title, so the title and what it measures read as one phrase
+         * (council round 5, D1): "Where it went" and the daily calendar follow it. The grouping is on the filter row.
+         */}
+        <header className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5" data-usage-chart-header>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1" data-usage-chart-title-row>
+            {/* One title for every measure; the switch beside it says which (council round 7, D3). */}
+            <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">Usage over time</span>
+            <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
+          </span>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:text-xs">
+            {trendCaption({ bucket: props.bucket, groupBy: props.groupBy, metric: trendMetric })}
+            {singleSeries && trendKeys[0] !== undefined ? <TrendKey label={trendKeys[0]} color={DATA_SERIES[0]} /> : null}
+          </span>
+        </header>
         <Chart
           ariaLabel={`${trendMetric} over time`}
           ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}
           definition={trendChart}
-          height={CHART_HEIGHT}
+          height={TrendChart.height(trendRows)}
         />
-      </Panel>
+      </ChartFrame>
 
-      <UsageSpendMap view={view} range={props.range} groupBy={props.groupBy} onGroupBy={props.onGroupBy} onShowRequests={props.onShowRequests} />
+      {/* "$0.00 / 0%" says nothing: the map waits for a range that cost something. */}
+      {view.summary.cost > 0 ? (
+        <UsageSpendMap
+          view={view}
+          metric={trendMetric}
+          range={props.range}
+          groupBy={props.groupBy}
+          onGroupBy={props.onGroupBy}
+          onShowRequests={props.onShowRequests}
+        />
+      ) : null}
       <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
-      <UsageCalendar view={view} range={props.range} />
+      <UsageCalendar view={view} metric={trendMetric} range={props.range} />
 
       <div className="dshx:grid dshx:gap-3 dshx:@min-[64rem]:grid-cols-2">
         <Panel title="Tokens" description="Uncached input, cache reads, cache writes and output.">

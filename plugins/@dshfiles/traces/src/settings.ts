@@ -3,45 +3,49 @@ import { Settings } from '@dshfiles/dshx/effect/settings'
 import { defineSettings, type SettingsValue } from '@dshfiles/dshx/settings'
 import type { Retention } from './trace-repo.js'
 
+// Receiver plumbing, retention limits and the Host stall probe are developer knobs: Settings folds them under Advanced.
 export const tracesSettings = defineSettings({
   namespace: 'dshfiles-traces',
   schema: Schema.object({
     mode: Schema.union([
-      Schema.const('plugin').description('This plugin: the built-in receiver owns the OTLP port and this panel shows what it stores'),
+      Schema.const('plugin').description('Built-in receiver: owns the OTLP port and stores what arrives'),
       Schema.const('external').description('External viewer: the receiver stays off; another tool (dsh-traces, a collector) owns the port'),
       Schema.const('both').description('Both: the built-in receiver stores and also forwards every request to the external viewer'),
     ])
       .default('plugin')
       .description('Where OTLP telemetry goes. Exporters send to OTEL_EXPORTER_OTLP_ENDPOINT, so in plugin or both mode set it to http://<host>:<port> below.'),
-    host: Schema.string().default('127.0.0.1').description('Address the receiver listens on. Loopback by default.'),
+    host: Schema.string().default('127.0.0.1').collapse().description('Address the receiver listens on. Loopback by default.'),
     allowNonLoopback: Schema.boolean()
       .default(false)
-      .description('Allow a non-loopback listen address. Anything on that network can then post telemetry here; leave off unless you mean it.'),
-    port: Schema.natural().max(65_535).default(4318).description('OTLP/HTTP port. 4318 is the standard one; 0 picks any free port (the panel shows which).'),
+      .collapse().description('Allow a non-loopback listen address. Anything on that network can then post telemetry here; leave off unless you mean it.'),
+    port: Schema.natural().max(65_535).default(4318).collapse().description('OTLP/HTTP port. 4318 is the standard one; 0 picks any free port (the panel shows which).'),
     forwardUrl: Schema.string()
       .default('')
-      .description('Both mode: the external viewer’s OTLP/HTTP base URL, e.g. http://127.0.0.1:4319. /v1/traces, /v1/metrics and /v1/logs are appended.'),
+      .collapse().description('Both mode: the external viewer’s OTLP/HTTP base URL, e.g. http://127.0.0.1:4319. /v1/traces, /v1/metrics and /v1/logs are appended.'),
     externalViewerUrl: Schema.string()
       .default('')
       .description('The external viewer’s web page (e.g. http://127.0.0.1:8000 for otel-desktop-viewer), linked from the panel in external and both modes.'),
     redactGenAiContent: Schema.boolean()
       .default(true)
       .description(
-        'Store GenAI message, prompt and tool-payload attributes (gen_ai.input.messages, gen_ai.tool.call.arguments, …) as their size only. Exporters send them only when content capture is opted into.',
+        'Store GenAI messages, prompts and tool payloads as their size only.',
       ),
-    retentionHours: Schema.natural().min(1).max(720).default(72).description('Drop stored telemetry older than this many hours.'),
-    retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(30_000).description('Keep at most this many spans; the oldest whole traces go first.'),
-    retentionLogs: Schema.natural().min(1_000).max(1_000_000).default(100_000).description('Keep at most this many log records; the oldest go first.'),
+    retentionHours: Schema.natural().min(1).max(720).default(72).collapse().description('Drop stored telemetry older than this many hours.'),
+    retentionSpans: Schema.natural().min(1_000).max(1_000_000).default(30_000).collapse().description('Keep at most this many spans; the oldest whole traces go first.'),
+    retentionLogs: Schema.natural().min(1_000).max(1_000_000).default(100_000).collapse().description('Keep at most this many log records; the oldest go first.'),
     retentionMetricPoints: Schema.natural()
       .min(1_000)
       .max(2_000_000)
       .default(60_000)
-      .description('Keep at most this many metric data points; the oldest go first.'),
+      .collapse().description('Keep at most this many metric data points; the oldest go first.'),
+    announceResolved: Schema.boolean()
+      .default(false)
+      .description('Also announce when an alert resolves. Off: only firing alerts show a banner and a browser notification.'),
     eventLoopStallMs: Schema.natural()
       .max(10_000)
       .default(100)
-      .description(
-        'Record a "host event-loop stall" span whenever the DSH Host event loop is blocked at least this many milliseconds (a 100 ms probe, about 0.6 ms of CPU per second). 0 turns the probe off.',
+      .collapse().description(
+        'Record a "host event-loop stall" span when DSH is blocked at least this many milliseconds. 0 turns it off.',
       ),
   }),
   applies: 'live',

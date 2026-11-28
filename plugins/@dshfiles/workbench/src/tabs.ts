@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { ReactNode } from 'react'
 import { CLOSE_BUTTON_POSITIONS, DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition } from './close-button-position.js'
 
@@ -8,7 +9,8 @@ export type HostTarget =
 /** A tab shows a Host target, or the shared Start suggestions page. */
 export type TabTarget = HostTarget | { readonly kind: 'start' }
 
-export type TabStatus = 'running' | 'needsYou' | 'unread'
+/** `failed` is absent on older providers: a thread whose last finished turn failed, read or not. */
+export type TabStatus = 'running' | 'needsYou' | 'failed' | 'unread'
 
 export { CLOSE_BUTTON_POSITIONS, DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition }
 
@@ -22,9 +24,21 @@ interface TabViewBase {
   readonly status: TabStatus | null
 }
 
+/**
+ * The rail destination a page belongs to (round five B4): its id names the nav tone, its icon the rail glyph. The tabs
+ * provider resolves it from thread-sidebar's destination table (which depends on Workbench, so Workbench cannot read
+ * it); a tab strip draws the glyph before the page title, in the destination's tone while the tab is on screen.
+ */
+export type TabDestinationId = 'threads' | 'inbox' | 'land' | 'work' | 'agents' | 'observe' | 'knowledge' | 'settings'
+export type TabDestinationIcon = 'messages-square' | 'inbox' | 'git-merge' | 'list-todo' | 'bot' | 'activity' | 'library' | 'settings'
+export interface TabDestination {
+  readonly id: TabDestinationId
+  readonly icon: TabDestinationIcon
+}
+
 export type TabView =
   | (TabViewBase & { readonly kind: 'thread'; readonly sessionId: string; readonly workspaceId?: string })
-  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string })
+  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string; readonly destination?: TabDestination })
   | (TabViewBase & { readonly kind: 'start' })
 
 /** The existing computed strip view, plus its actor-owned target (including panel scope). */
@@ -43,7 +57,7 @@ export interface WorkbenchTabsSnapshot {
   /** Project folder name per thread workspace id, for the tab's project chip; absent hides the chips. */
   readonly projectNames?: Readonly<Record<string, string>>
   /** Resolved project colour per thread workspace id, same key as `projectNames`: a palette class or a custom `#rrggbb`. */
-  readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+  readonly projectChips?: Readonly<Record<string, TabProjectChip>>
 }
 
 export interface WorkbenchTabsActions {
@@ -72,7 +86,10 @@ export interface WorkbenchTabsProvider {
   readonly renderStart: () => ReactNode
   /** Native-owner menu and localized labels; absent on older providers. */
   readonly renderTabMenu?: (tabId: string, onRename: () => void, onStatus?: (message: string) => void) => ReactNode
-  readonly label?: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string) => string
+  readonly label?: (
+    key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'failed' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab',
+    title?: string,
+  ) => string
 }
 
 const EMPTY_SNAPSHOT: WorkbenchTabsSnapshot = {
@@ -117,7 +134,7 @@ const createWorkbenchTabsChannel = () => {
     renderStart: (): ReactNode => provider?.renderStart() ?? null,
     renderTabMenu: (tabId: string, onRename: () => void, onStatus?: (message: string) => void): ReactNode =>
       provider?.renderTabMenu?.(tabId, onRename, onStatus) ?? null,
-    label: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string): string =>
+    label: (key: 'newTab' | 'pinned' | 'running' | 'needsYou' | 'failed' | 'unread' | 'renameThread' | 'renameFailed' | 'closeTab', title?: string): string =>
       provider?.label?.(key, title) ?? '',
     /** A replacement owns the channel immediately; a stale HMR disposer cannot clear it. */
     connect: (next: WorkbenchTabsProvider): (() => void) => {
@@ -181,5 +198,38 @@ export class WorkbenchTabDocking {
   /** The frame owns admission; stale plugin/HMR cleanup cannot clear a replacement. */
   static register(handler: WorkbenchTabAsideHandler): () => void {
     return asideChannel().connect(handler)
+  }
+}
+
+/** A project's resolved colour for a tab: a palette tone (and its class), or a custom `#rrggbb`. */
+export interface TabProjectChip {
+  readonly className?: string
+  readonly color?: string
+  readonly tone?: number
+}
+
+/** What a tab hands to the kit `ProjectMark`. */
+export interface TabProjectMarkPaint {
+  readonly tone?: number
+  readonly color?: string
+  readonly className?: string
+  readonly style?: CSSProperties
+}
+
+/**
+ * A project's tile on a tab (round five T5): the kit ProjectMark in the project's tone. A custom pick rides as --chip and
+ * the tile takes it clamped per scheme (L <= 0.52 in light, L >= 0.78 in dark), so a pale or dark pick still reads.
+ */
+export class TabProjectMark {
+  static paint(chip: TabProjectChip | undefined): TabProjectMarkPaint {
+    if (chip?.color !== undefined) {
+      const style: CSSProperties & Readonly<Record<'--chip' | '--chip-light' | '--chip-dark', string>> = {
+        '--chip': chip.color,
+        '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
+        '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
+      }
+      return { color: 'var(--chip-clamped)', className: 'dshx:[--chip-clamped:var(--chip-light)] dshx:dark:[--chip-clamped:var(--chip-dark)]', style }
+    }
+    return chip?.tone === undefined ? {} : { tone: chip.tone }
   }
 }

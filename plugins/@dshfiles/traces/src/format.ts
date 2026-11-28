@@ -16,17 +16,16 @@ const formatClock = (unixMs: number, now: number = Date.now()): string => {
 
 const formatAttribute = (value: AttributeValue): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
+// A service is an identity (DESIGN.md › Colour roles): the eight identity tones, never chart, info or accent hues.
 const SERVICE_TONES = [
-  { background: 'dshx:bg-chart-1', fill: 'dshx:fill-chart-1' },
-  { background: 'dshx:bg-chart-2', fill: 'dshx:fill-chart-2' },
-  { background: 'dshx:bg-chart-3', fill: 'dshx:fill-chart-3' },
-  { background: 'dshx:bg-info', fill: 'dshx:fill-info' },
-  { background: 'dshx:bg-chart-5', fill: 'dshx:fill-chart-5' },
-  { background: 'dshx:bg-primary', fill: 'dshx:fill-primary' },
-  { background: 'dshx:bg-chart-1/55', fill: 'dshx:fill-chart-1/55' },
-  { background: 'dshx:bg-chart-2/55', fill: 'dshx:fill-chart-2/55' },
-  { background: 'dshx:bg-chart-3/55', fill: 'dshx:fill-chart-3/55' },
-  { background: 'dshx:bg-info/55', fill: 'dshx:fill-info/55' },
+  { background: 'dshx:bg-identity-1', fill: 'dshx:fill-identity-1' },
+  { background: 'dshx:bg-identity-2', fill: 'dshx:fill-identity-2' },
+  { background: 'dshx:bg-identity-3', fill: 'dshx:fill-identity-3' },
+  { background: 'dshx:bg-identity-4', fill: 'dshx:fill-identity-4' },
+  { background: 'dshx:bg-identity-5', fill: 'dshx:fill-identity-5' },
+  { background: 'dshx:bg-identity-6', fill: 'dshx:fill-identity-6' },
+  { background: 'dshx:bg-identity-7', fill: 'dshx:fill-identity-7' },
+  { background: 'dshx:bg-identity-8', fill: 'dshx:fill-identity-8' },
 ] as const
 
 const toneOf = (service: string): (typeof SERVICE_TONES)[number] => {

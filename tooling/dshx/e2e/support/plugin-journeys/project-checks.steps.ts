@@ -6,7 +6,7 @@ import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
+import { createScratchDirectory, openComposerLocation, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
  * Trusted actions live only in the profile row, never in a settings form, so a journey writes them to the scratch
@@ -178,7 +178,7 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
   await expect(
     page
       .getByRole('status')
-      .filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
+      .filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })
       .last(),
   ).toBeVisible({ timeout: 60_000 })
   await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()
@@ -254,7 +254,7 @@ Then('the receipt is available without Activity Timeline', async ({ page }: { pa
 
 Then('the sibling folder offers no trusted action', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'project-checks-sibling-outside-the-root-is-refused', async () => {
-    await expect(checksPanel(page).getByText('No trusted actions are configured for this session directory.', { exact: true })).toBeVisible()
+    await expect(checksPanel(page).getByText('No trusted actions are set up for this thread’s folder.', { exact: true })).toBeVisible()
     await expect(checksPanel(page).getByRole('button', { name: 'Run', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -313,6 +313,7 @@ Then('the cancelled check remains available in Project Checks', async ({ page }:
 })
 
 When('the New thread workspace is set to its own workspace', async ({ page }: { page: Page }) => {
+  await openComposerLocation(page)
   const segment = page.locator('[data-run-segment="workspace"]').first()
   await expect(segment).toBeVisible({ timeout: 30_000 })
   await segment.click()

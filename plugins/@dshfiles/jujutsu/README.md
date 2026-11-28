@@ -10,7 +10,7 @@
 
 ![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
 
-![Keep one repository per Jujutsu tab, thread and dock](docs/screenshots/panel-scopes.png)
+![Keep one repository per Jujutsu tab](docs/screenshots/panel-scopes.png)
 
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
@@ -22,7 +22,7 @@ A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.
 
-Two panels in navigation, the main view and the Workbench chooser: **Revision graph** and **Source control**. Each opens straight on its toolbar (repository, Fetch, Push, refresh, view settings, repository actions); only the narrow per-thread side panel switches between both views with tabs. Repository-scoped tabs keep their repository titles. Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
+Two pages in navigation, the main view and the Workbench chooser: **History** (the revision graph) and **Source control**. As pages they carry the kit page header: the title, one line of description and the project select beside the title, which opens on the current project; the toolbar row below holds Fetch, Push, refresh, view settings and repository actions, and the graph's secondary filters (Mine, Hide immutable, date) sit in one **Filter** menu. Only the narrow per-thread side panel switches between both views with tabs. Project-scoped tabs are titled "History · project". Saved Workbench layouts keep `dshfiles-jujutsu.dock` for the graph; Source Control is `dshfiles-jujutsu.source-control`.
 
 A phone keeps the same compact rows and toolbar. Under a touch pointer each toolbar button gets an invisible hit box 8 px past its edges, so a 28 px button takes a 44 px tap without growing the row; a narrow row also drops a bookmark's colocated `@git` copy when the bookmark itself is shown.
 
@@ -80,9 +80,14 @@ A phone keeps the same compact rows and toolbar. Under a touch pointer each tool
   (setting `composerBar`): the thread workspace's net file diff since branching
   from the base (`composerBarBase`, `main` by default) as `+N −M`, the revisions
   only on `@` or only on that base in its tooltip, and one click into the Changes
-  view (or this panel when no Changes owner is loaded). A new thread shows no
-  pill. It replaced the changed-files bar that sat above the composer (visual
-  refresh T3.2); the Changes view carries the file list, diffs and scopes.
+  view (or this panel when no Changes owner is loaded). The diff is read for the
+  thread's folder, so the pill shows only for a thread in its own workspace that
+  changed something. A new thread, an unchanged workspace and a thread working
+  in the project checkout show no pill: there the workspace menu says "The
+  project has changes that are not on main" with a **Review** button, because
+  those changes can come from any thread. It replaced the changed-files bar that
+  sat above the composer (visual refresh T3.2); the Changes view carries the file
+  list, diffs and scopes.
 - One-click toggle of the right-panel Jujutsu page on the current thread's
   repository: the workspace and bookmark reading after Rich Composer's
   `project · host` run summary chip on the meter line (a

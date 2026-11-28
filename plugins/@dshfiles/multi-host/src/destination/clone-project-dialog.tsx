@@ -256,7 +256,7 @@ export const CloneProjectDialog = (props: {
                           <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">
                             {file.ignored ? 'ignored' : 'untracked'} ·{' '}
                             {file.copyReason === 'potential-secret'
-                              ? 'possible credential; blocked'
+                              ? 'possible credential. Blocked'
                               : file.copyReason === 'too-large'
                                 ? 'too large to copy'
                                 : `${file.bytes} B`}

@@ -558,6 +558,9 @@ importers:
       '@deepseek-ai/dsh-session-persistence':
         specifier: '>=0.2.2-rc.2 <0.3.0-0'
         version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-brand@0.2.2-rc.2)(@deepseek-ai/dsh-session@0.2.2-rc.2)(@deepseek-ai/dsh-timeout@0.2.2-rc.2)
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -880,6 +883,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-tool':
         specifier: 'catalog:'
         version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)
+      '@dshfiles/chat':
+        specifier: workspace:*
+        version: link:../chat
       '@dshfiles/rich-composer':
         specifier: workspace:*
         version: link:../rich-composer
@@ -3103,6 +3109,9 @@ importers:
       '@dshfiles/image-preview':
         specifier: workspace:*
         version: link:../image-preview
+      '@dshfiles/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -8902,6 +8911,9 @@ importers:
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts
+      '@dshfiles/background-jobs':
+        specifier: workspace:*
+        version: link:../background-jobs
       '@dshfiles/chat':
         specifier: workspace:*
         version: link:../chat
@@ -10538,6 +10550,9 @@ importers:
 
   plugins/@dshfiles/workspace-folder-picker:
     dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: 'catalog:'
+        version: 3.19.0
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -10608,12 +10623,21 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(vitest@4.1.12)
+      '@testing-library/dom':
+        specifier: 'catalog:'
+        version: 10.4.2
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@18.3.1)(react@18.3.1)
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 18.3.7(@types/react@18.3.31)
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
@@ -10626,6 +10650,9 @@ importers:
       react:
         specifier: 'catalog:'
         version: 18.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

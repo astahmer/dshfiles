@@ -14,12 +14,14 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { EvidenceWell } from '@dshfiles/plugin-ui/components/ui/evidence-well'
 import { KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
@@ -29,13 +31,26 @@ import { PeekCard, RowPeek } from '@dshfiles/plugin-ui/components/peek'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArrowUpRightIcon,
+  BellIcon,
+  CheckIcon,
+  ClockIcon,
+  EllipsisIcon,
+  InboxIcon,
+  ListChecksIcon,
+  MessagesSquareIcon,
+  PencilLineIcon,
+  RefreshCwIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -52,15 +67,32 @@ import { AttentionSubjectOpeners, type AttentionSubjectOpener } from './attentio
 import { HeldOrder } from './held-order.js'
 import { InboxQuickReplies } from './quick-replies.js'
 import { InboxKeys } from './inbox-keys.js'
-import { InboxNotifications } from './inbox-notifications.js'
+import { InboxAlerts } from './inbox-alerts.js'
 import { InboxPush } from './web-push-client.js'
 import { INBOX_CHIP, TriageBar, TriageReply, TriageZero } from './triage-stage.js'
 import { triageMachine, TriageModel, type TriageRequest } from './triage-machine.js'
+import type { PrimaryAction } from './inbox-keys.js'
 import type { InboxTranslate } from './inbox-locales.js'
+import { usePublishInboxPhoneActions } from './inbox-phone-bar.js'
 import { InboxSwipe, InboxView, type SnoozeChoice } from './inbox-view.js'
 import { ThreadReferences } from './thread-reference.js'
 
 const PROVIDER_VERBS: readonly AttentionProviderVerb[] = ['Approve', 'Land', 'Retry', 'Resume']
+
+/**
+ * The list is a stack of cards (each item draws its own surface, InboxView.CARD), not one bordered box of rows: 16px
+ * apart, 8px on a compact pane, where the band and the border already part them and the third card's action stays above
+ * the fold (round six C1).
+ */
+const INBOX_STACK = 'dshx:gap-4 dshx:divide-y-0 dshx:rounded-none dshx:border-0 dshx:bg-transparent dshx:@max-pane-narrow:gap-2'
+
+/** A prompt-library reply a stopped thread's card offers in its menu. */
+interface InboxQuickReply {
+  readonly id: string
+  readonly label: string
+  readonly disabled: boolean
+  readonly onSelect: () => void
+}
 
 export interface Navigation {
   readonly sessions: ISessions
@@ -113,13 +145,7 @@ export const useInboxOpener = (navigation: Navigation): ((subject: AttentionSubj
   )
 }
 
-/** Plan §4.7: blocking items are Needs you, failed stay Failed, ready is Ready; anything closed reads as Done. */
-const statusOf = (item: AttentionItem, view: AttentionView): WorkStatus => {
-  if (view === 'closed') return 'done'
-  if (item.severity === 'blocking') return 'needs-you'
-  if (item.severity === 'failed') return 'failed'
-  return 'ready'
-}
+const statusOf = InboxView.statusOf
 
 const statusLabelOf = (status: WorkStatus, t: InboxTranslate): string => {
   switch (status) {
@@ -129,6 +155,8 @@ const statusLabelOf = (status: WorkStatus, t: InboxTranslate): string => {
       return t('severityFailed')
     case 'ready':
       return t('severityReady')
+    case 'idle':
+      return t('severityInfo')
     default:
       return t('closed')
   }
@@ -141,12 +169,28 @@ export const coarsePointer = (): boolean => {
   return coarsePointerMatch
 }
 
+/** What Open is called for an item: review a finished turn, open its thread, or the page its provider registered. */
+const openLabelOf = (item: AttentionItem, opener: AttentionSubjectOpener | undefined, t: InboxTranslate): string => {
+  const openAction = InboxView.openActionOf(item)
+  if (openAction === 'approval') return t('review')
+  return openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
+}
+
+/** The muted "·" before a card head's part (council round 8 C2); decorative, the parts read in order without it. */
+const HeadSep = (): JSX.Element => (
+  <span aria-hidden data-inbox-head-sep="" className={InboxView.HEAD_SEP}>
+    ·
+  </span>
+)
+
 const InboxRow = (props: {
   readonly item: AttentionItem
   readonly view: AttentionView
   readonly t: InboxTranslate
   readonly now: number
   readonly sessionLabel: (sessionId: string) => string
+  /** The project a thread works in, by name; undefined when the client does not know its folder. */
+  readonly projectOf: (sessionId: string) => string | undefined
   readonly busy: boolean
   readonly openers: ReadonlyMap<AttentionSubjectKind, AttentionSubjectOpener>
   readonly onOpen: (item: AttentionItem) => void
@@ -166,10 +210,12 @@ const InboxRow = (props: {
   readonly onFocusRow?: () => void
   /** The choice keys (1–9) shown on the answer buttons while this row is highlighted. */
   readonly showChoiceKeys?: boolean
-  /** Quick-reply chips for a waiting thread (prompt library), sent to that thread. */
-  readonly quickReplies?: (sessionId: string) => React.ReactNode
+  /** Quick replies for a stopped thread (prompt library), sent to that thread; never on an item that asks a question. */
+  readonly quickReplies?: (sessionId: string) => readonly InboxQuickReply[]
   /** Bumped by Triage's Enter on a Land item: open the Land confirmation, never Land itself. */
   readonly landSignal?: number
+  /** Triage shows the item only: its bar is the one action row, so the card draws none of its own. */
+  readonly actionRow?: boolean
 }): JSX.Element => {
   const { item, t } = props
   const [confirmingLand, setConfirmingLand] = useState(false)
@@ -194,14 +240,296 @@ const InboxRow = (props: {
   const status = statusOf(item, props.view)
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
+  const text = InboxView.textOf(item)
+  // Council round 15 C2: a failed turn says why in one well under its title; its head keeps its one verb (a phone's
+  // 390×664 fold cannot seat a footer Review), so the card stays compact.
+  const failure = InboxView.failureWell(item)
+  // Council round 4 (C3): an approval says its title once and reads its command as one; a bodyless Failed item is one row.
+  const card =
+    failure === null
+      ? InboxView.cardText({ source: item.source, reason: InboxView.bodyReason(text.reason, title), detail: text.detail }, title)
+      : { reason: null, detail: null, command: false }
+  const reason = card.reason
+  const compact = InboxView.compact(status, card)
+  const clamped = InboxView.clampsText(item, props.view)
+  // A question the card answers reads at body size in ink; any other text is a muted note under the head band.
+  const answerable = open && item.verbs.includes('Answer') && item.choices.length > 0
+  const doneable = open && item.verbs.includes('Done')
+  const snoozable = open && props.view !== 'snoozed' && item.verbs.includes('Snooze')
+  const mutable = open && item.verbs.includes('MuteSource')
+  const quickReplies = InboxView.offersQuickReplies(item, props.view) ? (props.quickReplies?.(item.subject.id) ?? []) : []
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
-  const openAction = InboxView.openActionOf(item)
-  const openLabel = openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
+  const openLabel = openLabelOf(item, opener, t)
+  const project = item.subject.kind === 'session' ? props.projectOf(item.subject.id) : undefined
+  const head = InboxView.headMeta(item.source, project, status === 'failed')
   const referencedThreadId =
     item.subject.kind === 'session'
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
+  /**
+   * The card's verbs: in the head's trailing slot before the menu (council round 11 C2), under their short name (council
+   * round 9 C3: "Review", named "Review thread"); on a touch screen too when the card has one verb (council round 18
+   * C1: approval and failed alike). Several verbs on a touch screen sit in the body after the evidence they act on
+   * (council round 8 C2). A question's answers stay under it. The head holds glyph · title · project · kind · time,
+   * the verb and the menu.
+   */
+  const verbCount =
+    (open ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).length : 0) +
+    (open && props.onReview !== undefined ? 1 : 0) +
+    (openable && !answerable ? 1 : 0) +
+    (undo === null ? 0 : 1)
+  const hasVerbs = verbCount > 0
+  const footed = InboxView.footsVerbs({ compact, coarse: phone, verbs: verbCount, answers: answerable })
+  const hasMenu = doneable || snoozable || quickReplies.length > 0 || mutable
+  const verbButtons = (place: 'head' | 'body'): JSX.Element => {
+    const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.BODY_VERB
+    const shortLabel = place === 'head' && !footed ? t(InboxView.shortOpenLabelKey(InboxView.openActionOf(item))) : null
+    return (
+      <>
+          {open
+            ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
+                verb === 'Land' ? (
+                  <Button
+                    key={verb}
+                    size="sm"
+                    variant="outline"
+                    className={cn(INBOX_CHIP, size)}
+                    disabled={props.busy}
+                    onClick={() => setConfirmingLand(true)}
+                  >
+                    {t('land')}
+                  </Button>
+                ) : (
+                  <Button
+                    key={verb}
+                    size="sm"
+                    variant="outline"
+                    className={cn(INBOX_CHIP, size)}
+                    disabled={props.busy}
+                    onClick={() => props.onAct(item, verb)}
+                  >
+                    {verb}
+                  </Button>
+                ),
+              )
+            : null}
+          {open && props.onReview !== undefined ? (
+            <Button size="sm" variant="outline" className={cn(INBOX_CHIP, size)} onClick={() => props.onReview?.(item)}>
+              {t('review')}
+            </Button>
+          ) : null}
+          {/* A question's answers are its verbs; on a desktop its head still seats Open (council round 13 C2), so the verb
+              column down the list has no hole. Council round 14 C3: it names where it goes, "Open thread". Council round
+              16 C2: a quiet ghost in secondary ink with ↗, so the answers below are the card's strongest controls. */}
+          {place === 'head' && openable && answerable ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              data-inbox-open-head=""
+              className={cn('dshx:max-w-full', INBOX_CHIP, size, InboxView.SHORT_VERB, InboxView.QUIET_OPEN)}
+              onClick={() => props.onOpen(item)}
+            >
+              <span className="dshx:truncate">{openLabel}</span>
+              <ArrowUpRightIcon aria-hidden />
+            </Button>
+          ) : null}
+          {openable && !answerable ? (
+            <Button
+              size="sm"
+              variant={
+                open && !item.verbs.includes('Answer') ? (place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)) : 'ghost'
+              }
+              band={place === 'head' && InboxView.onBand(status)}
+              className={cn('dshx:max-w-full', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}
+              aria-label={openLabel}
+              onClick={() => props.onOpen(item)}
+            >
+              <span className="dshx:truncate">{shortLabel ?? openLabel}</span>
+            </Button>
+          ) : null}
+          {undo === 'reopen' || undo === 'unsnooze' ? (
+            <Button size="sm" variant="outline" className={size} disabled={props.busy} onClick={() => props.onReopen(item)}>
+              {undo === 'reopen' ? t('reopen') : t('unsnooze')}
+            </Button>
+          ) : null}
+          {undo === 'unmute' ? (
+            <Button size="sm" variant="outline" className={size} disabled={props.busy} onClick={() => props.onMute(item.source, false)}>
+              {t('unmuteSource')}
+            </Button>
+          ) : null}
+      </>
+    )
+  }
+  const headVerbs = (
+        <div data-inbox-row-actions="band" className={cn(InboxView.HEAD_SEAT, phone && !footed && hasVerbs && InboxView.HEAD_SEAT_VERB)}>
+          {footed ? null : verbButtons('head')}
+          {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
+          {hasMenu ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  data-inbox-card-menu=""
+                  className={cn('dshx:size-7 dshx:pointer-coarse:size-11', InboxView.MENU_AFTER_VERB)}
+                  aria-label={t('more')}
+                  disabled={props.busy}
+                >
+                  <EllipsisIcon aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dshx-root">
+                {doneable ? (
+                  <DropdownMenuItem keys="E" onSelect={() => props.onDone(item)}>
+                    <CheckIcon aria-hidden />
+                    {t('done')}
+                  </DropdownMenuItem>
+                ) : null}
+                {snoozable ? (
+                  <>
+                    <DropdownMenuLabel className="dshx:flex dshx:items-center dshx:gap-2">
+                      <ClockIcon aria-hidden className="dshx:size-3.5" />
+                      {t('snooze')}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
+                      {t('snoozeHour')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
+                  </>
+                ) : null}
+                {quickReplies.length === 0 ? null : (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{t('quickReplies')}</DropdownMenuLabel>
+                    {quickReplies.map(reply => (
+                      <DropdownMenuItem key={reply.id} disabled={reply.disabled} onSelect={reply.onSelect}>
+                        <span className="dshx:truncate">{reply.label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+                {mutable ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+  )
+  /** The answers a question offers, under it: the one row of controls a card body keeps. */
+  const answers = !answerable ? null : (
+        <div
+          data-inbox-row-actions=""
+          className={cn(InboxView.ANSWERS, InboxView.ANSWERS_MEASURE, InboxView.BODY_INSET)}
+        >
+          {[
+                ...item.choices.map((choice, index) => (
+                  <Button
+                    key={choice.id}
+                    size="sm"
+                    variant={InboxView.answerVariant(choice.recommended === true)}
+                    // On a phone each option is a full-width row of at least 44 px (InboxView.ANSWER_ROW).
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW, choice.recommended === true && InboxView.BORDERLESS_EDGE)}
+                    disabled={props.busy}
+                    onClick={() => props.onAct(item, 'Answer', choice.id)}
+                  >
+                    {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
+                    <span className="dshx:truncate dshx:pointer-coarse:whitespace-normal dshx:pointer-coarse:text-left">{choice.label}</span>
+                    {/* The recommendation reads in words, not only in the tint (round five C4). */}
+                    {choice.recommended === true ? (
+                      <span data-inbox-recommended="" className={InboxView.RECOMMENDED}>
+                        {t('recommended')}
+                      </span>
+                    ) : null}
+                  </Button>
+                )),
+                // A custom reply sits beside the answers: it opens the thread, where the composer takes free text.
+                openable ? (
+                  <Button
+                    key="write-own"
+                    size="sm"
+                    variant="ghost"
+                    data-inbox-write-own=""
+                    // Council round 17 C2: borderless, a pencil and its words on the answers' row and 44pt target, so the
+                    // boxed answers read as the choices and this as the way out to the thread's composer.
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW, InboxView.WRITE_OWN)}
+                    onClick={() => props.onOpen(item)}
+                  >
+                    <PencilLineIcon aria-hidden />
+                    <span className="dshx:truncate">{t('writeOwn')}</span>
+                  </Button>
+                ) : null,
+              ]}
+          {/* Any other verb a question card offers follows its answers (council round 8 C2). */}
+          {footed && hasVerbs && props.actionRow !== false ? verbButtons('body') : null}
+        </div>
+  )
+  /**
+   * What the card acts on, first in its body (council round 8 C2): a question's "Asks: …" in ink at body size, any
+   * other note muted. Council round 16 C3: what a card quotes sits in the kit's evidence well across the text measure,
+   * desktop and phone: an approval's "Runs: command" in the neutral well, a failed turn's provider line as
+   * "Error: line" in the danger well, and a failed turn with no line has no well (its meta already says Turn failed).
+   */
+  const failureText =
+    failure === null || failure.kind === 'stopped-on-error' ? null : failure.kind === 'error' ? (
+      <>
+        <span data-evidence-label="">{t('failedErrorLabel')}</span> {failure.line}
+      </>
+    ) : (
+      t('failedTokenLimit')
+    )
+  const evidence =
+    failure !== null ? (
+      failureText === null ? null : (
+        <div data-inbox-card-body="" className={InboxView.WELL_BODY}>
+          <EvidenceWell tone="danger" data-inbox-failure-well={failure.kind} className={InboxView.TEXT_MEASURE}>
+            <span className={InboxView.WELL_CLAMP_ERROR}>{failureText}</span>
+          </EvidenceWell>
+        </div>
+      )
+    ) : reason === null && card.detail === null ? null : (
+      <div
+        data-inbox-card-body=""
+        className={cn(
+          card.command ? InboxView.WELL_BODY : 'dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col dshx:gap-0.5',
+          answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
+        )}
+      >
+        {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
+        {card.detail === null ? null : card.command ? (
+          <EvidenceWell data-inbox-runs="" className={InboxView.TEXT_MEASURE}>
+            <span className={cn(clamped && InboxView.WELL_CLAMP_RUNS)}>
+              <span data-evidence-label="">{t('runs')}</span>{' '}
+              <code className={InboxView.WELL_CODE}>
+                {InboxView.commandWords(card.detail).map((word, index) => (
+                  <span key={index}>
+                    {index === 0 ? null : ' '}
+                    {word.keep ? <span className="dshx:whitespace-nowrap">{word.text}</span> : word.text}
+                  </span>
+                ))}
+              </code>
+            </span>
+          </EvidenceWell>
+        ) : (
+          <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', answerable && 'dshx:text-xs dshx:text-muted-foreground', InboxView.TEXT_MEASURE)}>
+            {card.detail}
+          </span>
+        )}
+      </div>
+    )
+  /** The verbs, right after the evidence they act on; a question's verbs follow its answers instead. */
+  const bodyVerbs =
+    props.actionRow === false || !footed || !hasVerbs || answers !== null ? null : (
+      <div data-inbox-row-actions="body" className={InboxView.BODY_VERBS}>
+        {verbButtons('body')}
+      </div>
+    )
   const row = (
     <EntityRow
       role="listitem"
@@ -214,170 +542,89 @@ const InboxRow = (props: {
       }}
       selected={props.selected === true}
       data-cursor={props.cursor === true ? '' : undefined}
-      aria-selected={props.selected === true}
       className={cn(
-        'dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
-        phone && 'dshx:relative dshx:bg-card dshx:py-1',
+        // The card draws the surface (InboxView.CARD); the row fills it edge to edge, so the head band is flush with its top.
+        'dshx:rounded-none dshx:bg-card dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
+        // The swipe reveal sits under the row.
+        'dshx:relative',
+        // The verbs and the menu share the head row with the title on every width (round five C4, council round 5).
+        InboxView.CARD_HEAD,
+        // On a phone every card's head is the same two lines: glyph · full title · seat, then mark · kind · age (council
+        // round 9 C1).
+        InboxView.HEAD_TWO_LINES,
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
+        InboxView.headerBand(status),
       )}
       data-attention-item={item.id}
       data-severity={item.severity}
       status={status}
       statusLabel={statusLabel}
-      heading={title}
+      heading={<span className={InboxView.TITLE}>{title}</span>}
+      trailing={(props.actionRow === false && !compact) || (footed && !hasMenu) ? undefined : headVerbs}
       meta={
         <>
-          <span>{InboxView.sourceLabel(item.source)}</span>
+          {/* Every head reads glyph · title · project · kind · time with muted "·" separators (council round 7 C1, round 8
+              C2); a finished turn's project replaces its "Thread turns" kind (round five C4), and a failed one reads "Turn
+              failed" (council round 9 C3). On a phone these parts take a second line under the full title
+              (InboxView.HEAD_TWO_LINES), where the "·" after the title goes. Council round 14 C1: project, kind and age are
+              the kit's AttentionMeta, the one formatter the thread list uses too (age drops first, then the name). */}
+          <span data-inbox-head-part="lead" className={InboxView.HEAD_PART}>
+            <HeadSep />
+          </span>
+          <AttentionMeta
+            data-inbox-head-meta=""
+            className={InboxView.HEAD_META}
+            project={head.project}
+            kind={head.kind}
+            age={InboxView.headAge(item.openedAt, props.now, phone)}
+          />
           {referencedThreadId === null ? null : (
-            <button
-              type="button"
-              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
-              onClick={() => props.onOpenThread(referencedThreadId)}
-            >
-              <MessagesSquareIcon aria-hidden className="dshx:size-3" />
-              {t('openThread')}
-            </button>
+            <span data-inbox-head-part="thread" className={InboxView.HEAD_PART}>
+              <HeadSep />
+              <button
+                type="button"
+                className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
+                onClick={() => props.onOpenThread(referencedThreadId)}
+              >
+                <MessagesSquareIcon aria-hidden className="dshx:size-3" />
+                {t('openThread')}
+              </button>
+            </span>
           )}
-          <span>{InboxView.relativeAge(item.openedAt, props.now)}</span>
-          {item.occurrences > 1 ? <Badge variant="outline">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
-          {item.resolvedAt !== null ? <Badge variant="secondary">{t('resolved')}</Badge> : null}
+          {item.occurrences > 1 ? <Badge variant="outline" className="dshx:ml-2">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
+          {item.resolvedAt !== null ? <Badge variant="secondary" className="dshx:ml-2">{t('resolved')}</Badge> : null}
           {props.view === 'snoozed' ? (
-            <Badge variant="outline">
+            <Badge variant="outline" className="dshx:ml-2">
               {item.snoozeUntilChange ? t('snoozedUntilChange') : `${t('snoozedUntil')} ${new Date(item.snoozedUntil ?? 0).toLocaleString()}`}
             </Badge>
           ) : null}
         </>
       }
-      description={
-        <>
-          <span>{item.reason}</span>
-          {item.detail === null ? null : <span className="dshx:line-clamp-2">{item.detail}</span>}
-        </>
-      }
     >
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-2 dshx:pl-9">
-        {open && item.verbs.includes('Answer') && item.choices.length > 0
-          ? item.choices.map((choice, index) => (
-              <Button
-                key={choice.id}
-                size="sm"
-                variant={choice.recommended === true ? 'default' : 'outline'}
-                className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
-                disabled={props.busy}
-                onClick={() => props.onAct(item, 'Answer', choice.id)}
-              >
-                {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
-                <span className="dshx:truncate">{choice.label}</span>
-                {choice.recommended === true ? <span className="dshx:sr-only"> ({t('recommended')})</span> : null}
-              </Button>
-            ))
-          : null}
-        {open && item.subject.kind === 'session' && item.severity !== 'ready' && !(item.verbs.includes('Answer') && item.choices.length > 0)
-          ? props.quickReplies?.(item.subject.id)
-          : null}
-        {open
-          ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
-              verb === 'Land' ? (
-                <Button
-                  key={verb}
-                  size="sm"
-                  variant="outline"
-                  className={cn('dshx:shrink', INBOX_CHIP)}
-                  disabled={props.busy}
-                  onClick={() => setConfirmingLand(true)}
-                >
-                  {t('land')}
-                </Button>
-              ) : (
-                <Button
-                  key={verb}
-                  size="sm"
-                  variant="outline"
-                  className={cn('dshx:shrink', INBOX_CHIP)}
-                  disabled={props.busy}
-                  onClick={() => props.onAct(item, verb)}
-                >
-                  {verb}
-                </Button>
-              ),
-            )
-          : null}
-        {open && props.onReview !== undefined ? (
-          <Button size="sm" variant="outline" className={INBOX_CHIP} onClick={() => props.onReview?.(item)}>
-            {t('review')}
-          </Button>
-        ) : null}
-        {openable ? (
-          <Button
-            size="sm"
-            variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'}
-            className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
-            onClick={() => props.onOpen(item)}
-          >
-            <span className="dshx:truncate">{openLabel}</span>
-          </Button>
-        ) : null}
-        {open && item.verbs.includes('Done') ? (
-          <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy} onClick={() => props.onDone(item)}>
-            {t('done')}
-          </Button>
-        ) : null}
-        {open && props.view !== 'snoozed' && item.verbs.includes('Snooze') ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy}>
-                <ClockIcon aria-hidden />
-                {t('snooze')}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
-                {t('snoozeHour')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-        {undo === 'reopen' || undo === 'unsnooze' ? (
-          <Button size="sm" variant="outline" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onReopen(item)}>
-            {undo === 'reopen' ? t('reopen') : t('unsnooze')}
-          </Button>
-        ) : null}
-        {undo === 'unmute' ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="dshx:shrink dshx:pointer-coarse:min-h-11"
-            disabled={props.busy}
-            onClick={() => props.onMute(item.source, false)}
-          >
-            {t('unmuteSource')}
-          </Button>
-        ) : null}
-        {open && item.verbs.includes('MuteSource') ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')}>
-                <EllipsisIcon aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
+      {evidence === null && bodyVerbs === null ? null : (
+        <div
+          data-inbox-card-evidence=""
+          className={cn(
+            InboxView.EVIDENCE,
+            InboxView.BODY_INSET,
+            // The body ends the card unless answers follow it; a phone's verb ends it 8px from the edge (council round 7 C2).
+            (answers === null || props.actionRow === false) && 'dshx:pb-3',
+            answers === null && bodyVerbs !== null && InboxView.VERB_MARGIN,
+          )}
+        >
+          {evidence}
+          {bodyVerbs}
+        </div>
+      )}
+      {props.actionRow === false ? null : answers}
       {/* Land rebases the thread's work onto the bookmark and moves it: say what lands before it runs (never one click). */}
       <AlertDialog open={confirmingLand} onOpenChange={setConfirmingLand}>
         <AlertDialogContent className="dshx-root">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('landConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{item.reason}</AlertDialogDescription>
+            <AlertDialogDescription>{text.reason}</AlertDialogDescription>
           </AlertDialogHeader>
-          {item.detail === null ? null : <p className="dshx:text-sm dshx:text-foreground dshx:break-words">{item.detail}</p>}
+          {text.detail === null ? null : <p className="dshx:text-sm dshx:text-foreground dshx:break-words">{text.detail}</p>}
           <p className="dshx:text-xs dshx:text-muted-foreground">{t('landConfirmHint')}</p>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
@@ -415,15 +662,14 @@ const InboxRow = (props: {
       ) : null}
     </EntityRow>
   )
-  if (!phone) return row
   return (
-    <div role="none" data-inbox-card="" className="dshx:relative dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-muted">
+    <div role="none" data-inbox-card="" className={InboxView.CARD}>
       {revealed === undefined ? null : (
         <div
           aria-hidden="true"
           data-inbox-swipe-reveal={revealed}
           className={cn(
-            'dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:px-5 dshx:text-sm dshx:font-medium dshx:text-foreground',
+            'dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:bg-muted dshx:px-5 dshx:text-sm dshx:font-medium dshx:text-foreground',
             revealed === 'done' ? 'dshx:justify-end' : 'dshx:justify-start',
           )}
         >
@@ -464,7 +710,7 @@ const InboxActionSheet = (props: {
       <DropdownMenuTrigger asChild>
         <span aria-hidden="true" tabIndex={-1} className="dshx:pointer-events-none dshx:absolute dshx:inset-x-0 dshx:bottom-0 dshx:h-0" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" aria-label={t('actionSheet', { title: item.reason })} data-inbox-action-sheet="">
+      <DropdownMenuContent align="start" aria-label={t('actionSheet', { title: InboxView.textOf(item).reason })} data-inbox-action-sheet="">
         {props.openable ? <DropdownMenuItem onSelect={props.onOpen}>{t('open')}</DropdownMenuItem> : null}
         {live && props.onReview !== undefined ? <DropdownMenuItem onSelect={props.onReview}>{t('review')}</DropdownMenuItem> : null}
         {live
@@ -534,7 +780,7 @@ const peekRetain =
   (sessions: ISessions): RetainThread =>
   (sessionId, signal) => {
     const listed = sessions.list.getSnapshot().ids.find(candidate => candidate === sessionId)
-    if (listed === undefined) throw new Error('This thread is not listed; open it from the thread list.')
+    if (listed === undefined) throw new Error('This thread is not listed. Open it from the thread list.')
     const reference = sessions.retain(listed, { source: 'inboxPeek', signal })
     return { ready: reference.ready.then(binding => ({ eventSource: binding.eventSource })), release: () => reference.release() }
   }
@@ -575,6 +821,15 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const [notice, setNotice] = useState<{ readonly tone: 'ok' | 'error'; readonly text: string } | null>(null)
   const openSubject = useInboxOpener(props)
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
+  const sessionCwd = EntityLabels.useSessionCwd(props.sessions)
+  const workspaceLabel = EntityLabels.useWorkspaceLabel(props.workspaces)
+  const projectOf = useCallback(
+    (sessionId: string): string | undefined => {
+      const cwd = sessionCwd(sessionId)
+      return cwd === null || cwd === '' ? undefined : workspaceLabel({ path: cwd })
+    },
+    [sessionCwd, workspaceLabel],
+  )
   const listQuery = useResource(attentionApi, 'list', { view, limit: ATTENTION_LIST_LIMIT }, ATTENTION_READ)
   const settle = (outcome: { readonly ok: boolean; readonly message: string } | null): void => {
     if (outcome !== null) setNotice({ tone: outcome.ok ? 'ok' : 'error', text: outcome.message })
@@ -682,12 +937,16 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     if (!triageBusy) sendTriage({ type: 'act', request })
   }
   const triagePrimary = triageItem === undefined ? undefined : InboxKeys.primaryOf(triageItem)
-  const runTriagePrimary = (): void => {
-    if (triageItem === undefined || triagePrimary === undefined) return
-    if (triagePrimary.kind === 'answer') triageAct({ kind: 'act', id: triageItem.id, verb: 'Answer', choiceId: triagePrimary.choiceId })
-    else if (triagePrimary.kind === 'verb') triageAct({ kind: 'act', id: triageItem.id, verb: triagePrimary.verb })
-    else if (triagePrimary.kind === 'land') setLandSignal(current => current + 1)
+  const runTriageAction = (action: PrimaryAction | { readonly kind: 'review' }): void => {
+    if (triageItem === undefined) return
+    if (action.kind === 'answer') triageAct({ kind: 'act', id: triageItem.id, verb: 'Answer', choiceId: action.choiceId })
+    else if (action.kind === 'verb') triageAct({ kind: 'act', id: triageItem.id, verb: action.verb })
+    else if (action.kind === 'land') setLandSignal(current => current + 1)
+    else if (action.kind === 'review') reviewOf(triageItem)?.(triageItem)
     else openItem(triageItem)
+  }
+  const runTriagePrimary = (): void => {
+    if (triagePrimary !== undefined) runTriageAction(triagePrimary)
   }
   const triageRegion = (): HTMLDivElement | null => triageRoot.current
   useCommands(triaging ? plugin : undefined, [
@@ -1092,22 +1351,13 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const quickReplies =
     replies.length === 0
       ? undefined
-      : (sessionId: string) => (
-          <span role="group" aria-label={t('quickReplies')} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5" data-quick-replies="">
-            {replies.map(reply => (
-              <Button
-                key={reply.id}
-                size="sm"
-                variant="outline"
-                className="dshx:max-w-48 dshx:shrink dshx:rounded-full"
-                disabled={quickReply.isPending}
-                onClick={() => quickReply.mutate({ sessionId, text: reply.text })}
-              >
-                <span className="dshx:truncate">{reply.label}</span>
-              </Button>
-            ))}
-          </span>
-        )
+      : (sessionId: string): readonly InboxQuickReply[] =>
+          replies.map(reply => ({
+            id: reply.id,
+            label: reply.label,
+            disabled: quickReply.isPending,
+            onSelect: () => quickReply.mutate({ sessionId, text: reply.text }),
+          }))
   const peekSessionId = peeking && cursorItem?.subject.kind === 'session' ? cursorItem.subject.id : undefined
   const reply = useLastReply(peeking ? retain : undefined, peekSessionId)
   const triageReply = useLastReply(triaging ? retain : undefined, triageItem?.subject.kind === 'session' ? triageItem.subject.id : undefined)
@@ -1124,18 +1374,23 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           onSelect: () => transition.mutate({ kind: 'resume-all', itemIds: resumableIds }),
         }
       : null
+  const triageable = (counts?.needsYou ?? 0) + (counts?.other ?? 0) > 0
   const triageAction = {
     id: 'triage',
     label: t('triageStart'),
     icon: <ListChecksIcon aria-hidden />,
-    disabled: (counts?.needsYou ?? 0) + (counts?.other ?? 0) === 0,
     onSelect: () => void startTriage(),
   }
-  // On a phone, Triage (one card at a time, 1 of N, verbs in the thumb zone) is the way through the Inbox: it is the
-  // page's visible button rather than an entry in its overflow menu, unless Resume all needs that seat.
-  const triageOnTop = coarsePointer() && resumeAllAction === null
-  const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number }[] = [
-    { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0 },
+  const [alertSettingsOpen, setAlertSettingsOpen] = useState(false)
+  InboxPush.useNotificationOpen()
+  const alertSettingsAction = { id: 'alerts', label: t('alertSettings'), icon: <BellIcon aria-hidden />, onSelect: () => setAlertSettingsOpen(true) }
+  // Triage (one card at a time, 1 of N; on a phone its verbs sit in the thumb zone) is the way through the Inbox: it is
+  // the page's one ink button, unless Resume all needs that seat (round five P2: no ink button in a card).
+  const triageOnTop = resumeAllAction === null && triageable
+  // Needs you holds two statuses: on a phone its segment shows them as a tally (◆ 2 · ✕ 1), so a failure below the fold
+  // shows at first glance (council round 10 C2; the kit draws it only in the phone shell, where the title is hidden).
+  const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number; readonly statusCounts?: ReturnType<typeof InboxView.titleCounts> }[] = [
+    { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0, statusCounts: InboxView.titleCounts(counts) },
     { view: 'other', label: t('other'), count: counts?.other ?? 0 },
     { view: 'snoozed', label: t('snoozed'), count: counts?.snoozed ?? 0 },
     { view: 'closed', label: t('closed'), count: counts?.closed ?? 0 },
@@ -1143,10 +1398,20 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   ]
   const visibleTabs = tabs.filter(tab => tab.view === 'needs-you' || tab.view === 'other' || tab.count > 0 || tab.view === view)
   const peekAnchor = cursor === null ? null : (rowElements.current.get(cursor) ?? null)
+  const primaryAction = resumeAllAction ?? (triageOnTop ? triageAction : undefined)
+  const headerActions = InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
+    action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
+  )
+  // On a phone the top bar keeps its title and ⋯ (inbox-phone-bar.tsx): Resume all and the other actions fold into the
+  // ⋯, and Triage is a worded text button beside it (council round 11 C1); triage draws its own bar, so the top bar
+  // holds none then.
+  const phoneActions = [...(resumeAllAction === null ? [] : [resumeAllAction]), ...headerActions.filter(action => action.id !== 'triage')]
+  const phoneBar = { actions: triaging ? [] : phoneActions, moreLabel: t('more') }
+  usePublishInboxPhoneActions(triaging || !triageable ? phoneBar : { ...phoneBar, triage: { label: t('triage'), onSelect: () => void startTriage() } })
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
-      <Page scroll heading={t('triage')} description={t('subtitle')} className="dshx:mx-auto dshx:w-full dshx:max-w-3xl">
+      <Page scroll width="lane" mark={<InboxIcon />} markTone="inbox" heading={t('triage')} description={t('subtitle')}>
         <div
           ref={triageRoot}
           tabIndex={-1}
@@ -1169,16 +1434,20 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                 index={progress.index}
                 total={progress.total}
                 item={triageItem}
-                primary={triagePrimary}
+                actions={InboxKeys.triageActions(triageItem, {
+                  openable: triageItem.subject.kind === 'session' || openers.has(triageItem.subject.kind),
+                  reviewable: reviewOf(triageItem) !== undefined,
+                })}
+                openLabel={openLabelOf(triageItem, triageItem.subject.kind === 'session' ? undefined : openers.get(triageItem.subject.kind), t)}
                 busy={triageBusy}
                 error={triage.context.error}
-                onPrimary={runTriagePrimary}
+                onAction={runTriageAction}
                 onDone={() => triageAct({ kind: 'done', id: triageItem.id })}
                 onSnooze={() => triageAct({ kind: 'snooze', id: triageItem.id })}
                 onSkip={() => sendTriage({ type: 'skip' })}
                 onExit={() => sendTriage({ type: 'exit' })}
               />
-              <EntityList aria-label={t('triage')}>
+              <EntityList aria-label={t('triage')} className={INBOX_STACK}>
                 <InboxRow
                   key={triageItem.id}
                   item={triageItem}
@@ -1186,11 +1455,11 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                   t={t}
                   now={Date.now()}
                   sessionLabel={sessionLabel}
+                  projectOf={projectOf}
                   busy={triageBusy}
                   openers={openers}
-                  showChoiceKeys
+                  actionRow={false}
                   landSignal={landSignal}
-                  {...(quickReplies === undefined ? {} : { quickReplies })}
                   onOpen={openItem}
                   onReview={reviewOf(triageItem)}
                   onOpenThread={sessionId => {
@@ -1214,16 +1483,37 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   return (
     <Page
       scroll
+      // The rail's Inbox glyph in its tone before the title (council round 7 C1, kit A2).
+      mark={<InboxIcon />}
+      markTone="inbox"
       heading={t('title')}
-      description={t('subtitle')}
-      className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
-      {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
-      actions={triageOnTop ? [] : [triageAction]}
+      // Council round 15 C1: no tally beside the title; the Needs you tab holds it (◆ 2 · ✕ 1) and the rail its badge.
+      // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
+      // goes and the segmented control leads the page.
+      description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
+      className={cn(
+        'dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden',
+        // Council round 7 C2: 8px, not 12, above the segmented control and under it, so the failed card clears the tab bar.
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2 dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2',
+        // Council round 12 C3: the segmented control spans the row; its segments grow from one basis, so they are equal
+        // wherever a segment's words fit (Needs you keeps its tally's width).
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]>div]:w-full',
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-list]]:w-full',
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-trigger]]:flex-[1_1_0]',
+        // Council round 14 C3: the desktop "Needs you" tab shows its status tally (◆ 2 · ✕ 1) like the phone, not a
+        // plain 3 that hides which of them failed.
+        'dshx:[&_[data-slot=page-tab-count]]:hidden dshx:[&_[data-slot=page-tab-status-counts]]:inline-flex',
+      )}
+      // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
+      width="lane"
+      {...(primaryAction === undefined ? {} : { primaryAction })}
+      actions={headerActions}
+      overflowLabel={t('more')}
       tabs={{
         label: t('title'),
         value: view,
         onValueChange: value => setView(tabs.find(tab => tab.view === value)?.view ?? 'needs-you'),
-        items: visibleTabs.map(tab => ({ value: tab.view, label: tab.label, ...(tab.count > 0 && { count: tab.count }) })),
+        items: visibleTabs.map(tab => ({ value: tab.view, label: tab.label, ...(tab.count > 0 && { count: tab.count }), ...(tab.statusCounts !== undefined && { statusCounts: tab.statusCounts }) })),
       }}
     >
       {notice === null ? null : (
@@ -1232,16 +1522,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         </Alert>
       )}
       {listQuery.status !== 'error' ? null : (
-        <Alert variant="destructive">
-          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <span>
-              {errorMessage(listQuery.error, t('loadFailed'))} {t('loadFailedHint')}
-            </span>
-            <Button size="sm" variant="outline" onClick={() => void listQuery.refetch()}>
-              {t('retry')}
-            </Button>
-          </AlertDescription>
-        </Alert>
+        // One sentence that names the Inbox, Retry, the cause under Details: never an endpoint id (D6, D7).
+        <LoadError subject={t('title')} error={listQuery.error} onRetry={() => void listQuery.refetch()} retryLabel={t('retry')} />
       )}
       {data !== undefined && data.items.length === 0 ? <EmptyState>{emptyCopy(view, t)}</EmptyState> : null}
       {view === 'closed' && props.openNotifications !== undefined ? (
@@ -1285,10 +1567,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
               {t('updates', { count: updates })}
             </Button>
           ) : null}
-          <EntityList
-            aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')}
-            className="dshx:pointer-coarse:gap-2 dshx:pointer-coarse:divide-y-0 dshx:pointer-coarse:rounded-none dshx:pointer-coarse:border-0 dshx:pointer-coarse:bg-transparent"
-          >
+          <EntityList aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')} className={INBOX_STACK}>
             {shownItems.map(item => (
               <InboxRow
                 key={item.id}
@@ -1297,6 +1576,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                 t={t}
                 now={now}
                 sessionLabel={sessionLabel}
+                projectOf={projectOf}
                 busy={transition.isPending}
                 openers={openers}
                 cursor={item.id === cursor}
@@ -1325,14 +1605,14 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           {cursorItem === undefined ? null : (
             <RowPeek anchor={peekAnchor} open={peeking} onOpenChange={setPeeking} side="bottom">
               <PeekCard
-                heading={cursorItem.reason}
+                heading={InboxView.textOf(cursorItem).reason}
                 status={statusOf(cursorItem, view)}
                 statusLabel={statusLabelOf(statusOf(cursorItem, view), t)}
                 {...(cursorItem.subject.kind === 'session' ? { reply } : {})}
                 {...(listOpen && cursorItem.verbs.includes('Answer') && cursorItem.choices.length > 0
                   ? {
                       question: {
-                        text: cursorItem.detail ?? cursorItem.reason,
+                        text: InboxView.textOf(cursorItem).detail ?? InboxView.textOf(cursorItem).reason,
                         choices: cursorItem.choices,
                         busy: transition.isPending,
                         onAnswer: (choiceId: string) => answer(cursorItem, choiceId),
@@ -1345,7 +1625,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                     cursorItem.subject.kind === 'session' ? sessionLabel(cursorItem.subject.id) : (cursorItem.subject.label ?? cursorItem.subject.id),
                     InboxView.relativeAge(cursorItem.openedAt, now),
                   ].join(' · '),
-                  ...(cursorItem.detail === null || cursorItem.verbs.includes('Answer') ? [] : [cursorItem.detail]),
+                  ...(cursorItem.verbs.includes('Answer') ? [] : [InboxView.textOf(cursorItem).detail ?? []].flat()),
                 ]}
                 actions={
                   <Button size="sm" variant="outline" onClick={() => openItem(cursorItem)}>
@@ -1359,8 +1639,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         </div>
       )}
       {view === 'other' ? <p className="dshx:text-xs dshx:text-muted-foreground">{t('otherExpiryHint')}</p> : null}
-      <InboxNotifications.Toggle t={t} />
-      <InboxPush.Control t={t} />
+      <InboxAlerts.SettingsDialog t={t} open={alertSettingsOpen} onOpenChange={setAlertSettingsOpen} />
     </Page>
   )
 }

@@ -19,15 +19,24 @@ import type { AccountProfile } from './api.js'
 import { aiAccountsSessionApi } from './account-session-api.js'
 import { aiAccountsKeys } from './accounts-queries.js'
 
-/** Mount under the page's existing PluginQueryProvider. Every destructive action needs a named, scoped confirmation. */
-export const AccountSignOut = (props: { readonly account: AccountProfile; readonly onSignedOut?: () => void; readonly disabled?: boolean }): JSX.Element => (
-  <AccountSignOutAction key={props.account.instanceId} {...props} />
-)
+/**
+ * Mount under the page's existing PluginQueryProvider. Every destructive action needs a named, scoped confirmation.
+ * With `open` and `onOpenChange` it draws only that confirmation: the account actions menu opens it (council round 4, D2).
+ */
+export const AccountSignOut = (props: {
+  readonly account: AccountProfile
+  readonly onSignedOut?: () => void
+  readonly disabled?: boolean
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
+}): JSX.Element => <AccountSignOutAction key={props.account.instanceId} {...props} />
 
-const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typeof AccountSignOut>[0]): JSX.Element => {
+const AccountSignOutAction = ({ account, onSignedOut, disabled, ...controlled }: Parameters<typeof AccountSignOut>[0]): JSX.Element => {
   const api = useApi(aiAccountsSessionApi)
   const client = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [localOpen, setLocalOpen] = useState(false)
+  const open = controlled.open ?? localOpen
+  const setOpen = controlled.onOpenChange ?? setLocalOpen
   const capability = useQuery({
     queryKey: [
       'ai-accounts',
@@ -64,7 +73,7 @@ const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typ
     if (disabled) return 'Finish the current account edit before signing out.'
     if (!account.signedIn) return 'This account is already signed out.'
     if (capability.isPending) return 'Checking sign-out availability…'
-    if (capability.isError) return 'Sign out needs the updated Host. Restart when idle, then retry.'
+    if (capability.isError) return 'Sign out needs an updated DSH. Restart DSH when idle, then retry.'
     return capability.data?.reason
   }
   const reason = blockedReason()
@@ -79,25 +88,27 @@ const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typ
         }
       }}
     >
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              className="dshx-root dshx:inline-flex"
-              tabIndex={blocked ? 0 : undefined}
-              aria-label={blocked ? `Sign out unavailable: ${reason ?? 'An account operation is running.'}` : undefined}
-            >
-              <AlertDialogTrigger asChild>
-                <Button type="button" size="sm" variant="outline" disabled={blocked}>
-                  <LogOutIcon aria-hidden="true" />
-                  Sign out
-                </Button>
-              </AlertDialogTrigger>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{reason ?? 'Sign out while keeping this account profile and its model preferences.'}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {controlled.open !== undefined ? null : (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="dshx-root dshx:inline-flex"
+                tabIndex={blocked ? 0 : undefined}
+                aria-label={blocked ? `Sign out unavailable: ${reason ?? 'An account operation is running.'}` : undefined}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button type="button" size="sm" variant="outline" disabled={blocked}>
+                    <LogOutIcon aria-hidden="true" />
+                    Sign out
+                  </Button>
+                </AlertDialogTrigger>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{reason ?? 'Sign out while keeping this account profile and its model preferences.'}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       <AlertDialogContent className="dshx-root" size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Sign out of {account.displayName}?</AlertDialogTitle>
@@ -111,9 +122,9 @@ const AccountSignOutAction = ({ account, onSignedOut, disabled }: Parameters<typ
             Could not sign out. Check the credential source or finish any active sign-in, then retry. Your profile was preserved.
           </p>
         ) : null}
-        {capability.data?.available === false ? (
+        {blocked && !signOut.isPending && reason !== undefined && reason !== null ? (
           <p role="status" className="dshx:text-sm dshx:text-muted-foreground">
-            {capability.data.reason}
+            {reason}
           </p>
         ) : null}
         <AlertDialogFooter>

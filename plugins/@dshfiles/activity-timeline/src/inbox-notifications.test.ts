@@ -63,3 +63,12 @@ describe('inbox browser notifications', () => {
     expect(InboxNotifications.newAlerts(new Set(['item-1:1']), [item({ openedAt: 9 })])).toHaveLength(1)
   })
 })
+
+describe('a Markdown question in a notification', () => {
+  const MARKDOWN =
+    'Asks: Pick a layout for [the 0.2 release notes](https://example.test/notes)\n\nBoth drafts list the same **12 changes**:\n\n| Layout | Lines |\n| --- | ---: |'
+
+  it('reads as plain words, not as source', () => {
+    expect(InboxNotifications.notificationOf(item({ reason: MARKDOWN }), label).body).toBe('Asks: Pick a layout for the 0.2 release notes')
+  })
+})

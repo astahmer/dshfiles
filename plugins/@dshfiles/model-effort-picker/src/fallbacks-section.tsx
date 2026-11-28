@@ -1,38 +1,329 @@
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
-import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import { aiAccountsModelFallbackApi, FALLBACK_RETURN_POLICIES, type FallbackRoute, type ModelFallbackSnapshot } from '@dshfiles/ai-accounts/model-fallback-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
-import { FallbackChain } from '@dshfiles/plugin-ui/components/motion/fallback-chain'
-import { accountColor } from './account-color.js'
-import { ModelPickerModel } from './model-picker-model.js'
-import { AccountBadge, BrandMark, InfoHint, QuotaText } from './picker-atoms.js'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { ChevronRightIcon, EllipsisIcon, PlusIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { AccountColor, AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
+import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
+import { BrandMark, InfoHint, quotaTone } from './picker-atoms.js'
 
 const RETURN_LABELS = {
-  stay: 'Stay on it',
-  'next-turn': 'Back next turn',
+  stay: 'stay on it',
+  'next-turn': 'return next turn',
 } satisfies Record<ModelFallbackSnapshot['returnPolicy'], string>
 
-const RETURN_SHORT = {
-  stay: 'Stay',
-  'next-turn': 'Return',
-} satisfies Record<ModelFallbackSnapshot['returnPolicy'], string>
+/** One rung as the list shows it. */
+export interface FallbackRow {
+  readonly id: string
+  readonly model: string
+  readonly brand: ReturnType<typeof ModelPickerModel.brandFor>
+  readonly account: string
+  readonly tag: string
+  readonly color: AccountAccent
+  readonly quota: ModelQuota | undefined
+  readonly serving: boolean
+}
+
+/**
+ * Council picker round 1, N5: the fallback chain, collapsed to "Fallbacks · 2 routes ›". Expanded it is one numbered list
+ * (a rank column before each mark, the account tag, the quota trailing), the return policy below it once there is a
+ * route, and "Add fallback" always in the same place. Alt+Up and Alt+Down move a focused rung.
+ */
+export const FallbackList = (props: {
+  readonly rows: readonly FallbackRow[]
+  readonly expanded: boolean
+  readonly onExpandedChange: (expanded: boolean) => void
+  readonly returnPolicy: ModelFallbackSnapshot['returnPolicy']
+  readonly disabled: boolean
+  readonly canAdd: boolean
+  readonly threadChain: boolean
+  readonly serving: string | null
+  readonly error: string | null
+  readonly onAdd: () => void
+  readonly onRemove: (index: number) => void
+  readonly onMove: (from: number, to: number) => void
+  readonly onPolicyChange: (policy: ModelFallbackSnapshot['returnPolicy']) => void
+  readonly onUseDefault: () => void
+  readonly onReturn: () => void
+}) => {
+  const listId = useId()
+  const count = props.rows.length
+  const summary = count === 0 ? 'none' : count === 1 ? '1 route' : `${String(count)} routes`
+  // Round 5 U5: a move from the keyboard or the actions menu says where the route went.
+  const [moved, setMoved] = useState('')
+  // Round 6 V7: a removed route's Actions button is gone, so focus moves to the route now at its rank (or the one above,
+  // or Add fallback when none is left) once the chain updates, and the removal is announced.
+  const focusAfterRemove = useRef<number | null>(null)
+  const removeAt = (index: number): void => {
+    const row = props.rows[index]
+    focusAfterRemove.current = index
+    if (row !== undefined) setMoved(`${row.model} on ${row.account} removed`)
+    props.onRemove(index)
+  }
+  useEffect(() => {
+    const index = focusAfterRemove.current
+    const element = section.current
+    if (index === null || element === null) return
+    focusAfterRemove.current = null
+    const remaining = [...element.querySelectorAll<HTMLElement>('[data-model-fallback-actions]')]
+    const target = remaining[FallbackFocus.afterRemove({ index, count: remaining.length })] ?? element.querySelector<HTMLElement>('[data-model-fallback-add]')
+    target?.focus()
+  }, [props.rows.length])
+  const moveTo = (from: number, to: number): void => {
+    const row = props.rows[from]
+    props.onMove(from, to)
+    if (row !== undefined) setMoved(`${row.model} on ${row.account} is now fallback ${String(to + 1)}`)
+  }
+
+  const move = (event: KeyboardEvent<HTMLLIElement>, index: number): void => {
+    if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+    event.preventDefault()
+    const to = index + (event.key === 'ArrowUp' ? -1 : 1)
+    if (to >= 0 && to < count && !props.disabled) moveTo(index, to)
+  }
+
+  // Round 4 T10: opening the chain brings its heading to the top of the details body, so the routes show.
+  const section = useRef<HTMLElement>(null)
+  const opening = useRef(false)
+  const toggle = (): void => {
+    if (!props.expanded) opening.current = true
+    props.onExpandedChange(!props.expanded)
+  }
+  useEffect(() => {
+    if (!props.expanded || !opening.current) return
+    opening.current = false
+    const element = section.current
+    const body = element?.closest('[data-model-details-body]')
+    if (element === null || element === undefined || !(body instanceof HTMLElement)) return
+    // Round 6 V2: scroll only as far as needed (\"nearest\") to show what opening revealed: the first route, or Add
+    // fallback's whole 44 pt target.
+    const target = element.querySelector('[data-model-fallback-rung]') ?? element.querySelector('[data-model-fallback-add]')
+    const top = FallbackReveal.scrollTop({ body: body.getBoundingClientRect(), scrollTop: body.scrollTop, target: (target ?? element).getBoundingClientRect() })
+    if (top !== body.scrollTop) body.scrollTo({ top, behavior: 'auto' })
+  }, [props.expanded])
+
+  return (
+    <section aria-label="Fallbacks" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fallbacks ref={section}>
+      {/* Round 4 T10: the label, its chevron and its help icon sit together on the inspector's left edge, as effort's do. */}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+        <button
+          aria-controls={listId}
+          aria-expanded={props.expanded}
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-0 dshx:text-left dshx:text-xs dshx:font-medium dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
+          data-model-fallbacks-toggle
+          onClick={toggle}
+          type="button"
+        >
+          <span className="dshx:truncate">
+            Fallbacks <span className="dshx:font-normal dshx:text-muted-foreground">· {summary}</span>
+          </span>
+        </button>
+        <InfoHint description="Routes tried in order when this model request fails under Priority distribution." label="About fallbacks" />
+        {/* The rest of the row opens it too, for the pointer only (round 5 U15: not a nameless button); the labelled toggle
+            carries the state for assistive tech and the keyboard. */}
+        <span
+          aria-hidden="true"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pr-1.75 dshx:pointer-coarse:pr-1.5"
+          data-model-fallbacks-chevron
+          onClick={toggle}
+        >
+          <ChevronRightIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', props.expanded && 'dshx:rotate-90')} />
+        </span>
+      </div>
+
+      {props.expanded ? (
+        <div className="dshx:flex dshx:flex-col dshx:gap-1" id={listId}>
+          {/* Round 5 U11: on touch the help icon is hidden, so the chain says what it is. */}
+          <p className="dshx:hidden dshx:text-xs dshx:text-pretty dshx:text-muted-foreground dshx:pointer-coarse:block" data-model-fallbacks-help>
+            If this model fails, DSH tries these in order.
+          </p>
+          {props.serving === null ? null : (
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
+              <Undo2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">Serving {props.serving}</span>
+              <Button className="dshx:pointer-coarse:h-11" disabled={props.disabled} onClick={props.onReturn} size="xs" variant="ghost">
+                Return
+              </Button>
+            </div>
+          )}
+
+          <span className="dshx:sr-only" id={`${listId}-reorder`}>
+            Alt+Arrow to reorder.
+          </span>
+          <span aria-live="polite" className="dshx:sr-only" data-model-fallback-announcer>
+            {moved}
+          </span>
+          {count === 0 ? null : (
+            <ol aria-label="Fallback order" className="dshx:flex dshx:flex-col dshx:gap-px">
+              {props.rows.map((row, index) => (
+                <li
+                  aria-label={`Fallback ${String(index + 1)}: ${row.model} on ${row.account}${row.serving ? ', serving now' : ''}.`}
+                  // Round 6 V8: the key hint is a description, not part of each route's name.
+                  aria-describedby={`${listId}-reorder`}
+                  className={cn(
+                    'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                    row.serving && 'dshx:bg-selected-wash',
+                  )}
+                  data-model-fallback-rung
+                  key={row.id}
+                  onKeyDown={event => move(event, index)}
+                  tabIndex={0}
+                >
+                  <span aria-hidden="true" className="dshx:w-4 dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground" data-model-fallback-rank>
+                    {index + 1}
+                  </span>
+                  <BrandMark brand={row.brand} className="dshx:size-4" name={row.model} />
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.model}</span>
+                  {/* Round 5 U5: the account in a fixed left-aligned slot, so the dots line up as in the list. */}
+                  <span
+                    className="dshx:flex dshx:w-12 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground"
+                    data-model-fallback-account
+                  >
+                    <AccountDot accent={row.color} className="dshx:size-1.5" />
+                    {row.tag}
+                  </span>
+                  <span
+                    className={cn(
+                      // Round 6 V11: with a mouse the quota ends where the account quotas end, 7 px past the gap.
+                      'dshx:w-9 dshx:shrink-0 dshx:text-right dshx:tabular-nums dshx:pointer-fine:-mr-1.75',
+                      row.quota === undefined ? 'dshx:text-muted-foreground' : quotaTone(row.quota.percent),
+                    )}
+                    data-model-fallback-quota
+                  >
+                    {row.quota === undefined ? '—' : `${String(Math.round(row.quota.percent))}%`}
+                  </span>
+                  {/* Round 5 U5: one actions button per route (44 pt on touch), so the order changes without Alt+Arrow. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-label={`Actions for fallback ${String(index + 1)}`}
+                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11 dshx:pointer-coarse:justify-end dshx:pointer-coarse:pr-1.5"
+                        data-model-fallback-actions
+                        disabled={props.disabled}
+                        size="icon-xs"
+                        variant="ghost"
+                      >
+                        <EllipsisIcon aria-hidden="true" className="dshx:size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      // The trigger leaves with its route on Remove; the effect above places focus instead.
+                      onCloseAutoFocus={event => {
+                        if (focusAfterRemove.current !== null) event.preventDefault()
+                      }}
+                    >
+                      {index === 0 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index - 1)}>Move up</DropdownMenuItem>}
+                      {index === count - 1 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index + 1)}>Move down</DropdownMenuItem>}
+                      <DropdownMenuItem onSelect={() => removeAt(index)} variant="destructive">
+                        Remove
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {count === 0 ? null : (
+            <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-model-fallback-policy>
+              <span>After a fallback answers:</span>
+              {/* Round 3 R15: a visible small select (with its chevron), not a word that changes when clicked. */}
+              <Select
+                disabled={props.disabled}
+                onValueChange={value => {
+                  const policy = FALLBACK_RETURN_POLICIES.find(candidate => candidate === value)
+                  if (policy !== undefined) props.onPolicyChange(policy)
+                }}
+                value={props.returnPolicy}
+              >
+                <SelectTrigger
+                  aria-label="After a fallback answers"
+                  className="dshx:h-7 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:pointer-coarse:h-11"
+                  data-model-fallback-policy-select
+                  size="sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FALLBACK_RETURN_POLICIES.map(policy => (
+                    <SelectItem key={policy} value={policy}>
+                      {RETURN_LABELS[policy]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Add fallback is always the first action under the list, wherever the list ends. */}
+          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-1">
+            <Button
+              className="dshx:h-7 dshx:gap-1 dshx:px-0! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:bg-transparent dshx:hover:text-foreground dshx:pointer-coarse:h-11"
+              data-model-fallback-add
+              disabled={props.disabled || !props.canAdd}
+              onClick={props.onAdd}
+              size="xs"
+              variant="ghost"
+            >
+              <PlusIcon aria-hidden="true" className="dshx:size-3.5" />
+              Add fallback
+            </Button>
+            {props.threadChain ? (
+              <Button
+                className="dshx:h-7 dshx:shrink-0 dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:h-11"
+                disabled={props.disabled}
+                onClick={props.onUseDefault}
+                size="xs"
+                variant="ghost"
+              >
+                Reset to default chain
+              </Button>
+            ) : null}
+          </div>
+
+          {props.error === null ? null : (
+            <p className="dshx:px-2 dshx:text-xs dshx:text-destructive">{props.error} Try again, or reopen the picker to reload the chain.</p>
+          )}
+        </div>
+      ) : null}
+    </section>
+  )
+}
 
 /**
  * The ordered routes the Host walks when this thread's model request fails under Priority distribution. The Host
  * owns the chain (AI Accounts runs the fail-over), so every edit is a Host write and the list renders what it stored.
  */
+/** Which route's Actions button takes focus after a removal (round 6 V7): the one now at its rank, else the last. */
+export class FallbackFocus {
+  static afterRemove(input: { readonly index: number; readonly count: number }): number {
+    return input.count === 0 ? -1 : Math.min(input.index, input.count - 1)
+  }
+}
+
+/** Where to scroll the details body so what opening Fallbacks revealed shows (round 6 V2): the nearest position. */
+export class FallbackReveal {
+  static scrollTop(input: { readonly body: { readonly bottom: number }; readonly scrollTop: number; readonly target: { readonly bottom: number } }): number {
+    const below = input.target.bottom - input.body.bottom
+    return below <= 0 ? input.scrollTop : input.scrollTop + below
+  }
+}
+
 export const FallbacksSection = (props: {
   readonly sessionId: string
   readonly groups: ModelDirectoryState['groups']
   readonly current: ModelSelection | null
   readonly busy: boolean
-  readonly accountAccents: ReadonlyMap<string, string>
+  readonly accountAccents: ReadonlyMap<string, AccountAccent>
+  /** N2: each account's short tag ("CC2"), the one the status bar and AI Accounts show. */
+  readonly accountBadges?: ReadonlyMap<string, string>
   readonly providerLabels: ReadonlyMap<string, string>
 }) => {
   const api = useApi(aiAccountsModelFallbackApi)
@@ -40,24 +331,14 @@ export const FallbacksSection = (props: {
   const usage = useApiQuery(aiAccountsApi, 'usage')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   // An older Host or a profile without AI Accounts has no fallback API; the picker works without it.
   const snapshot = state.data
-  if (snapshot === undefined) {
-    if (state.error !== undefined && state.error !== null) return null
-    return (
-      <section aria-label="Fallbacks" className="dshx:mt-2.5 dshx:flex dshx:flex-col dshx:gap-1">
-        <p className="dshx:text-2xs dshx:font-medium">Fallback chain</p>
-        <p className="dshx:text-2xs dshx:text-muted-foreground">Loading fallbacks…</p>
-      </section>
-    )
-  }
+  if (snapshot === undefined) return null
 
   const chain = snapshot.threadChain ?? snapshot.defaultChain
   const disabled = props.busy || pending
-  const policyIndex = FALLBACK_RETURN_POLICIES.indexOf(snapshot.returnPolicy)
-  const nextPolicy: ModelFallbackSnapshot['returnPolicy'] =
-    FALLBACK_RETURN_POLICIES[(policyIndex + 1) % FALLBACK_RETURN_POLICIES.length] ?? snapshot.returnPolicy
 
   const write = async (call: () => Promise<ModelFallbackSnapshot>): Promise<void> => {
     setPending(true)
@@ -73,145 +354,43 @@ export const FallbacksSection = (props: {
   }
 
   const save = (next: readonly FallbackRoute[]): void => void write(() => api.setChain({ sessionId: props.sessionId, chain: [...next] }))
-  const serving = snapshot.active === null ? null : ModelPickerModel.fallbackLabel(props.groups, snapshot.active)
+  const servingLabel = snapshot.active === null ? null : ModelPickerModel.fallbackLabel(props.groups, snapshot.active)
   const canAdd = props.current !== null && !chain.some(route => route.provider === props.current?.provider && route.model === props.current.model)
-
-  const addFallback = (
-    <Button
-      className="dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground"
-      disabled={disabled || !canAdd || props.current === null}
-      onClick={() => {
-        if (props.current !== null) save(ModelPickerModel.withFallback(chain, ModelPickerModel.fallbackFor(props.current)))
-      }}
-      size="xs"
-      variant="ghost"
-    >
-      <PlusIcon aria-hidden="true" className="dshx:size-3" />
-      Add fallback
-    </Button>
-  )
+  const rows = chain.map((route): FallbackRow => {
+    const label = ModelPickerModel.fallbackLabel(props.groups, route)
+    const routeModel = props.groups.find(group => group.id === route.provider)?.models.find(model => model.id === route.model)
+    return {
+      id: `${route.provider}/${route.model}`,
+      model: label.model,
+      brand: routeModel === undefined ? undefined : ModelPickerModel.brandFor({ model: routeModel }),
+      account: label.provider,
+      tag: props.accountBadges?.get(route.provider) ?? ModelPickerModel.accountTag({ name: label.provider }),
+      color: props.accountAccents.get(route.provider) ?? AccountColor.of({ instanceId: route.provider }),
+      quota: ModelPickerModel.quota(usage.data?.cards.find(card => card.instanceId === route.provider)),
+      serving: snapshot.active !== null && snapshot.active.provider === route.provider && snapshot.active.model === route.model,
+    }
+  })
 
   return (
-    <section aria-label="Fallbacks" className="dshx:mt-2.5 dshx:flex dshx:flex-col dshx:gap-1">
-      <FallbackChain
-        actions={
-          <>
-            <InfoHint description="Routes tried in order when this model request fails under Priority distribution." />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  aria-label={`After a fallback answers: ${RETURN_LABELS[snapshot.returnPolicy]}. Switch to ${RETURN_LABELS[nextPolicy]}.`}
-                  className="dshx:h-5 dshx:gap-1 dshx:px-1 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground"
-                  disabled={disabled}
-                  onClick={() => void write(() => api.setReturnPolicy({ returnPolicy: nextPolicy }))}
-                  size="xs"
-                  variant="ghost"
-                >
-                  <Undo2Icon aria-hidden="true" className="dshx:size-3" />
-                  {RETURN_SHORT[snapshot.returnPolicy]}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">After a fallback answers: {RETURN_LABELS[snapshot.returnPolicy]}</TooltipContent>
-            </Tooltip>
-          </>
-        }
-        attempts={chain.map((route, index) => {
-          const label = ModelPickerModel.fallbackLabel(props.groups, route)
-          const routeModel = props.groups.find(group => group.id === route.provider)?.models.find(model => model.id === route.model)
-          const providerLabel = props.providerLabels.get(route.provider)
-          const quota = ModelPickerModel.quota(usage.data?.cards.find(card => card.instanceId === route.provider))
-          const isServing = snapshot.active !== null && snapshot.active.provider === route.provider && snapshot.active.model === route.model
-          return {
-            id: `${route.provider}/${route.model}`,
-            model: label.model,
-            provider: label.provider,
-            status: isServing ? 'answered' : 'waiting',
-            statusLabel: isServing ? 'Serving now' : [providerLabel, label.effort].filter(Boolean).join(' · ') || 'Waiting',
-            label: `Fallback ${index + 1}: ${label.model}${providerLabel === undefined ? '' : ` via ${providerLabel}`}, ${label.provider}${isServing ? ', serving now' : ''}. Alt+Arrow to reorder.`,
-            mark: (
-              <BrandMark
-                brand={routeModel === undefined ? undefined : ModelPickerModel.brandFor({ model: routeModel })}
-                className="dshx:size-4"
-                name={label.model}
-              />
-            ),
-            meta: (
-              <>
-                <AccountBadge
-                  className="dshx:max-w-[7rem]"
-                  color={props.accountAccents.get(route.provider) ?? accountColor({ instanceId: route.provider })}
-                  label={ModelPickerModel.accountTag({ name: label.provider, provider: providerLabel })}
-                  name={label.provider}
-                />
-                {quota === undefined ? null : (
-                  <QuotaText className="dshx:w-6 dshx:shrink-0 dshx:text-right" label={quota.label} onReserve={quota.onReserve} percent={quota.percent} />
-                )}
-              </>
-            ),
-            actions: (
-              <Button
-                aria-label={`Remove ${label.model}`}
-                className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground"
-                disabled={disabled}
-                onClick={() => save(ModelPickerModel.withoutFallback(chain, index))}
-                size="icon-xs"
-                variant="ghost"
-              >
-                <XIcon aria-hidden="true" className="dshx:size-3" />
-              </Button>
-            ),
-          }
-        })}
-        density="compact"
-        formatCost={CostEstimateModel.formatUsd}
-        heading="Fallback chain"
-        onReorder={(from, to) => save(ModelPickerModel.reorderedFallback(chain, from, to))}
-        reorderDisabled={disabled}
-        route={props.current === null ? 'selection' : `${props.current.provider}/${props.current.model}`}
-        summary={chain.length === 0 ? null : <span className="dshx:text-2xs">{chain.length === 1 ? '1 route' : `${String(chain.length)} routes`}</span>}
-      />
-
-      {snapshot.active !== null && (
-        <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground" role="status">
-          <Undo2Icon aria-hidden="true" className="dshx:size-3" />
-          <span className="dshx:min-w-0 dshx:truncate">
-            {serving?.model} · {serving?.provider}
-          </span>
-          <Button disabled={disabled} onClick={() => void write(() => api.returnToSelection({ sessionId: props.sessionId }))} size="xs" variant="ghost">
-            Return
-          </Button>
-        </div>
-      )}
-
-      {chain.length === 0 ? (
-        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-          <p className="dshx:text-2xs dshx:text-muted-foreground">No fallbacks</p>
-          {addFallback}
-        </div>
-      ) : null}
-
-      {chain.length === 0 ? null : (
-        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-1">
-          {addFallback}
-          {snapshot.threadChain === null ? null : (
-            <Button
-              className="dshx:h-6 dshx:shrink-0 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground"
-              disabled={disabled}
-              onClick={() => void write(() => api.setChain({ sessionId: props.sessionId, chain: null }))}
-              size="xs"
-              variant="ghost"
-            >
-              Use default
-            </Button>
-          )}
-        </div>
-      )}
-
-      {error === null ? null : (
-        <p className="dshx:text-2xs dshx:text-destructive" role="alert">
-          {error}
-        </p>
-      )}
-    </section>
+    <FallbackList
+      canAdd={canAdd}
+      disabled={disabled}
+      error={error}
+      // A thread serving a fallback shows the chain open, so the Return control is in view.
+      expanded={expanded || snapshot.active !== null}
+      onAdd={() => {
+        if (props.current !== null) save(ModelPickerModel.withFallback(chain, ModelPickerModel.fallbackFor(props.current)))
+      }}
+      onExpandedChange={setExpanded}
+      onMove={(from, to) => save(ModelPickerModel.reorderedFallback(chain, from, to))}
+      onRemove={index => save(ModelPickerModel.withoutFallback(chain, index))}
+      onReturn={() => void write(() => api.returnToSelection({ sessionId: props.sessionId }))}
+      onPolicyChange={returnPolicy => void write(() => api.setReturnPolicy({ returnPolicy }))}
+      onUseDefault={() => void write(() => api.setChain({ sessionId: props.sessionId, chain: null }))}
+      returnPolicy={snapshot.returnPolicy}
+      rows={rows}
+      serving={servingLabel === null ? null : `${servingLabel.model} · ${servingLabel.provider}`}
+      threadChain={snapshot.threadChain !== null}
+    />
   )
 }

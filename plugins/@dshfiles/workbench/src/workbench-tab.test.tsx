@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createDockview, type DockviewApi, type IDockviewPanel } from 'dockview-react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,20 @@ import { connectWorkbenchTabs, type CloseButtonPosition, type WorkbenchTab, type
 import { createWorkbenchTab, WorkbenchNewTabButton } from './workbench-tab.js'
 import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
+
+// Round nine B2: the pages that name themselves on their tab (settings-shell provides them through TabPlaceGlyphs).
+const registry = vi.hoisted(() => {
+  const places: Array<{ readonly panelId: string; readonly glyph: () => JSX.Element; readonly tone: string }> = []
+  return { places }
+})
+vi.mock('@dshfiles/dshx/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@dshfiles/dshx/client')>()
+  return {
+    ...actual,
+    useRegistry: (token: Parameters<typeof actual.useRegistry>[0]) =>
+      token.id === '@dshfiles/workbench.tab-place-glyph' ? registry.places : actual.useRegistry(token),
+  }
+})
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -32,11 +47,12 @@ const fixture = (
     readonly semantic?: boolean
     readonly closeButtonPosition?: CloseButtonPosition
     readonly projectNames?: Readonly<Record<string, string>>
-    readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+    readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string; readonly tone?: number }>>
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
+    readonly tab?: WorkbenchTab
   } = {},
 ) => {
-  const initial: WorkbenchTab = {
+  const initial: WorkbenchTab = options.tab ?? {
     id: 'thread:a',
     kind: 'thread',
     sessionId: 'a',
@@ -100,7 +116,7 @@ const fixture = (
   const view = render(<Tab api={panel.api} containerApi={api} params={{}} tabLocation="header" />)
   const update = (patch: Partial<Extract<WorkbenchTab, { kind: 'thread' }>>) =>
     act(() => {
-      snapshot = { ...snapshot, tabs: [{ ...initial, ...patch }] }
+      snapshot = { ...snapshot, tabs: [initial.kind === 'thread' ? { ...initial, ...patch } : initial] }
       for (const listener of listeners) listener()
     })
   const trigger = () => {
@@ -111,7 +127,12 @@ const fixture = (
   const menu = () => {
     fireEvent.contextMenu(trigger(), { button: 2, clientX: 20, clientY: 20 })
   }
-  return { api, panel, actions, view, update, trigger, menu }
+  /** The docking verbs live one level down, under Layout. */
+  const layoutMenu = () => {
+    menu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Layout' }))
+  }
+  return { api, panel, actions, view, update, trigger, menu, layoutMenu }
 }
 
 describe('workbench semantic tab chrome', () => {
@@ -124,19 +145,147 @@ describe('workbench semantic tab chrome', () => {
     reveal.mockRestore()
   })
 
-  it('shows the project chip before a thread title when the provider publishes project names', () => {
+  it('shows the project as a ProjectMark tile before a thread title, named for assistive tech', () => {
     const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
     tab.update({ workspaceId: 'workspace-a' })
-    const chip = screen.getByText('NixConfig')
+    const mark = screen.getByRole('img', { name: 'NixConfig' })
     const title = screen.getByText('Thread A')
-    expect(chip.getAttribute('data-workbench-tab-project')).toBe('')
-    expect(chip.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mark.getAttribute('data-workbench-tab-project')).toBe('')
+    expect(mark.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark.getAttribute('data-size')).toBe('dense')
+    expect(mark.textContent).toBe('NI')
+    expect(mark.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // No rose pill: the tile carries the colour, the name is not repeated as tinted text.
+    expect(screen.queryByText('NixConfig')).toBeNull()
   })
 
-  it('tints the project chip with its chosen tone', () => {
-    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { className: 'project-tone-balanced-3' } } })
+  it('paints the tile in the project\'s chosen tone', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { className: 'project-tone-balanced-3', tone: 3 } } })
     tab.update({ workspaceId: 'workspace-a' })
-    expect(screen.getByText('NixConfig').className).toContain('project-tone-balanced-3')
+    expect(screen.getByRole('img', { name: 'NixConfig' }).className).toContain('project-tone-balanced-3')
+  })
+
+  it('keeps a custom tile colour readable by clamping its lightness in each scheme', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { color: '#ffd400' } } })
+    tab.update({ workspaceId: 'workspace-a' })
+    const mark = screen.getByRole('img', { name: 'NixConfig' })
+    // The pick rides as --chip; the tile is the pick at L ≤ 0.52 in light and L ≥ 0.78 in dark.
+    expect(mark.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(mark.style.color).toBe('var(--chip-clamped)')
+    expect(mark.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(mark.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
+    expect(mark.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
+    expect(mark.className).toContain('dshx:dark:[--chip-clamped:var(--chip-dark)]')
+  })
+
+  it('names a page tab\'s destination with its rail glyph, in its nav tone while the tab is on screen (round five B4)', () => {
+    fixture({
+      tab: {
+        id: 'panel:backlog',
+        kind: 'panel',
+        panelId: 'dshfiles-backlog-panel',
+        destination: { id: 'work', icon: 'list-todo' },
+        target: { kind: 'panel', panelId: 'dshfiles-backlog-panel' },
+        title: 'Backlog',
+        active: true,
+        pinned: false,
+        preview: false,
+        available: true,
+        status: null,
+      },
+    })
+    const glyph = document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph?.getAttribute('data-tab-destination')).toBe('work')
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(glyph?.className).toContain('dshx:nav-tone-work')
+    // Tertiary on a background tab; the tone only where Dockview marks the tab active. The label stays ink.
+    expect(glyph?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:text-nav-tone')
+    // Round nine B2: the active tab's glyph on its tone's 14% tile.
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:bg-nav-tile')
+    expect(glyph?.querySelector('svg')?.getAttribute('width')).toBe('14')
+    expect(glyph?.getAttribute('data-tab-place')).toBeNull()
+    expect((glyph?.compareDocumentPosition(screen.getByText('Registered title')) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('names a page with its own place glyph by that glyph in its tone, not its destination\'s (round nine B2)', () => {
+    registry.places = [{ panelId: 'ai-accounts', glyph: () => <svg data-testid="leaf" />, tone: 'var(--dshx-identity-2)' }]
+    fixture({
+      tab: {
+        id: 'panel:ai-accounts',
+        kind: 'panel',
+        panelId: 'ai-accounts',
+        destination: { id: 'settings', icon: 'settings' },
+        target: { kind: 'panel', panelId: 'ai-accounts' },
+        title: 'AI accounts',
+        active: true,
+        pinned: false,
+        preview: false,
+        available: true,
+        status: null,
+      },
+    })
+    const glyph = document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph?.getAttribute('data-tab-place')).toBe('ai-accounts')
+    expect(glyph?.querySelector('[data-testid="leaf"]')).not.toBeNull()
+    expect(glyph?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-2)')
+    expect(glyph?.className).not.toContain('dshx:nav-tone-settings')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:bg-nav-tile')
+    registry.places = []
+  })
+
+  it('seats the compose glyph in the Threads tone on a new thread tab, which has no status and no project yet (council round 6 B6)', () => {
+    const tab = fixture()
+    tab.update({ status: null, title: 'New thread' })
+    const seat = document.querySelector<HTMLElement>('[data-tab-status-slot]')
+    const glyph = seat?.querySelector<HTMLElement>('[data-tab-compose]')
+    expect(glyph).not.toBeNull()
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(glyph?.className).toContain('dshx:nav-tone-threads')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:text-nav-tone')
+    // A running thread shows its status there instead; a thread in a project shows the project's tile.
+    tab.update({ status: 'running' })
+    expect(document.querySelector('[data-tab-compose]')).toBeNull()
+    cleanup()
+    const inProject = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    inProject.update({ status: null, workspaceId: 'workspace-a' })
+    expect(document.querySelector('[data-tab-compose]')).toBeNull()
+  })
+
+  it('draws the list\'s Idle ring in the seat of a thread tab with a project and no status (council round 34, B4)', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    tab.update({ status: null, workspaceId: 'workspace-a' })
+    const seat = (): HTMLElement | null => tab.view.container.querySelector<HTMLElement>('[data-tab-status-slot]')
+    // Seat before the project tile before the title, in both states: nothing between them changes.
+    const order = (): readonly string[] => {
+      const mark = tab.view.container.querySelector('[data-workbench-tab-project]')
+      const title = screen.getByText('Thread A')
+      const after = (a: Element | null | undefined, b: Element | null): boolean => a !== null && a !== undefined && b !== null && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+      return after(seat(), mark) && after(mark, title) ? ['seat', 'project'] : ['seat']
+    }
+    const ring = seat()?.querySelector('[data-tab-idle]')
+    expect(ring?.getAttribute('data-status')).toBe('idle')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat()?.childElementCount).toBe(1)
+    expect(order()).toEqual(['seat', 'project'])
+    // A turn starts: the same seat holds its working ring, so the title does not move.
+    tab.update({ status: 'running', workspaceId: 'workspace-a' })
+    expect(seat()?.querySelector('[data-tab-idle]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-status="running"]')).not.toBeNull()
+    expect(seat()?.childElementCount).toBe(1)
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(order()).toEqual(['seat', 'project'])
+  })
+
+  it('keeps the ProjectMark, not a destination glyph, on a thread tab', () => {
+    fixture()
+    expect(document.querySelector('[data-tab-destination]')).toBeNull()
+  })
+
+  it('starts every tab\'s content 12px from its edge', () => {
+    fixture()
+    const content = document.querySelector<HTMLElement>('[data-workbench-tab-id]')
+    expect(content?.className).toContain('dshx:pl-3')
   })
 
   it('hides the project chip without a project name for the tab', () => {
@@ -224,15 +373,77 @@ describe('workbench semantic tab chrome', () => {
     const tab = fixture()
     const trigger = tab.trigger()
     expect(screen.getByText('Thread A')).toBeTruthy()
-    expect(screen.getByLabelText('running')).toBeTruthy()
+    expect(screen.getByLabelText('Working')).toBeTruthy()
     expect(trigger.getAttribute('data-preview')).toBe('true')
     tab.update({ title: 'Renamed', status: 'unread', pinned: true, preview: false })
     expect(tab.trigger()).toBe(trigger)
     expect(screen.getByText('Renamed')).toBeTruthy()
-    expect(screen.getByLabelText('unread')).toBeTruthy()
+    expect(screen.getByLabelText('Ready')).toBeTruthy()
     expect(screen.getByLabelText('Pinned')).toBeTruthy()
-    expect(screen.queryByLabelText('running')).toBeNull()
+    expect(screen.queryByLabelText('Working')).toBeNull()
     expect(trigger.hasAttribute('data-preview')).toBe(false)
+  })
+
+  it('draws the shared status glyph for every tab status and never a coloured dot of its own', () => {
+    const tab = fixture()
+    const glyph = () => tab.view.container.querySelector('[data-slot="status-glyph"]')
+    expect(glyph()?.getAttribute('data-status')).toBe('working')
+    expect(tab.view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    tab.update({ status: 'needsYou' })
+    expect(glyph()?.getAttribute('data-status')).toBe('needs-you')
+    expect(tab.view.container.innerHTML).not.toMatch(/bg-info|bg-warning|animate-pulse/)
+    tab.update({ status: 'failed' })
+    expect(glyph()?.getAttribute('data-status')).toBe('failed')
+    tab.update({ status: 'unread' })
+    expect(glyph()?.getAttribute('data-status')).toBe('ready')
+    tab.update({ status: null })
+    expect(glyph()).toBeNull()
+  })
+
+  it('keeps a 16 px status seat on a thread tab, so its title does not move when a thread starts or stops', () => {
+    // The glyph mounted only with a status: the title moved 24 px at each start and end of a turn (F13).
+    const tab = fixture()
+    const seat = () => tab.view.container.querySelector('[data-tab-status-slot]')
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(1)
+    tab.update({ status: null })
+    expect(seat()?.className).toContain('dshx:size-4')
+    // No status glyph; without a project the seat shows the compose glyph instead (council round 6 B6).
+    expect(seat()?.querySelector('[data-tab-status]')).toBeNull()
+  })
+
+  it('draws every tab not on screen in one ink, preview or kept (council round 18 B2.1), and caps the title with an ellipsis', () => {
+    const tab = fixture()
+    const title = screen.getByText('Thread A')
+    // The preview stays in the DOM, but its title takes no ink of its own: a muted preview beside an ink kept tab read
+    // as two inks for one state.
+    expect(tab.trigger().getAttribute('data-preview')).toBe('true')
+    expect(title.className).not.toContain('italic')
+    expect(title.className).not.toContain('dshx:text-muted-foreground')
+    expect(title.className).toContain('dshx:truncate')
+    expect(title.className).toContain('dshx:max-w-56')
+    // The tab's own `.dshx-root` reset its ink to the primary label, over Dockview's per-state tab ink: a kept inactive
+    // tab drew in ink. The content inherits the `.dv-tab` colour instead.
+    expect(tab.trigger().className).toContain('dshx-root')
+    expect(tab.trigger().className).toContain('dshx:text-inherit')
+    tab.update({ preview: false })
+    expect(screen.getByText('Thread A').className).not.toContain('dshx:text-muted-foreground')
+  })
+
+  it('gives every inactive tab the secondary ink in the Dockview theme, in and outside the focused group', () => {
+    const css = readFileSync('src/dockview-theme.css', 'utf8')
+    const ink = (name: string): string | undefined => new RegExp(`--dv-${name}-tab-color: ([^;]+);`, 'u').exec(css)?.[1]
+    expect(ink('activegroup-visiblepanel')).toBe('var(--dsw-alias-label-primary)')
+    expect(ink('activegroup-hiddenpanel')).toBe('var(--dsw-alias-label-secondary)')
+    expect(ink('inactivegroup-visiblepanel')).toBe('var(--dsw-alias-label-secondary)')
+    expect(ink('inactivegroup-hiddenpanel')).toBe('var(--dsw-alias-label-secondary)')
+  })
+
+  it('draws the title of the tab on screen in ink at 500, even while it is a preview (round five B5)', () => {
+    fixture()
+    const title = screen.getByText('Thread A')
+    expect(title.className).toContain('dshx:in-[.dv-active-tab]:text-foreground')
+    expect(title.className).toContain('dshx:in-[.dv-active-tab]:font-medium')
   })
 
   it('keeps a preview on double click and delegates close exactly once without archiving', () => {
@@ -317,6 +528,28 @@ describe('workbench semantic tab chrome', () => {
     fireEvent.keyDown(editor, { key: 'Escape' })
   })
 
+  it('keeps tab verbs at the top level and puts the docking verbs under one Layout submenu', () => {
+    const tab = fixture()
+    tab.menu()
+    const topLevel = (): string[] => screen.getAllByRole('menuitem').map(item => item.textContent ?? '')
+    expect(topLevel()).toEqual(['Keep tab', 'Pin tab', 'Move to side panel', 'Close tab', 'Close other tabs', 'Close tabs to the right', 'Layout'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Layout' }))
+    expect(screen.getByRole('menuitem', { name: 'Float panel' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Hide tab row' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: 'Close panel' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
+    expect(tab.actions.close).toHaveBeenCalledExactlyOnceWith('thread:a')
+  })
+
+  it('names the close verb of a panel without a semantic tab Close tab as well', () => {
+    const tab = fixture({ semantic: false })
+    tab.menu()
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Close tab', 'Close other tabs', 'Close tabs to the right', 'Layout'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Close tab' }))
+    expect(tab.api.getPanel(tab.panel.id)).toBeUndefined()
+    expect(tab.actions.close).not.toHaveBeenCalled()
+  })
+
   it('closes the other native tabs of its group, or only those to its right', () => {
     const tab = fixture({ semantic: false })
     act(() => {
@@ -340,7 +573,7 @@ describe('workbench semantic tab chrome', () => {
 
   it('hides only a single native tab row without closing or navigating its panel', () => {
     const tab = fixture({ semantic: false })
-    tab.menu()
+    tab.layoutMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Hide tab row' }))
     expect(tab.panel.group.header.hidden).toBe(true)
     expect(tab.api.getPanel(tab.panel.id)).toBe(tab.panel)
@@ -350,19 +583,20 @@ describe('workbench semantic tab chrome', () => {
 
   it('disables hiding a multi-tab row and rechecks eligibility after the menu opens', () => {
     const tab = fixture()
-    tab.menu()
+    tab.layoutMenu()
     const hide = screen.getByRole('menuitem', { name: 'Hide tab row' })
     act(() => tab.api.addPanel({ id: 'second', component: 'body', position: { referenceGroup: tab.panel.group } }))
     fireEvent.click(hide)
     expect(tab.panel.group.header.hidden).toBe(false)
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
-    tab.menu()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    tab.layoutMenu()
     expect(screen.getByRole('menuitem', { name: 'Hide tab row' }).getAttribute('data-disabled')).toBe('')
   })
 
   it('floats the real panel and leaves the semantic actor unchanged', () => {
     const tab = fixture()
-    tab.menu()
+    tab.layoutMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Float panel' }))
     expect(tab.panel.group.api.location.type).toBe('floating')
     expect(tab.actions.close).not.toHaveBeenCalled()

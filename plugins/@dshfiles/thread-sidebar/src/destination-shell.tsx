@@ -1,8 +1,13 @@
 import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
+import { useContract } from '@dshfiles/dshx/client'
+import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
+import { LEADING_GLYPH_ATTRIBUTE, SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { fieldLook } from '@dshfiles/plugin-ui/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -12,6 +17,7 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CornerDownRightIcon,
   EllipsisIcon,
   GitMergeIcon,
   InboxIcon,
@@ -27,12 +33,14 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PLACE_TONE_CLASS, placeToneStyle, type PlaceTone } from '@dshfiles/plugin-ui/components/ui/place-glyph'
 import * as Schema from 'effect/Schema'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DESTINATION_IDS,
   Destinations,
+  KNOWN_SECTIONS,
   type DestinationIcon,
   type DestinationId,
   type DestinationPanel,
@@ -44,12 +52,24 @@ import { ListHeaderExtras } from './list-header-extras.js'
 import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, FolderNotice, ViewGlyph, viewDrag, type SidebarFolderUi } from './sidebar-folders.js'
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import type { WorkCountPart } from '@dshfiles/plugin-ui/lib/work-count'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
+import type { PhoneStageMeta } from './phone-thread-meta.js'
+import { PhoneLayout } from './phone-layout.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
 import { PhoneDrawer } from './phone-drawer.js'
+import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
+import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
+import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
+import { SettingsColumnScroll } from './settings-column-scroll.js'
+import { SettingsEntryGlyph, SettingsIcons, SettingsToneMark } from '@dshfiles/settings-shell/settings-icons'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -123,8 +143,6 @@ const storedDestination = createStoredValue({
 const soleSection = (destination: ResolvedDestination): string | undefined =>
   destination.id !== 'threads' && destination.id !== 'settings' && destination.sections.length === 1 ? destination.sections[0]?.panelId : undefined
 
-const PHONE_QUERY = '(max-width: 639.98px)'
-
 /**
  * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
  * False when the shell is not loaded: the rail then only shows its list, never the native Settings dialog.
@@ -133,18 +151,27 @@ const openSettingsPage = (): boolean => dispatchOpenSettings()
 const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
 /** Inside a thread the tab bar is gone; the stage still stops above the home indicator. */
 const PHONE_NAV_HIDDEN_HEIGHT = 'env(safe-area-inset-bottom, 0px)'
-/** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
-const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
+/**
+ * The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px), with a subagent's
+ * parent strip under it when there is one: the stage starts under both. Whatever sits in the bar's 44px row from this
+ * height (the thread's ⋯) subtracts the strip, `--dsh-phone-top-strip`, 0px everywhere else.
+ */
+const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))'
+/**
+ * A subagent's parent strip (round 22 item 4): 13px over a 32px line, under the bar. The bar cannot also name the parent
+ * at 390px: its title and line 2 fill it, and a Back label had ~72px (`‹ Audit …`).
+ */
+const PHONE_PARENT_STRIP = '32px'
+/**
+ * The phone top bar's one seat rule (council round 17 B2.2): every bar has a leading and a trailing 44 x 44 seat on its
+ * 44px row under the status bar, 4px in from the screen edge (the safe-area inset when that is larger), so a 20px glyph
+ * centres 26px from its edge on every root screen. Published on the root, so a page or a plugin that draws into the bar
+ * (the Inbox's gauge, Triage and menu; a thread's menu) takes the same x: `left: var(--dsh-phone-seat-left, 4px)`.
+ */
+const PHONE_SEAT_LEFT = 'max(4px, env(safe-area-inset-left, 0px))'
+const PHONE_SEAT_RIGHT = 'max(4px, env(safe-area-inset-right, 0px))'
 
-const subscribePhone = (listener: () => void): (() => void) => {
-  if (typeof window.matchMedia !== 'function') return () => undefined
-  const query = window.matchMedia(PHONE_QUERY)
-  query.addEventListener('change', listener)
-  return () => query.removeEventListener('change', listener)
-}
-const readPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
-
-export const usePhoneLayout = (): boolean => useSyncExternalStore(subscribePhone, readPhone, () => false)
+export const usePhoneLayout = (): boolean => useSyncExternalStore(PhoneLayout.subscribe, PhoneLayout.matches, () => false)
 
 export interface DestinationShellProps {
   readonly panels: readonly DestinationPanel[]
@@ -172,16 +199,29 @@ export interface DestinationShellProps {
   readonly customizeThreads?: { readonly label: string; readonly expanded: boolean; readonly toggle: () => void }
   /** Settings › All settings; null when the Host serves no settings page. */
   readonly openSettings: (() => void) | null
+  /**
+   * Settings' categories (`@dshfiles/settings-shell`): the Settings column lists them with its pages, as the one Settings
+   * navigation (council round 4 B1). Absent, the column lists its pages under All settings.
+   */
+  readonly settingsNavigation?: SettingsNavigationService | undefined
   /** The thread the stage shows, as its title (the phone top bar names the stage). */
   readonly stageTitle?: string | undefined
   /** A thread picked in the list that the stage has not opened yet: the phone bar names it at once. */
   readonly pendingTitle?: string | undefined
+  /** The stage thread or one of its subagents works: the phone thread bar's glyph before its title (council round 13 B6). */
+  readonly stageWorking?: boolean | undefined
+  /** The phone thread header's meta line under the title: project, status, subagents (council round 17 B2.2). */
+  readonly stageMeta?: PhoneStageMeta | undefined
+  /** Opens a thread on the stage: a subagent's phone Back opens its parent (round 21 D3). */
+  readonly openThread?: ((sessionId: string) => void) | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
   readonly edgeSwipePanels?: boolean
   /** Phone model (Settings › phoneNavigation): the tab-bar stack, or the thread list as a drawer over the thread. */
   readonly phoneNavigation?: 'stack' | 'drawer'
+  /** Settings › Developer lists the pages for plugin authors; off hides the group (the palette still opens them). */
+  readonly showDeveloperPages?: boolean
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
   /** Sidebar folders (b:952m): the rail's folders and their verbs; absent, the rail lists the eight destinations. */
@@ -194,6 +234,39 @@ export interface DestinationShellProps {
 }
 
 const NO_RAIL_ACTIONS: readonly RailAction[] = []
+
+/** "The column is folded because the stage page asked": the frame persists the collapse, so this persists too. */
+const stageFoldMarker = createStoredValue({ key: 'dshfiles.thread-sidebar.stage-fold.v1', schema: Schema.Boolean, fallback: false })
+
+/**
+ * Folds the left column to its rail while the stage shows a page its list would only repeat (`StageFold`), and opens it
+ * again when the page leaves. True while folded this way: the rail then keeps its labels and its active item.
+ */
+const useStageFold = (wants: boolean, collapsed: boolean, toggle: () => void, enabled: boolean): boolean => {
+  // Read once per mount, from storage itself: another tab or an earlier mount may have changed the marker.
+  const [initial] = useState((): StageFoldState => {
+    stageFoldMarker.reload()
+    return { folded: stageFoldMarker.get(), userOpened: false }
+  })
+  const state = useRef<StageFoldState>(initial)
+  const [folded, setFolded] = useState(initial.folded)
+  // Steps run on a change of the page or of the column only: a new toggle identity alone must not read the column it
+  // just asked to fold, still open in this render, as one the person opened by hand.
+  const toggleRef = useRef(toggle)
+  toggleRef.current = toggle
+  useEffect(() => {
+    if (!enabled) return
+    const { next, toggle: flip } = StageFold.step(state.current, { wants, collapsed })
+    if (next.folded !== state.current.folded) {
+      if (next.folded) stageFoldMarker.set(true)
+      else stageFoldMarker.remove()
+    }
+    state.current = next
+    setFolded(next.folded)
+    if (flip) toggleRef.current()
+  }, [wants, collapsed, enabled])
+  return enabled && wants && collapsed && folded
+}
 
 const setStoredDestination = (next: string): void => void storedDestination.set(next)
 
@@ -245,6 +318,7 @@ const entriesOfSections = (destination: ResolvedDestination): readonly ResolvedE
     mapped: true,
     description: section.description,
     unmapped: section.unmapped,
+    developer: section.group === 'developer',
   }))
 
 const railFoldersOf = (destinations: readonly ResolvedDestination[], folderUi: SidebarFolderUi | undefined): readonly RailFolder[] => {
@@ -286,6 +360,18 @@ const soleEntry = (folder: RailFolder): string | undefined =>
 
 const isDestinationId = (id: string): id is DestinationId => DESTINATION_IDS.some(candidate => candidate === id)
 
+/** Each destination's identity tone (council round 3 A7): its glyph on the rail and the phone tab bar. */
+const NAV_TONE = {
+  threads: 'dshx:nav-tone-threads',
+  inbox: 'dshx:nav-tone-inbox',
+  land: 'dshx:nav-tone-land',
+  work: 'dshx:nav-tone-work',
+  agents: 'dshx:nav-tone-agents',
+  observe: 'dshx:nav-tone-observe',
+  knowledge: 'dshx:nav-tone-knowledge',
+  settings: 'dshx:nav-tone-settings',
+} as const satisfies Record<DestinationId, string>
+
 const RailButton = (props: {
   readonly folder: RailFolder
   readonly active: boolean
@@ -321,17 +407,30 @@ const RailButton = (props: {
         props.onDropView(viewId)
       }}
       className={cn(
-        'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1.5 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
+        'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
         'dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-        props.active && 'dshx:bg-accent dshx:text-foreground',
+        // Navigation identity (council round 3 B2, A7): each destination's glyph in its own tone. The active item is its
+        // tone's 14% tile behind the glyph and an ink label at 600, no wash: the leaf row in the list carries the marker.
+        isDestinationId(props.folder.id) ? NAV_TONE[props.folder.id] : undefined,
+        props.active && 'dshx:text-foreground',
         dropping && 'dshx:ring-2 dshx:ring-ring',
       )}
     >
-      <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center" aria-hidden="true">
+      <span
+        className={cn(
+          'dshx:inline-flex dshx:h-6 dshx:w-8 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-nav-tone',
+          props.active && 'dshx:bg-nav-tile',
+        )}
+        aria-hidden="true"
+        data-rail-icon=""
+      >
         {props.icon}
       </span>
       {props.showLabel ? (
-        <span className="dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight">{props.folder.label}</span>
+        // The 11px floor at -0.01em (round five B3): "Knowledge", the longest, keeps side room in the 60px rail.
+        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-[-0.01em]', props.active && 'dshx:font-semibold')}>
+          {props.folder.label}
+        </span>
       ) : null}
     </button>
   )
@@ -370,12 +469,26 @@ const folderIcon = (props: Pick<DestinationShellProps, 'panels' | 'renderPanelIc
     destinationIcon(props, folder.destination, active, size)
   )
 
+/**
+ * A page glyph may draw a count over its icon (the Inbox's Needs you count): right for the 20px rail seat, but in a list
+ * row the count sat on the icon and touched the label. In a row the count is positioned against the row instead, at its
+ * trailing edge, clear of the label and of the row's menu.
+ */
+const SECTION_ROW_BADGE =
+  'dshx:[&_[data-attention-badge]]:static dshx:[&_[data-attention-badge]>span]:top-2 dshx:[&_[data-attention-badge]>span]:right-8 dshx:[&_[data-attention-badge]>span]:left-auto'
+const SECTION_ROW_BADGE_ROOM = "dshx:has-[[data-attention-badge]:not([data-attention-badge='0'])]:pr-14"
+/**
+ * The seat sizes the glyph (council round 10 B2): a page may register an unsized icon (a bare lucide icon is 24px), which
+ * filled the 24px place seat. Every side-column glyph draws at 16px in its seat.
+ */
+const SECTION_ROW_GLYPH = 'dshx:[&_svg]:size-4 dshx:[&_svg]:shrink-0'
+
 /** One section: its label is the button's whole name, so a reach or a screen reader finds it by that alone. */
 const SectionButton = (props: {
   readonly label: string
   readonly description?: string | undefined
   readonly selected: boolean
-  readonly panelId?: string
+  readonly panelId?: string | undefined
   /** The page's own sidebar glyph, which may carry its badge (RAM's detached memory, the Inbox count). */
   readonly icon?: ReactNode
   readonly onSelect: () => void
@@ -383,6 +496,15 @@ const SectionButton = (props: {
   readonly menu?: ReactNode
   /** Drag the row to another folder or before another row (b:952m). */
   readonly drag?: { readonly onDropBefore: (viewId: string) => void } | undefined
+  /** While Settings searches: the row's matches; none dims it. */
+  readonly count?: number | undefined
+  /** A row under the row above it (a category's settings under its page). */
+  readonly nested?: boolean
+  /**
+   * The place's tone (round nine B2, kit A1): a destination's, or any CSS colour (a Settings group's identity tone). The
+   * selected row's glyph sits on a 14% tile of it; at rest a destination row's glyph stays in the secondary ink.
+   */
+  readonly place?: { readonly tone: PlaceTone } | { readonly color: string } | undefined
 }): JSX.Element => {
   const descriptionId = useId()
   const [dropping, setDropping] = useState(false)
@@ -416,32 +538,96 @@ const SectionButton = (props: {
         aria-describedby={props.description === undefined ? undefined : descriptionId}
         onClick={props.onSelect}
         className={cn(
-          'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
+          'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-          props.selected && 'dshx:bg-accent',
+          // A child row hangs its child-line glyph 12px in from its parent's (council round 14 B2), so its label still
+          // starts 12px past the parent's text edge (council round 6 B3): 22px inset, 16px seat, 8px gap.
+          props.nested === true && 'dshx:pl-5.5',
+          props.count === 0 && 'dshx:opacity-45',
+          // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
+          SECTION_ROW_BADGE_ROOM,
+          // The open page (round five T3, A1; council round 3 B2): the neutral selected wash and its leading marker, which
+          // carries the accent, with an ink icon and label: the current place is lit once, here.
+          props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
+          // A row led by a plain glyph draws no pill, so the kit's selected edge outlines its wash (council round 12 B1). A
+          // place-tile row (the Settings column, a side column's pages) takes no edge either (council round 13 B4): its
+          // toned tile, the wash and the 550 label carry the selection.
+          // A child row's connector is not a place either: it is selected like its place-tile siblings.
+          props.selected && props.icon !== undefined && props.icon !== null && props.place === undefined && props.nested !== true && SELECTED_EDGE,
         )}
       >
-        {props.icon === undefined || props.icon === null ? null : (
+        {props.nested === true ? (
+          // The child line (council round 14 B2): a muted ↳ in the 16px glyph seat, so the row reads as its parent's
+          // child instead of a row that lost its glyph.
           <span
             className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
             aria-hidden="true"
+            data-section-icon=""
+            data-section-child-line=""
+            {...LEADING_GLYPH_ATTRIBUTE}
+          >
+            <CornerDownRightIcon className="dshx:size-3.5" strokeWidth={1.5} />
+          </span>
+        ) : null}
+        {props.nested === true || props.icon === undefined || props.icon === null ? null : props.place === undefined ? (
+          <span
+            className={cn(
+              'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',
+              props.selected ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+              SECTION_ROW_GLYPH,
+              SECTION_ROW_BADGE,
+            )}
+            aria-hidden="true"
+            data-section-icon=""
+            // A row led by its glyph draws no marker pill beside it (council round 11 B3, kit A1): the wash and the 550
+            // label carry the selection. A place seat is found by the kit rule itself.
+            {...LEADING_GLYPH_ATTRIBUTE}
+          >
+            {props.icon}
+          </span>
+        ) : (
+          // The selected-place seat (round nine B2, kit A1): 24px on the 16px glyph's footprint (negative margins), so
+          // the tile it draws under `aria-current` never moves the row or its label.
+          <span
+            className={cn(
+              'dshx:place-seat dshx:size-6 dshx:-mx-1 dshx:-mt-0.5 dshx:-mb-1 dshx:rounded-md',
+              'tone' in props.place && props.selected ? PLACE_TONE_CLASS[props.place.tone] : undefined,
+              SECTION_ROW_GLYPH,
+              SECTION_ROW_BADGE,
+            )}
+            style={'color' in props.place ? placeToneStyle(props.place.color) : props.selected ? undefined : placeToneStyle(PLACE_REST_TONE)}
+            aria-hidden="true"
+            data-section-icon=""
           >
             {props.icon}
           </span>
         )}
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-          <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-medium')}>{props.label}</span>
+          <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-selected')}>{props.label}</span>
           {props.description === undefined ? null : (
-            <span id={descriptionId} className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+            // One line at most (round five T4): the row is a destination, the page itself says the rest.
+            <span id={descriptionId} className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">
               {props.description}
             </span>
           )}
         </span>
+        {props.count === undefined || props.count === 0 ? null : (
+          <span className="dshx:self-center dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
+            {props.count}
+          </span>
+        )}
       </button>
       {props.menu === undefined ? null : <div className="dshx:absolute dshx:top-1.5 dshx:right-1">{props.menu}</div>}
     </div>
   )
 }
+
+/** A side-column row's glyph at rest: the secondary ink, as before it had a place seat. */
+const PLACE_REST_TONE = 'var(--dsw-alias-label-secondary)'
+
+/** The tone a folder's selected row carries: its destination's, or none for a user folder. */
+const placeOf = (folder: RailFolder, toneGroup: 'pages' | 'developer' | undefined): { readonly tone: PlaceTone } | { readonly color: string } | undefined =>
+  toneGroup !== undefined ? { color: SettingsIcons.toneOf(toneGroup) } : isDestinationId(folder.id) ? { tone: folder.id } : undefined
 
 /** The rows of one folder: a page opens in the stage, any other view through the Workbench (b:952m). */
 const EntryRows = (props: {
@@ -452,23 +638,178 @@ const EntryRows = (props: {
   readonly renderPanelIcon: DestinationShellProps['renderPanelIcon']
   readonly folderUi: SidebarFolderUi | undefined
   readonly descriptions?: boolean
+  /** In the Settings column: the group whose tone the rows' own icons take (council round 8 B4, no grey group). */
+  readonly toneGroup?: 'pages' | 'developer' | undefined
 }): JSX.Element => (
   <>
-    {props.entries.map(entry => (
-      <SectionButton
-        key={entry.viewId}
-        panelId={entry.viewId}
-        label={entry.title}
-        description={props.descriptions === false ? undefined : entry.description}
-        icon={entry.kind === 'page' ? props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId) : <ViewGlyph />}
-        selected={props.activePanelId === entry.viewId}
-        onSelect={() => props.openEntry(entry)}
-        menu={props.folderUi === undefined ? undefined : <EntryMenu entry={entry} folderId={props.folder.id} ui={props.folderUi} />}
-        drag={props.folderUi === undefined ? undefined : { onDropBefore: viewId => props.folderUi?.actions.movePanel(viewId, props.folder.id, entry.viewId) }}
-      />
-    ))}
+    {props.entries.map(entry => {
+      const destination = props.folder.destination
+      const icon =
+        entry.kind !== 'page' ? (
+          <ViewGlyph />
+        ) : destination !== undefined && DESTINATION_GLYPH_PAGES.has(entry.viewId) ? (
+          // The destination's own act (Review under Land): its tab's glyph, so the row and the tab name it alike.
+          <DestinationGlyph icon={destination.icon} />
+        ) : (
+          props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId)
+        )
+      return (
+        <SectionButton
+          key={entry.viewId}
+          panelId={entry.viewId}
+          label={entry.title}
+          description={props.descriptions === false ? undefined : entry.description}
+          icon={props.toneGroup === undefined ? icon : <SettingsToneMark group={props.toneGroup}>{icon}</SettingsToneMark>}
+          place={placeOf(props.folder, props.toneGroup)}
+          selected={props.activePanelId === entry.viewId}
+          onSelect={() => props.openEntry(entry)}
+          menu={props.folderUi === undefined ? undefined : <EntryMenu entry={entry} folderId={props.folder.id} ui={props.folderUi} />}
+          drag={props.folderUi === undefined ? undefined : { onDropBefore: viewId => props.folderUi?.actions.movePanel(viewId, props.folder.id, entry.viewId) }}
+        />
+      )
+    })}
   </>
 )
+
+/** Pages whose row draws their destination's glyph, the one their tab shows (council round 10 B2). */
+const DESTINATION_GLYPH_PAGES: ReadonlySet<string> = new Set(KNOWN_SECTIONS.flatMap(section => (section.glyph === 'destination' ? [section.panelId] : [])))
+
+const DestinationGlyph = (props: { readonly icon: DestinationIcon }): JSX.Element => {
+  const Icon = ICONS[props.icon]
+  return <Icon className="dshx:size-4" strokeWidth={1.5} />
+}
+
+/** The phone bar's title: the bar row's 17/22, at 600 (council round 4 B3, round 7 B5). */
+const PHONE_TITLE_CLASS = 'dshx:min-w-0 dshx:truncate dshx:font-semibold'
+
+/**
+ * The children after line 2's state (round 22 items 2 and 3): `· 6 working · ✕ 2 failed`, the one count formula, the
+ * failed clause in the failed ink after the list's ✕. It keeps its width: the project's name gives way first.
+ */
+const PhoneChildCount = (props: { readonly parts: readonly WorkCountPart[] }): JSX.Element | null =>
+  props.parts.length === 0 ? null : (
+    <span data-phone-children="" className="dshx:flex dshx:shrink-0 dshx:items-center dshx:tabular-nums">
+      {props.parts.map(part => (
+        <Fragment key={part.key}>
+          <span className="dshx:shrink-0 dshx:px-1">
+            <span aria-hidden="true">·</span>
+            <span className="dshx:sr-only">, </span>
+          </span>
+          <span
+            data-phone-children-part={part.key}
+            className={cn('dshx:inline-flex dshx:items-center dshx:gap-1', part.tone === 'failed' && 'dshx:text-destructive')}
+          >
+            {part.tone === 'failed' ? <StatusGlyph status="failed" decorative className="dshx:size-3" /> : null}
+            {part.text}
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  )
+
+/**
+ * A Settings group head (council round 13 B5): 12/600 in the tertiary ink at +0.01em, a label over its rows rather than
+ * a second row of titles. 2px under it plus the group's 2px row gap: 4px over the first row.
+ */
+const SETTINGS_GROUP_HEAD = 'dshx:px-2.5 dshx:pb-0.5 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-(--dsw-alias-label-tertiary)'
+/** A Settings group: 20px under the group above (council round 13 B5), its rows 2px apart. */
+const SETTINGS_GROUP = 'dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-0.5'
+
+/**
+ * The Settings column (council round 4 B1): Settings' categories by task group and the destination's pages, one list
+ * with no entry twice. While it shows, the Settings page drops its own list (`attach`).
+ */
+const SettingsColumnList = (props: {
+  readonly navigation: SettingsNavigationService
+  readonly folder: RailFolder
+  /** The destination's mapped pages: a category claims its own, the rest follow under Pages. */
+  readonly entries: readonly ResolvedEntry[]
+  readonly activePanelId: string | null
+  readonly openEntry: (entry: ResolvedEntry) => void
+  readonly selectPanel: (panelId: string) => void
+  readonly folderUi: SidebarFolderUi | undefined
+  readonly rows: (entries: readonly ResolvedEntry[], toneGroup?: 'pages' | 'developer') => JSX.Element
+  readonly addPanel: ReactNode
+}): JSX.Element => {
+  const { navigation, folder, folderUi } = props
+  // The Settings page's All / DSH / Plugins filter (upstream #290) heads the list it narrows.
+  const OriginFilter = navigation.OriginFilter
+  const state: SettingsNavigationState = useSyncExternalStore(navigation.state.subscribe, navigation.state.get, navigation.state.get)
+  useEffect(() => navigation.attach(), [navigation])
+  const { groups, rest } = useMemo(() => SettingsColumn.merge({ state, entries: props.entries }), [state, props.entries])
+  // The current row comes into view at its nearest edge, with the label of a group the top edge cuts (council round 18
+  // B2.4), whenever the current place changes; a frame later, once a category's nested row has laid out.
+  const column = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (column.current !== null) SettingsColumnScroll.reveal(column.current)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [state.activeId, props.activePanelId])
+  const open = (row: SettingsColumnRow): void => {
+    if (row.page === undefined) navigation.select(row.id)
+    else if (row.entry !== undefined) props.openEntry(row.entry)
+    else props.selectPanel(row.page)
+  }
+  return (
+    <nav ref={column} aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
+      {OriginFilter === undefined ? null : (
+        <div data-settings-column-filter="">
+          <OriginFilter />
+        </div>
+      )}
+      {groups.map(group => (
+        <div
+          key={group.id}
+          role="group"
+          aria-label={group.label}
+          data-settings-group={group.id}
+          className={cn(SETTINGS_GROUP, 'dshx:first:mt-0')}
+        >
+          {group.named ? <h3 className={SETTINGS_GROUP_HEAD}>{group.label}</h3> : null}
+          {group.rows.map(row => {
+            const here = SettingsColumn.isCurrent(row, { state, activePanelId: props.activePanelId })
+            const category = row.category
+            const settingsHere = category !== undefined && state.activeId === category
+            const entry = row.entry
+            return (
+              <Fragment key={row.id}>
+                <SectionButton
+                  label={row.label}
+                  // Every category's 16px glyph in its group's tone (round five B5, council round 6 B3), as its phone tile.
+                  icon={<SettingsEntryGlyph group={group.id} label={row.label} />}
+                  // The selected category's glyph on a 14% tile of its group's tone (round nine B2).
+                  place={{ color: SettingsIcons.toneOf(group.id) }}
+                  selected={here}
+                  onSelect={() => open(row)}
+                  count={state.searching ? row.count : undefined}
+                  panelId={entry?.viewId}
+                  menu={folderUi === undefined || entry === undefined ? undefined : <EntryMenu entry={entry} folderId={folder.id} ui={folderUi} />}
+                  drag={
+                    folderUi === undefined || entry === undefined
+                      ? undefined
+                      : { onDropBefore: viewId => folderUi.actions.movePanel(viewId, folder.id, entry.viewId) }
+                  }
+                />
+                {/* The category's own settings, one row under its page while either is the current place. */}
+                {category !== undefined && (here || settingsHere) ? (
+                  <SectionButton nested label={`${row.label} settings`} selected={settingsHere} onSelect={() => navigation.select(category)} />
+                ) : null}
+              </Fragment>
+            )
+          })}
+        </div>
+      ))}
+      {rest.length === 0 ? null : (
+        <div role="group" aria-label="Pages" data-settings-group="pages" className={SETTINGS_GROUP}>
+          <h3 className={SETTINGS_GROUP_HEAD}>Pages</h3>
+          {props.rows(rest, 'pages')}
+        </div>
+      )}
+      {props.addPanel}
+    </nav>
+  )
+}
 
 /** One folder's list: its rows, opened in the stage, and + Add panel. Threads shows the thread list instead. */
 const FolderIndex = (props: {
@@ -480,17 +821,37 @@ const FolderIndex = (props: {
   readonly folderUi: SidebarFolderUi | undefined
   /** Phone: the top bar already names the destination, so the heading stays for assistive tech only. */
   readonly phone?: boolean
+  /** List the pages for plugin authors, in their own group at the end of Settings. */
+  readonly showDeveloperPages?: boolean | undefined
+  /** Settings › Plugins, where a page that did not load is diagnosed. */
+  readonly openPlugins?: (() => void) | undefined
+  /** Settings' categories, listed with the Settings pages (council round 4 B1). */
+  readonly settingsNavigation?: SettingsNavigationService | undefined
+  readonly selectPanel: (panelId: string) => void
 }): JSX.Element => {
   const { folder, folderUi } = props
   const [renaming, setRenaming] = useState(false)
   const resolved = folderUi?.folders.find(candidate => candidate.id === folder.id)
   // Settings lists the pages nobody mapped, and the panels of a deleted folder, under Other pages.
   const other = (entry: ResolvedEntry): boolean => entry.unmapped || (folder.id === 'settings' && !entry.mapped)
-  const mapped = folder.entries.filter(entry => !other(entry))
-  const unmapped = folder.entries.filter(other)
+  // Pages for plugin authors sit apart, after everything a user came for; a sidebar setting hides the group.
+  const developerEntries = folder.entries.filter(entry => entry.developer === true)
+  const developer = props.showDeveloperPages === false ? [] : developerEntries
+  const mapped = folder.entries.filter(entry => !other(entry) && entry.developer !== true)
+  const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
-  const empty = mapped.length === 0 && unmapped.length === 0 && settings === null
-  const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
+  // With the Settings page on stage the column folds to the rail (round five B1); opened by hand, this list drops its
+  // header line and reads as a plain list of the other Settings pages.
+  const settingsOnStage = folder.id === 'settings' && props.activePanelId === SETTINGS_PANEL_ID
+  // The one Settings navigation (council round 4 B1): categories and pages in one list, beside the stage; a phone keeps
+  // its list of pages and the page's own Sections select.
+  const settingsNavigation = folder.id === 'settings' && props.phone !== true ? props.settingsNavigation : undefined
+  // The column keeps its "Settings" head, with the folder's ⋯, on every Settings page (council round 7 B2): the Settings
+  // page's h1 names its category ("General"), so nothing reads "Settings Settings" and the list never jumps between pages.
+  const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
+  const missingPage = Destinations.expectedPageOf(folder.id)
+  // Rows are names only (round five B1): the header's one line describes the destination, each page says the rest.
+  const rows = (entries: readonly ResolvedEntry[], toneGroup?: 'pages' | 'developer'): JSX.Element => (
     <EntryRows
       folder={folder}
       entries={entries}
@@ -498,50 +859,93 @@ const FolderIndex = (props: {
       openEntry={props.openEntry}
       renderPanelIcon={props.renderPanelIcon}
       folderUi={folderUi}
-      descriptions={descriptions}
+      descriptions={false}
+      toneGroup={toneGroup}
     />
   )
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index={folder.id}>
-      {/* The right padding keeps the folder's ⋯ clear of the pane's own top-right Show tab row control (b:952m). */}
+      {/* The right padding keeps the folder's ⋯ clear of the pane's own top-right Show tab row control (b:952m). On a
+          desktop column 8px over the 20px title line put its ink 12px under the brand hairline (council round 19 B1). */}
       <header
-        className={cn('dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pt-1 dshx:pb-2 dshx:pl-3', props.phone === true ? 'dshx:pr-3' : 'dshx:pr-9')}
+        className={cn(
+          'dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pb-2 dshx:pl-3',
+          props.phone === true ? 'dshx:pt-1 dshx:pr-3' : 'dshx:pt-2 dshx:pr-9',
+        )}
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
           {/* Phone pages already name the page in the top bar, and a one-line description only truncates there. */}
-          {props.phone === true ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
+          {props.phone === true || settingsOnStage || settingsNavigation !== undefined ? null : (
+            <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>
+          )}
         </div>
         {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
         )}
       </header>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-1.5">
-        {empty && folderUi === undefined ? (
-          <EmptyState>
-            {folder.id === 'inbox'
-              ? 'The inbox is not installed in this profile yet. Threads that need you are marked in the thread list.'
-              : 'No page here yet. Plugins add their pages to this list.'}
-          </EmptyState>
+        {empty && missingPage !== undefined ? (
+          // A page this destination is known for did not register: its plugin did not load (D6).
+          <LoadError
+            subject={missingPage}
+            sentence={`${missingPage} did not load. Reload the page; if it keeps failing, open Settings › Plugins.`}
+            data-destination-load-error={folder.id}
+            actions={
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>
+                  Reload
+                </Button>
+                {props.openPlugins === undefined ? null : (
+                  <Button type="button" size="sm" variant="ghost" onClick={props.openPlugins}>
+                    Open Plugins
+                  </Button>
+                )}
+              </>
+            }
+          />
+        ) : null}
+        {settingsNavigation !== undefined ? (
+          <SettingsColumnList
+            navigation={settingsNavigation}
+            folder={folder}
+            entries={mapped}
+            activePanelId={props.activePanelId}
+            openEntry={props.openEntry}
+            selectPanel={props.selectPanel}
+            folderUi={folderUi}
+            rows={rows}
+            addPanel={folderUi === undefined || resolved === undefined ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
+          />
+        ) : empty && folderUi === undefined ? (
+          missingPage === undefined ? <EmptyState>No page here yet. Plugins add their pages to this list.</EmptyState> : null
         ) : (
           <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
             {settings === null ? null : (
-              <SectionButton
-                panelId={SETTINGS_PANEL_ID}
-                label="All settings"
-                description="Appearance, models, agents, tools and more."
-                selected={props.activePanelId === SETTINGS_PANEL_ID}
-                onSelect={settings}
-              />
+              <SectionButton panelId={SETTINGS_PANEL_ID} label="All settings" selected={settingsOnStage} onSelect={settings} />
             )}
-            {rows(mapped, props.phone !== true)}
+            {rows(mapped)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
           </nav>
         )}
         {unmapped.length === 0 ? null : (
           <section className="dshx:mt-3" aria-label="Other pages">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Other pages</h3>
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped, false)}</div>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped)}</div>
+          </section>
+        )}
+        {developer.length === 0 ? null : (
+          // In Settings the group's head is one more Settings group head (round nine B1): the same step, indent and room
+          // around it, no rule of its own; elsewhere it stays a quiet label under a rule.
+          <section
+            className={folder.id === 'settings' ? SETTINGS_GROUP : 'dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3'}
+            aria-label="Developer"
+            data-destination-group="developer"
+          >
+            <h3 className={folder.id === 'settings' ? SETTINGS_GROUP_HEAD : 'dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'}>
+              Developer
+            </h3>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer, folder.id === 'settings' ? 'developer' : undefined)}</div>
           </section>
         )}
       </div>
@@ -564,8 +968,9 @@ const ThreadsHeaderExtras = (props: {
   readonly openEntry: (entry: ResolvedEntry) => void
   readonly renderPanelIcon: DestinationShellProps['renderPanelIcon']
   readonly customizeThreads: DestinationShellProps['customizeThreads']
+  readonly scopeSlot: HTMLElement | null
 }): null => {
-  const { entries, activePanelId, openEntry, renderPanelIcon, customizeThreads } = props
+  const { entries, activePanelId, openEntry, renderPanelIcon, customizeThreads, scopeSlot } = props
   useLayoutEffect(
     () =>
       ListHeaderExtras.publish({
@@ -577,40 +982,70 @@ const ThreadsHeaderExtras = (props: {
           open: () => openEntry(entry),
         })),
         customize: customizeThreads,
+        scopeSlot,
       }),
-    [entries, activePanelId, openEntry, renderPanelIcon, customizeThreads],
+    [entries, activePanelId, openEntry, renderPanelIcon, customizeThreads, scopeSlot],
   )
   return null
 }
 
-const ListPane = (
-  props: DestinationShellProps & { readonly folder: RailFolder; readonly openEntry: (entry: ResolvedEntry) => void; readonly phone?: boolean },
-): JSX.Element =>
-  props.folder.id === 'threads' ? (
-    <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index="threads">
+type ListPaneProps = DestinationShellProps & { readonly folder: RailFolder; readonly openEntry: (entry: ResolvedEntry) => void; readonly phone?: boolean }
+
+const ThreadsPane = (props: ListPaneProps): JSX.Element => {
+  // The phone's one toolbar row (council round 10 B1): the list draws its scope button into this seat after the search.
+  const [scopeSlot, setScopeSlot] = useState<HTMLElement | null>(null)
+  const phone = props.phone === true
+  return (
+    // A desktop column starts its search field 12px under the brand hairline (council round 19 B1); a phone list pads
+    // itself under its top bar.
+    <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', !phone && 'dshx:pt-3')} data-destination-index="threads">
       <ThreadsHeaderExtras
         entries={props.folder.entries}
         activePanelId={props.activePanelId}
         openEntry={props.openEntry}
         renderPanelIcon={props.renderPanelIcon}
         customizeThreads={props.customizeThreads}
+        scopeSlot={phone && props.searchThreads !== null ? scopeSlot : null}
       />
       {/* One search entry above the list (T5.3/T5.4): Board and Customize live in the list's Filter menu. */}
       {props.searchThreads === null ? null : (
-        <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1">
+        // The phone gutter (round nine B4): fields fill from 12px, their text and glyphs start at 24px. On a phone the row
+        // is the list's one toolbar (council round 10 B1): the search and the list's scope button, 8px apart, 6px over the
+        // first group head (its own half-leading makes about 12px to the label).
+        <div
+          className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', phone && 'dshx:gap-2 dshx:px-3 dshx:pb-1.5')}
+          data-threads-toolbar=""
+        >
           <Button
-            size="sm"
-            variant="outline"
-            className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground"
+            // The one control height (round nine B5, kit A4): 32px beside the project and Filter fields, 44px on touch.
+            size="field"
+            // A launcher that looks like a field is drawn as one (council round 8 B1): the kit field look, so no
+            // outline `dark:border-input` replaces the field edge in dark; left-aligned, its label in placeholder ink.
+            variant="field"
+            className={cn(
+              // It stands for a text field, so it keeps the text field's 3:1 edge and paper fill where the value triggers
+              // beside it are quiet filled chips (council round 10 A1).
+              fieldLook,
+              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:text-muted-foreground',
+              // On a phone its glyph starts on the 24px text edge (round nine B4).
+              phone && 'dshx:gap-2 dshx:px-3',
+            )}
             onClick={props.searchThreads}
           >
             <SearchIcon className="dshx:size-3.5" aria-hidden="true" />
             {props.labels.searchThreads}
           </Button>
+          {phone ? <div ref={setScopeSlot} data-thread-list-scope="" className="dshx:flex dshx:max-w-[45%] dshx:min-w-0 dshx:shrink-0 dshx:empty:hidden" /> : null}
         </div>
       )}
       <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0">{props.threadList}</div>
     </div>
+  )
+}
+
+const ListPane = (props: ListPaneProps): JSX.Element =>
+  props.folder.id === 'threads' ? (
+    <ThreadsPane {...props} />
   ) : (
     <FolderIndex
       folder={props.folder}
@@ -620,6 +1055,10 @@ const ListPane = (
       renderPanelIcon={props.renderPanelIcon}
       folderUi={props.folderUi}
       phone={props.phone === true}
+      showDeveloperPages={props.showDeveloperPages}
+      openPlugins={() => props.selectPanel('plugins')}
+      settingsNavigation={props.settingsNavigation}
+      selectPanel={props.selectPanel}
     />
   )
 
@@ -682,6 +1121,21 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
   const folder = railFolders.find(candidate => candidate.id === destinationId) ?? railFolders[0]
   // The phone shell and the top bar keep the eight destinations: user folders live in More's tree there.
   const destination = destinations.find(candidate => candidate.id === destinationId) ?? destinations[0]
+  // One navigation (round five B1, B2): Settings and a one-page destination fold the column to the rail while their
+  // page is on the stage. A phone has no column beside the stage.
+  const stageFolded = useStageFold(
+    folder !== undefined &&
+      StageFold.wants({
+        folderId: folder.id,
+        builtIn: folder.builtIn,
+        activePanelId: props.activePanelId,
+        settingsPanelId: SETTINGS_PANEL_ID,
+        solePanelId: soleEntry(folder),
+      }),
+    collapsed,
+    toggleSidebar,
+    !phone,
+  )
   if (folder === undefined || destination === undefined) return <></>
   const openSection = (panelId: string, surface: NavigationRecord['surface'] = 'index'): void => {
     props.selectPanel(panelId)
@@ -710,13 +1164,20 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     )
   }
   const choose = (next: RailFolder, surface: NavigationRecord['surface'] = 'rail', openFirst = false): void => {
-    // Collapsed, a folder of pages opens a flyout of its rows instead of the whole column (b:952m).
-    if (props.collapsed && folderUi !== undefined && next.id !== 'threads' && next.id !== 'settings' && next.entries.length > 0 && !openFirst) {
+    // Collapsed, a folder of pages opens a flyout of its rows instead of the whole column (b:952m). A column the stage
+    // folded behaves as open: the next destination's page decides whether it stays folded.
+    const handCollapsed = props.collapsed && !stageFolded
+    // The folded destination's own item again opens its list: Settings' other pages stay one click away.
+    if (stageFolded && next.id === folder.id) {
+      props.toggleSidebar()
+      return
+    }
+    if (handCollapsed && folderUi !== undefined && next.id !== 'threads' && next.id !== 'settings' && next.entries.length > 0 && !openFirst) {
       setFlyout(current => (current === next.id ? null : next.id))
       return
     }
     setDestination(next.id)
-    if (props.collapsed) props.toggleSidebar()
+    if (handCollapsed) props.toggleSidebar()
     // G then a key opens the destination's first page too: a keyboard user has no index to click through.
     const firstPage = next.entries.find(entry => entry.kind === 'page')?.viewId
     const sole = soleEntry(next) ?? (openFirst && next.id !== 'threads' && next.id !== 'settings' ? firstPage : undefined)
@@ -733,21 +1194,25 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     }
   }
   chooseRef.current = choose
+  // One chrome (round five B1): folding the column never changes the rail. It keeps its labels, its order and its
+  // active item; only the list beside it hides (sidebar-fold.ts).
   const railButton = (candidate: RailFolder): JSX.Element => {
-    const active = !props.collapsed && candidate.id === folder.id
+    const active = candidate.id === folder.id
     const button = (
       <RailButton
         key={candidate.id}
         folder={candidate}
         active={active}
-        showLabel={!props.collapsed}
+        // The bottom cluster (New folder, the rail actions, Settings) is glyphs only, each with its tooltip: label all of
+        // a cluster or none of it (council round 4 B6).
+        showLabel={!candidate.bottom}
         controls={props.collapsed ? undefined : listId}
         icon={folderIcon(props, candidate, active)}
         onSelect={() => choose(candidate)}
         onDropView={folderUi === undefined || candidate.id === 'threads' ? undefined : viewId => folderUi.actions.movePanel(viewId, candidate.id)}
       />
     )
-    if (!props.collapsed || folderUi === undefined) return button
+    if (!props.collapsed || stageFolded || folderUi === undefined) return button
     return (
       <Popover key={candidate.id} open={flyout === candidate.id} onOpenChange={open => setFlyout(open ? candidate.id : null)}>
         <PopoverAnchor asChild>
@@ -779,13 +1244,20 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
       <nav
         aria-label="Destinations"
         className={cn(
-          'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]',
-          // 2px gutters and unpadded buttons: "Knowledge", the longest destination, fits whole at the label size without
-          // widening the rail (productivity pass Q5, T5.3).
-          props.collapsed ? 'dshx:w-full dshx:px-2' : 'dshx:w-16 dshx:px-0.5',
+          'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pt-2 dshx:pb-2 dshx:[scrollbar-width:none]',
+          // Its first tile stands 12px under the brand hairline (council round 19 B1): 8px above, the button's own 4px.
+          // One width open and folded: the frame's folded track (60px, frame-layout's SIDEBAR_COLLAPSED) holds the rail
+          // whole (round five B1, B3). Unpadded buttons: "Knowledge", the longest destination, fits whole at the label
+          // size (productivity pass Q5, T5.3).
+          'dshx:w-15 dshx:px-0',
+          // One rail surface open and folded, on every destination (council round 4 B2): the panel step the frame's folded
+          // track paints, not the base of the pane the open column sits in.
+          'dshx:bg-[var(--dsw-specific-sidebar-fill)]',
         )}
+        data-stage-folded={stageFolded ? '' : undefined}
       >
-        {/* Expanded, New thread sits in the header row; collapsed, the rail keeps it reachable. */}
+        {/* New thread sits in the header row, which a folded column keeps over the stage; where it cannot (no tab strip,
+            zen mode) the rail keeps it reachable (client.css). */}
         {props.collapsed && props.showNewThread ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -793,6 +1265,7 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
                 variant="ghost"
                 size="icon"
                 aria-label={props.labels.newThread}
+                data-sidebar-folded-new-thread=""
                 className="dshx:mb-1 dshx:w-full dshx:shrink-0"
                 onClick={props.startSession}
               >
@@ -805,6 +1278,9 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         <div role="tablist" aria-orientation="vertical" aria-label="Destinations" className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           {railFolders.filter(candidate => !candidate.bottom).map(railButton)}
           <div className="dshx:mt-auto dshx:flex dshx:flex-col dshx:pt-2">
+            {/* The labelled destinations and the glyph-only bottom cluster are two instruments: one hairline between
+                them, inset like the icon tiles (round five B3). */}
+            <div aria-hidden="true" data-rail-divider="" className="dshx:mx-3 dshx:mb-1.5 dshx:border-t dshx:border-border" />
             {folderUi === undefined ? null : (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -827,7 +1303,8 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         </div>
       </nav>
       {props.collapsed ? null : (
-        <div id={listId} role="tabpanel" aria-label={folder.label} className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        // Every navigation column sits on the nav surface (round five B5, kit A4); the page beside it is on stage.
+        <div id={listId} role="tabpanel" aria-label={folder.label} className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:surface-nav">
           <ListPane {...props} folder={folder} openEntry={openEntryIn(folder)} />
           {folderUi === undefined ? null : <FolderNotice notice={folderUi.notice} dismiss={folderUi.dismissNotice} />}
         </div>
@@ -847,6 +1324,12 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
 
 /** Phone tab bar (productivity pass E8): Threads, Inbox (with its count), Land, More; New is the `+` in the Threads header. */
 export const PHONE_TABS = ['threads', 'inbox', 'land', 'more'] as const
+/**
+ * The current phone tab's seat (council round 13 B2): one neutral pill on every tab, the secondary ink at 14% (what
+ * Inbox already drew), so the selection never changes colour between tabs. The glyph on it carries the tab's tone;
+ * Inbox and More, the neutral destinations, draw ink. Tone glyphs keep 3:1 on it (list-colour-contrast.test.ts).
+ */
+export const PHONE_TAB_PILL = 'dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-secondary)_14%,transparent)]'
 type PhoneTab = (typeof PHONE_TABS)[number]
 /** The destinations with a tab of their own; More lists the rest. */
 const TABBED_DESTINATIONS: readonly DestinationId[] = ['threads', 'inbox', 'land']
@@ -920,6 +1403,8 @@ const PhoneNavigation = (
     root.setAttribute('data-shell-phone-nav', '')
     root.style.setProperty('--dsh-phone-nav-height', PHONE_NAV_HEIGHT)
     root.style.setProperty('--dsh-phone-top-height', PHONE_TOP_HEIGHT)
+    root.style.setProperty('--dsh-phone-seat-left', PHONE_SEAT_LEFT)
+    root.style.setProperty('--dsh-phone-seat-right', PHONE_SEAT_RIGHT)
     // Safe-area insets only resolve under viewport-fit=cover; the bars pad by them (home indicator, notch, landscape).
     const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
     const previous = meta?.getAttribute('content') ?? null
@@ -928,6 +1413,8 @@ const PhoneNavigation = (
       root.removeAttribute('data-shell-phone-nav')
       root.style.removeProperty('--dsh-phone-nav-height')
       root.style.removeProperty('--dsh-phone-top-height')
+      root.style.removeProperty('--dsh-phone-seat-left')
+      root.style.removeProperty('--dsh-phone-seat-right')
       if (meta !== null && previous !== null) meta.setAttribute('content', previous)
     }
   }, [])
@@ -1022,9 +1509,16 @@ const PhoneNavigation = (
     if (!listOpen) toggleSidebar()
   }
   const stageOwner = Destinations.owning(props.destinations, props.activePanelId)?.id
-  /** The highlighted tab: with the list closed, an Inbox or Land page in the stage; with it open, the shown destination. */
+  /**
+   * The highlighted tab: with the list closed, an Inbox or Land page in the stage, or More for Settings and any other
+   * destination's page (council round 3 B6: you reached it through More); with it open, the shown destination.
+   */
   const currentTab = (): PhoneTab | null => {
-    if (!listOpen) return stageOwner === 'inbox' || stageOwner === 'land' ? stageOwner : null
+    if (!listOpen) {
+      if (stageOwner === 'inbox' || stageOwner === 'land') return stageOwner
+      const morePage = props.activePanelId === SETTINGS_PANEL_ID || (stageOwner !== undefined && stageOwner !== 'threads')
+      return morePage ? 'more' : null
+    }
     if (moreOpen || !TABBED_DESTINATIONS.includes(props.destination.id)) return 'more'
     return props.destination.id === 'inbox' ? 'inbox' : props.destination.id === 'land' ? 'land' : 'threads'
   }
@@ -1076,6 +1570,9 @@ const PhoneNavigation = (
   const others = props.railFolders.filter(candidate => !TABBED_DESTINATIONS.some(tabbed => tabbed === candidate.id))
   // New thread sits in the Threads list header (E8); ⌘⇧O and `c` keep starting one on a keyboard.
   const showNew = listOpen && !moreOpen && props.destination.id === 'threads'
+  // The status control (council round 3 B6, frame-layout C2): a 44px button in the Threads bar opens the status sheet,
+  // instead of a permanent band above the tab bar. Without frame-layout the bar shows none.
+  const phoneStatus = useContract(PhoneStatus)
   const stack = {
     listOpen,
     moreOpen,
@@ -1083,13 +1580,40 @@ const PhoneNavigation = (
     destinations: props.destinations,
     activePanelId: props.activePanelId,
     selectedThreadId: props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId,
-    stageTitle: props.stageTitle,
+    // A subagent is called by the name its parent gave it, as in the list, not by its prompt (round 21 D3).
+    stageTitle: props.stageMeta?.title ?? props.stageTitle,
     pendingTitle: props.pendingTitle,
     origin,
   }
   const bar = PhoneTopBarModel.resolve(stack)
   // The drawer never covers the stage, so its top bar always names what the stage shows.
   const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
+  // A page or a list centres its title (council round 4 B3); a thread's title leads, after the back chevron.
+  const centred = !(stageBar.thread && (drawer || !listOpen))
+  // A thread's bar names its project, status and working subagents on a 13px line under the title (council round 17
+  // B2.2), `[mark] billing-api · Working · 1 subagent`, inside the one 44px row. Without that line (no thread facts yet)
+  // the working glyph leads the title instead (council round 13 B6).
+  const meta = centred ? undefined : props.stageMeta
+  const working = !centred && meta === undefined && props.stageWorking === true
+  // A subagent's Back opens its parent thread (round 21 D3), as the desktop lineage's parent link does: the 44px chevron
+  // and the edge swipe. System Back still pops the stack to the list.
+  const openThread = props.openThread
+  const parentBack = meta?.parent !== undefined && openThread !== undefined ? meta.parent : null
+  const backToParent = (): void => {
+    if (parentBack === null || openThread === undefined) return
+    const parentId = parentBack.id
+    if (drawer) openThread(parentId)
+    else runStackMotion('pop', () => openThread(parentId))
+  }
+  // The child names its parent on a strip under the bar (round 22 item 4); the stage and the ⋯ follow its height.
+  const parentStrip = parentBack !== null
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--dsh-phone-top-strip', parentStrip ? PHONE_PARENT_STRIP : '0px')
+    return () => {
+      root.style.removeProperty('--dsh-phone-top-strip')
+    }
+  }, [parentStrip])
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1153,7 +1677,7 @@ const PhoneNavigation = (
     })
   }
   // The iOS back swipe (T5.3): a left-edge swipe is Back wherever the bar offers one.
-  useEdgeSwipe({ side: 'left', enabled: !drawer && bar.back !== null, onSwipe: back })
+  useEdgeSwipe({ side: 'left', enabled: !drawer && bar.back !== null, onSwipe: parentBack === null ? back : backToParent })
   // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
   // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
   // In drawer mode the open drawer is one level (two inside More or a list opened there): system Back closes it first.
@@ -1172,6 +1696,18 @@ const PhoneNavigation = (
     return () => root.removeAttribute('data-phone-in-thread')
   }, [inThread, tabBar])
   const togglePanels = props.togglePanels ?? null
+  // The thread panel opens from the thread's ⋯ menu (council round 17 B2.2): an unlabelled glyph beside ⋯ said nothing,
+  // and a label did not fit beside the title. Without rich-composer's menu the bar keeps its labelled-for-AT button.
+  const { service: threadMenu, snapshot: threadMenuState } = usePhoneThreadMenu()
+  const menuReader = threadMenuState.launcherReader
+  const panelsInMenu = threadMenu !== undefined
+  const togglePanelsLatest = useRef(togglePanels)
+  togglePanelsLatest.current = togglePanels
+  const panelsOffered = stageBar.thread && togglePanels !== null
+  useLayoutEffect(() => {
+    if (!panelsOffered || threadMenu === undefined || menuReader === null) return
+    return threadMenu.registerTool({ id: 'thread-sidebar.thread-panels', readerId: menuReader, label: 'Thread panels', icon: <PanelBottomOpenIcon />, opens: true, open: () => togglePanelsLatest.current?.() })
+  }, [panelsOffered, threadMenu, menuReader])
   // The thread panel from the right edge (opt-in); an open sheet is modal, so the swipe never closes it again.
   useEdgeSwipe({ side: 'right', enabled: inThread && props.edgeSwipePanels === true && togglePanels !== null, onSwipe: () => togglePanels?.() })
   // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
@@ -1303,7 +1839,7 @@ const PhoneNavigation = (
             <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
           </button>
         )}
-        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold">
+        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-heading">
           {drawerView === 'more' ? 'More' : props.destination.label}
         </h2>
         {drawerView === 'threads' ? (
@@ -1341,14 +1877,27 @@ const PhoneNavigation = (
         data-phone-top-bar=""
         data-phone-stage={listOpen && !drawer ? undefined : stageBar.thread ? 'thread' : (props.activePanelId ?? 'none')}
         className={cn(
-          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[max(4px,env(safe-area-inset-left,0px))] dshx:text-foreground',
+          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:flex-col dshx:justify-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[var(--dsh-phone-seat-left,4px)] dshx:text-foreground',
           // A thread on the stage puts its Changes pill and one `⋯` menu (rich-composer, T1.4/T3.2) in the trailing
           // corner, publishing that bar's width; the status strip is a pill above the tab bar (frame-layout, T1.6).
-          stageBar.thread && (drawer || !listOpen) ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+4px)]' : 'dshx:pr-1',
+          stageBar.thread && (drawer || !listOpen)
+            ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+var(--dsh-phone-seat-right,4px))]'
+            : 'dshx:pr-[var(--dsh-phone-seat-right,4px)]',
         )}
         style={{ height: PHONE_TOP_HEIGHT }}
       >
-        <div className="dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5">
+        {/* A page or a list centres its title between the way back and the trailing controls (council round 4 B3); a
+            thread's title starts 12px after the back chevron, its length needs the width. */}
+        <div
+          data-phone-bar-layout={centred ? 'centred' : 'leading'}
+          className={cn(
+            // Back and title read at 17px (council round 4 B3); the title adds the weight.
+            'dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:text-[17px] dshx:leading-[22px]',
+            // A thread's title starts 12px after the chevron's glyph: the 44px seat ends 12px past it, so no gap.
+            centred ? 'dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] dshx:gap-1' : 'dshx:flex',
+          )}
+        >
+          <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-start' : 'dshx:contents'}>
           {pageBack === null ? null : (
             <button
               type="button"
@@ -1360,6 +1909,18 @@ const PhoneNavigation = (
               <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
             </button>
           )}
+          {drawer && pageBack === null && parentBack !== null ? (
+            <button
+              type="button"
+              data-phone-back=""
+              data-phone-back-parent=""
+              aria-label={`Back to ${parentBack.title}`}
+              onClick={backToParent}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          ) : null}
           {drawer ? (
             <button
               ref={sidebarButton}
@@ -1378,24 +1939,89 @@ const PhoneNavigation = (
             <button
               type="button"
               data-phone-back=""
-              aria-label={`Back to ${bar.back.label}`}
-              onClick={back}
-              className="dshx:flex dshx:h-11 dshx:min-w-11 dshx:max-w-[40%] dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pr-2 dshx:pl-1 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+              data-phone-back-parent={parentBack === null ? undefined : ''}
+              aria-label={`Back to ${parentBack?.title ?? bar.back.label}`}
+              onClick={parentBack === null ? back : backToParent}
+              className={cn(
+                'dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
+                // The chevron sits in the leading seat (council round 17 B2.2), centred where the Threads and Inbox bars
+                // centre their gauge. On a thread the chevron alone goes back, as in other chat apps; a page's Back names
+                // where it goes after it.
+                bar.thread ? 'dshx:w-11 dshx:justify-center' : 'dshx:min-w-11 dshx:max-w-full dshx:pr-2 dshx:pl-3',
+              )}
             >
               <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
-              {/* On a thread the title needs the width: the chevron alone goes back, as in other chat apps. */}
-              <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{bar.back.label}</span>
+              <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{parentBack?.title ?? bar.back.label}</span>
             </button>
           )}
-          <h1
-            data-phone-title=""
-            className={cn(
-              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold',
-              !drawer && bar.back === null && 'dshx:pl-2.5',
-            )}
-          >
-            {stageBar.title}
-          </h1>
+          {/* The status gauge leads, in the seat the Inbox bar gives it (council round 6 B1); + stays trailing. */}
+          {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
+          </div>
+          {working ? (
+            <h1
+              data-phone-title=""
+              className={cn(PHONE_TITLE_CLASS, 'dshx:flex dshx:flex-1 dshx:items-center dshx:gap-2', !drawer && bar.back === null && 'dshx:pl-2.5')}
+            >
+              <StatusGlyph status="working" decorative />
+              <span data-phone-title-text="" className="dshx:min-w-0 dshx:truncate">
+                {stageBar.title}
+              </span>
+            </h1>
+          ) : meta !== undefined ? (
+            <div data-phone-title-block="" className={cn('dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:justify-center', !drawer && bar.back === null && 'dshx:pl-2.5')}>
+              {/* 17/20 over 13/16: 36px of text centred in the 44px row, 4px clear above and below. */}
+              <h1 data-phone-title="" className={cn(PHONE_TITLE_CLASS, 'dshx:leading-5')}>
+                {stageBar.title}
+              </h1>
+              {/* 13/16 in the secondary ink: the list row's line 2, its project mark and its status word. */}
+              {meta.route === undefined ? (
+                <span data-phone-subtitle="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-sm/4 dshx:whitespace-nowrap dshx:text-muted-foreground">
+                  <AttentionMeta
+                    className="dshx:flex-initial dshx:text-sm/4"
+                    project={meta.project}
+                    kind={meta.status}
+                    // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
+                    kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                    {...(meta.mark === undefined ? {} : { mark: meta.mark })}
+                  />
+                  <PhoneChildCount parts={meta.children} />
+                </span>
+              ) : (
+                // A subagent (round 21 D3): `[mark] model · state`, the kit's RouteModel where the project would be. The
+                // model's name truncates first; the state word stays whole.
+                <span data-phone-subtitle="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-sm/4 dshx:whitespace-nowrap dshx:text-muted-foreground">
+                  <RouteModel provider={meta.route.provider} model={meta.route.model} className="dshx:text-sm/4" />
+                  {/* No state word when the children count says it works: the count brings its own "·". */}
+                  {meta.status === undefined ? null : (
+                    <>
+                      <span className="dshx:shrink-0 dshx:px-1">
+                        <span aria-hidden="true">·</span>
+                        <span className="dshx:sr-only">, </span>
+                      </span>
+                      <AttentionMeta
+                        className="dshx:flex-none dshx:text-sm/4"
+                        kind={meta.status}
+                        kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                      />
+                    </>
+                  )}
+                  <PhoneChildCount parts={meta.children} />
+                </span>
+              )}
+            </div>
+          ) : (
+            <h1
+              data-phone-title=""
+              className={cn(
+                PHONE_TITLE_CLASS,
+                centred ? 'dshx:text-center' : 'dshx:flex-1',
+                !centred && !drawer && bar.back === null && 'dshx:pl-2.5',
+              )}
+            >
+              {stageBar.title}
+            </h1>
+          )}
+          <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-end' : 'dshx:contents'}>
           {showNew && !drawer ? (
             <button
               type="button"
@@ -1407,7 +2033,7 @@ const PhoneNavigation = (
               <PlusIcon className="dshx:size-5" strokeWidth={1.75} aria-hidden="true" />
             </button>
           ) : null}
-          {stageBar.thread && togglePanels !== null ? (
+          {panelsOffered && !panelsInMenu ? (
             <button
               type="button"
               data-phone-panels=""
@@ -1418,14 +2044,40 @@ const PhoneNavigation = (
               <PanelBottomOpenIcon className="dshx:size-5" aria-hidden="true" />
             </button>
           ) : null}
+          </div>
         </div>
+        {parentBack === null ? null : (
+          // A subagent names its parent under the bar (round 22 item 4): `Subagent of Audit money rounding ›`, 13px in
+          // the secondary ink at the title's x, on the bar's plate. The line is 32px; its hit reaches 12px up into the
+          // title block (no control there) for 44px, and stops at the ⋯ seat, the header's trailing padding.
+          <button
+            type="button"
+            data-phone-parent-strip=""
+            onClick={backToParent}
+            className="dshx:relative dshx:ml-11 dshx:flex dshx:h-8 dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:pb-1 dshx:text-left dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:before:absolute dshx:before:inset-x-0 dshx:before:-top-3 dshx:before:bottom-0 dshx:before:content-[''] dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:text-foreground"
+          >
+            <span className="dshx:min-w-0 dshx:truncate">Subagent of {parentBack.title}</span>
+            <ChevronRightIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          </button>
+        )}
       </header>
       {listOpen && !drawer ? (
         <div
           data-phone-list=""
           onClick={closeAfterPick}
-          className="dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-2 dshx:text-foreground"
-          style={{ top: PHONE_TOP_HEIGHT, bottom: PHONE_NAV_HEIGHT }}
+          className={cn(
+            // 12px under the top bar's rule (round nine B4, the phone shell grid). The phone roots share one canvas
+            // (council round 18 B2.1): Threads sits on the stage as Inbox and Settings do, and the list's own sidebar
+            // fills (its root, sticky group headers, a swiped row's backing) resolve to that canvas here.
+            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:surface-stage dshx:[--dsw-specific-sidebar-fill:var(--dshx-surface-stage)] dshx:pt-3 dshx:text-foreground',
+            // The Threads toolbar band (council round 11 B2): the 44px search row 8px under the rule, the inset Inbox's
+            // and Settings' first controls keep (council round 19 B4).
+            'dshx:has-[[data-threads-toolbar]]:pt-2',
+            // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list
+            // ends above it whenever the frame draws it (round five, lane C asked), and covers it while the keyboard is up.
+            'dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]',
+          )}
+          style={{ top: PHONE_TOP_HEIGHT, bottom: `calc(${PHONE_NAV_HEIGHT} + var(--phone-list-status-room, 0px))` }}
         >
           {listContent}
         </div>
@@ -1446,13 +2098,27 @@ const PhoneNavigation = (
               onClick={() => select(tab)}
               className={cn(
                 'dshx:flex dshx:h-14 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:text-(--dsw-alias-label-tertiary) dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:active:text-foreground',
+                // Colour on the current tab only (council round 12 B3, reversing round nine B3): a tinted glyph reads as
+                // "selected" on a phone, so the others rest in tertiary ink. The current glyph takes its destination's tone
+                // on one neutral pill (round 13 B2), with an ink label at 600; Inbox and More draw ink. The
+                // desktop rail keeps its always-toned glyphs: a launcher, not a tab bar.
+                NAV_TONE[tab === 'more' ? 'settings' : tab],
                 current === tab && 'dshx:text-foreground',
               )}
             >
-              <span className="dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center" aria-hidden="true">
+              <span
+                className={cn(
+                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full',
+                  current === tab
+                    ? cn(PHONE_TAB_PILL, tab === 'inbox' || tab === 'more' ? 'dshx:text-foreground' : 'dshx:text-nav-tone')
+                    : 'dshx:text-(--dsw-alias-label-tertiary)',
+                )}
+                aria-hidden="true"
+                data-phone-tab-seat=""
+              >
                 {tabIcon(tab)}
               </span>
-              <span className={cn('dshx:text-2xs dshx:leading-tight', current === tab && 'dshx:font-medium')}>{tabLabel[tab]}</span>
+              <span className={cn('dshx:text-2xs dshx:leading-tight', current === tab && 'dshx:font-semibold')}>{tabLabel[tab]}</span>
             </button>
           ))}
         </nav>

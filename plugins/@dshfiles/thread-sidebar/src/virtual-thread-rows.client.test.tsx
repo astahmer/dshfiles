@@ -124,3 +124,26 @@ test('select all covers rows that are not mounted', () => {
   fireEvent.keyDown(first ?? document.body, { key: 'a', metaKey: true })
   expect(selection.sessionIds).toHaveLength(200)
 })
+
+test('sets rows 6px apart, windowed or not (round five T1)', () => {
+  const short = render(
+    <VirtualThreadRows
+      entries={['a', 'b']}
+      keyOf={id => id}
+      threadIdOf={id => id}
+      render={id => <article data-thread-id={id} />}
+      scrollElement={{ current: null }}
+      pinnedThreadIds={[]}
+      revealThreadId={undefined}
+      estimateSize={ROW_HEIGHT}
+      enabled
+    />,
+  )
+  const items = Array.from(short.container.querySelectorAll<HTMLElement>('[role="listitem"]'))
+  expect(items).toHaveLength(2)
+  for (const item of items) expect(item.className).toContain('dshx:pb-1.5')
+  cleanup()
+  const long = render(<List />)
+  const windowed = long.container.querySelector<HTMLElement>('[data-virtual-row]')
+  expect(windowed?.className).toContain('dshx:pb-1.5')
+})

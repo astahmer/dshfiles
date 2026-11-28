@@ -1,11 +1,12 @@
-import type { CSSProperties } from 'react'
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
 import { useState, useSyncExternalStore } from 'react'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -13,21 +14,13 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { SidebarFolderTargets } from './shell-merge.js'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { DEFAULT_CLOSE_BUTTON_POSITION, workbenchTabs } from './tabs.js'
-import type { WorkbenchPanelRegistry } from './registry.js'
+import { DEFAULT_CLOSE_BUTTON_POSITION, TabProjectMark, workbenchTabs } from './tabs.js'
+import { withoutPluginPrefix, type WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
-
-const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
-  if (chip === undefined) return undefined
-  const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
-  if (chip.color !== undefined) style.color = chip.color
-  return style
-}
+import { TabComposeGlyph, TabDestinationGlyph, TabIdleGlyph, TabStatusGlyph } from './tab-status.js'
 
 /** The main seat's compact action drives the existing tab provider, never a second tab actor. */
 export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.Element | null => {
@@ -81,7 +74,9 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const definition = useSyncExternalStore(registry.subscribe, () => registry.get(sourceId))
     const tab = snapshot.tabs.find(candidate => candidate.id === definition?.tabId)
     const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
-    const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
+    // A page title never carries its plugin's name, including a native panel's own dockview title ("Plugin Manager: Plugins").
+    const title =
+      definition?.newView === true ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : withoutPluginPrefix(definition?.title ?? tab?.title ?? props.api.title ?? '')
     const project = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectNames?.[tab.workspaceId] : undefined
     const projectChip = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectChips?.[tab.workspaceId] : undefined
     const [renaming, setRenaming] = useState(false)
@@ -109,7 +104,10 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className="dshx-root dshx:flex dshx:h-full dshx:items-center dshx:gap-2 dshx:px-2"
+            // 12px in on every tab (round five T5): dockview's own side padding is zeroed in dockview-theme.css. The root
+            // inherits the `.dv-tab` ink (council round 18 B2.1): `.dshx-root` alone resets it to the primary label, which
+            // drew every kept inactive tab in ink.
+            className="dshx-root dshx:flex dshx:h-full dshx:items-center dshx:gap-2 dshx:pr-2 dshx:pl-3 dshx:text-inherit"
             data-preview={tab?.preview || undefined}
             data-workbench-tab-id={props.api.id}
             onPointerDownCapture={event => {
@@ -133,26 +131,15 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             }}
           >
             {tab?.pinned && <PinIcon aria-label={channel.label?.('pinned') || 'Pinned'} size={12} />}
-            {tab?.status && (
-              <StatusDot
-                aria-label={channel.label?.(tab.status) || tab.status}
-                className={tab.status === 'running' ? 'dshx:animate-pulse dshx:bg-info' : tab.status === 'needsYou' ? 'dshx:bg-warning' : 'dshx:bg-primary'}
-              />
-            )}
+            {tab?.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? (project === undefined ? <TabComposeGlyph activeClassName="dshx:in-[.dv-active-tab]:text-nav-tone" /> : <TabIdleGlyph />) : <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} className="dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : tab?.status && <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} />}
             {closeButtonPosition === 'left' ? closeButton : null}
+            {tab?.kind === 'panel' && tab.destination !== undefined ? (
+              // A page names its destination with the rail glyph; the tab on screen takes its nav tone (round five B4).
+              <TabDestinationGlyph destination={tab.destination} panelId={tab.panelId} activeClassName="dshx:in-[.dv-active-tab]:bg-nav-tile dshx:in-[.dv-active-tab]:text-nav-tone" />
+            ) : null}
             {project === undefined ? null : (
-              <span
-                data-workbench-tab-project=""
-                className={cn(
-                  'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
-                  projectChip === undefined
-                    ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
-                    : cn('dshx:font-medium', projectChip.className),
-                )}
-                style={projectChipStyle(projectChip)}
-              >
-                {project}
-              </span>
+              // The tile names the project: the tab has no tooltip, and the title beside it is the thread's.
+              <ProjectMark name={project} size="dense" decorative={false} data-workbench-tab-project="" {...TabProjectMark.paint(projectChip)} />
             )}
             {renaming && tab?.kind === 'thread' ? (
               <InlineTitleEditor
@@ -170,7 +157,12 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 }}
               />
             ) : (
-              <span className={cn('dshx:truncate dshx:text-xs', tab?.preview && 'dshx:italic')}>{title}</span>
+              // Every tab not on screen takes the strip's one secondary ink, preview or kept (council round 18 B2.1); a long
+              // title ends in an ellipsis instead of taking the strip. The tab on screen (dockview's active tab) is ink at
+              // 500 even while it is a preview (round five B5).
+              <span className="dshx:max-w-56 dshx:truncate dshx:text-xs dshx:in-[.dv-active-tab]:font-medium dshx:in-[.dv-active-tab]:text-foreground">
+                {title}
+              </span>
             )}
             {notice && (
               <span role="status" className="dshx:sr-only">
@@ -181,17 +173,24 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
+          {/* Tab verbs first. One close verb, "Close tab": the provider's menu carries its own, the rest get it here. */}
           {tab &&
             (channel.renderTabMenu?.(tab.id, () => setRenaming(true), setNotice) ?? (
               <>
                 <ContextMenuItem onSelect={() => channel.actions.keep(tab.id)}>Keep tab</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.togglePin(tab.id)}>{tab.pinned ? 'Unpin tab' : 'Pin tab'}</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.moveAside(tab.id)}>Move to side panel</ContextMenuItem>
+                <ContextMenuItem onSelect={close}>Close tab</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.closeOthers(tab.id)}>Close other tabs</ContextMenuItem>
                 <ContextMenuItem onSelect={() => channel.actions.closeToRight(tab.id)}>Close tabs to the right</ContextMenuItem>
               </>
             ))}
-          {tab === undefined && <GroupCloseItems panel={props.api} closePanel={closePanel} />}
+          {tab === undefined && (
+            <>
+              <ContextMenuItem onSelect={close}>Close tab</ContextMenuItem>
+              <GroupCloseItems panel={props.api} closePanel={closePanel} />
+            </>
+          )}
           {/* Add to sidebar ▸ ‹folder› (b:952m): a reusable view or page, never a thread tab or a chooser. */}
           {(() => {
             const sidebar = SidebarFolderTargets.get()
@@ -212,18 +211,24 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
               </ContextMenuSub>
             )
           })()}
-          <ContextMenuItem
-            onSelect={() => {
-              const panel = props.containerApi.getPanel(props.api.id)
-              if (panel !== undefined) props.containerApi.addFloatingGroup(panel)
-            }}
-          >
-            Float panel
-          </ContextMenuItem>
-          <ContextMenuItem disabled={!TabRows.canHide(props.api.group)} onSelect={() => TabRows.hide(props.containerApi, props.api.group)}>
-            Hide tab row
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={close}>Close panel</ContextMenuItem>
+          {/* Docking verbs act on the pane, not on the tab's content: one submenu keeps them out of the tab verbs. */}
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Layout</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem
+                onSelect={() => {
+                  const panel = props.containerApi.getPanel(props.api.id)
+                  if (panel !== undefined) props.containerApi.addFloatingGroup(panel)
+                }}
+              >
+                Float panel
+              </ContextMenuItem>
+              <ContextMenuItem disabled={!TabRows.canHide(props.api.group)} onSelect={() => TabRows.hide(props.containerApi, props.api.group)}>
+                Hide tab row
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
         </ContextMenuContent>
       </ContextMenu>
     )

@@ -1,12 +1,16 @@
 import { FilePath } from '@dshfiles/plugin-ui/components/code-block'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { ToolCard, type ToolStatus } from '@dshfiles/plugin-ui/components/tool-card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
-import { PatchView } from '@dshfiles/plugin-ui/diff'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import { hunkDiffs, hunkTotals, type HunkDiff } from './file-hunk-diff.js'
 import { FileToolModels, type FileHunk, type FileToolCall } from './file-tool-models.js'
+
+/** The renderer and shiki load when a hunk first opens; collapsed rows only count lines. */
+const PatchView = lazyView(() => import('@dshfiles/plugin-ui/diff').then(module => module.PatchView), { label: 'Diff', loading: 'Loading the diff…' })
 
 /** The Host conversation labels this card borrows, so a zh profile reads it like the native rows. */
 export type DiffTranslate = (
@@ -70,9 +74,7 @@ const HunkRow = (props: {
       className="dshx:flex dshx:w-full dshx:items-center dshx:gap-1.5 dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
     >
       <ChevronRightIcon className={cn('dshx:size-3 dshx:transition-transform', props.open && 'dshx:rotate-90')} />
-      <span className="dshx:shrink-0 dshx:font-mono dshx:tabular-nums">
-        <span className="dshx:text-success">+{props.entry.added}</span> <span className="dshx:text-destructive">−{props.entry.removed}</span>
-      </span>
+      <DiffStat added={props.entry.added} removed={props.entry.removed} className="dshx:shrink-0" />
       {props.showPath && <FilePath path={props.entry.hunk.path} />}
     </CollapsibleTrigger>
     <CollapsibleContent>
@@ -105,7 +107,9 @@ export const DiffToolCard = (props: DiffToolCardProps): ReactNode => {
   return (
     <ToolCard
       {...cardLabel(applied.title)}
-      meta={`+${totals.added} −${totals.removed}`}
+      // Round five C1: a succeeded edit shows the kit's copper pencil instead of a check.
+      kind="edit"
+      meta={<DiffStat added={totals.added} removed={totals.removed} />}
       onToggle={disclosure.toggle}
       open={disclosure.expanded}
       status={applied.status}

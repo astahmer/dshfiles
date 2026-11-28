@@ -1,5 +1,8 @@
 /** Content-sized model collapse for the composer's two control groups. */
 
+/** A phone's bar (unslop r5 C3): the viewport the mark step serves, the same bound as the dock's Live work row. */
+export const PHONE_BAR_QUERY = '(max-width: 27.99rem)'
+
 /**
  * The row's flex items: a `display: contents` group (the new-thread bar dissolves its tool, run and mode groups into the
  * row, visual refresh T3.2) contributes its own children, which are the boxes that actually share the line.
@@ -36,16 +39,25 @@ const wraps = (row: HTMLElement): boolean => {
  * the observer's callback, which the browser reports as a ResizeObserver loop.
  * @param row - Composer control row with its leading and trailing groups.
  * @param options.iconStep - whether the row may take the second, icon-only step (default yes).
+ * @param options.markStep - whether the bar is a phone's (unslop r5 C3): then it always takes the compact step and the
+ *   mark step (`data-model-mark`), where the model chip is its brand mark with the name beside it (truncated at 96px)
+ *   and the mode chip keeps its words; a bar those words would wrap (`data-model-mark-tight`, round five C1) shows the
+ *   mark and the mode icon alone. The icon step stays for a model without a mark. Default no.
  * @returns Disconnect the layout observers and font listener.
  */
-export function observeControlRow(row: HTMLElement, options: { readonly iconStep?: () => boolean } = {}): () => void {
+export function observeControlRow(
+  row: HTMLElement,
+  options: { readonly iconStep?: () => boolean; readonly markStep?: () => boolean } = {},
+): () => void {
   const overflows = (): boolean => {
     const style = getComputedStyle(row)
     const available = row.getBoundingClientRect().width
       - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
-    // An item that takes a line of its own (the phone place chip, b:4qjm) never competes for this one.
+    // An item that takes a line of its own (the phone place chip, b:4qjm) never competes for this one, and neither does
+    // one positioned out of the line (Send on a narrow card sits against the card, beside the row's box: unslop phone 6).
     const widths = flowItems(row)
       .filter(child => !child.hasAttribute('data-row-break') || getComputedStyle(child).flexBasis !== '100%')
+      .filter(child => !/^(absolute|fixed)$/u.test(getComputedStyle(child).position))
       .map(child => child.getBoundingClientRect().width)
       .filter(width => width > 0)
     const needed = widths.reduce((sum, width) => sum + width, 0)
@@ -63,6 +75,17 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
     // Always measure expanded demand, including text changed while collapsed.
     row.removeAttribute('data-model-compact')
     row.removeAttribute('data-model-icon')
+    row.removeAttribute('data-model-mark')
+    row.removeAttribute('data-model-mark-tight')
+    if (options.markStep?.() === true) {
+      row.setAttribute('data-model-compact', '')
+      row.setAttribute('data-model-mark', '')
+      // Round five C1 (council round 5): the mark names its model (up to 96px) and the mode chip keeps "Can edit" while
+      // the line holds them; a bar they would wrap drops both words to their icons.
+      row.toggleAttribute('data-model-mark-tight', wraps(row) || overflows())
+      measured = rowWidth()
+      return
+    }
     // A wrapped row is ground truth; the summed estimate still covers a bar that cannot wrap, where the overflow is
     // what the icon step answers.
     if (!wraps(row) && !overflows()) {

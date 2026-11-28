@@ -39,11 +39,11 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await dialog.getByRole('button', { name: 'Add view', exact: true }).click()
   await dialog.getByLabel('View name').fill('Needs focus')
   await selectViewOption(page, 'Group by', 'Date')
-  await selectViewStatuses(page, ['Needs attention', 'Archived'])
+  await selectViewStatuses(page, ['Needs you', 'Archived'])
   await selectViewOption(page, 'Source', 'Main threads')
   await dialog.getByRole('button', { name: 'Save view', exact: true }).click()
   await expect(dialog.getByRole('button', { name: 'Edit view Needs focus', exact: true })).toBeVisible()
-  await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs attention, Archived')
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs you, Archived')
 
   for (let step = 0; step < 3; step += 1) {
     await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
@@ -60,23 +60,23 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 
   const sidebar = threadSidebar(page)
-  // The views are the Filter menu's presets (Q5, b:xpvk); Show group / filter button now say whether
-  // that menu offers the Group submenu and the Status and Source submenus.
+  // The views are the Filter panel's presets (Q5, b:xpvk); Show group / filter button now say whether
+  // that panel offers Group by and the Status and Source rows.
   const tabs = await ThreadListFilter.openViews(page, sidebar)
-  await expect(tabs.getByRole('menuitemradio')).toHaveCount(2)
-  await expect(tabs.getByRole('menuitemradio').nth(0)).toContainText('Needs focus')
-  await expect(tabs.getByRole('menuitemradio').nth(1)).toContainText('Everything')
-  await tabs.getByRole('menuitemradio', { name: 'Needs focus', exact: true }).click()
+  await expect(tabs.getByRole('radio')).toHaveCount(2)
+  await expect(tabs.getByRole('radio').nth(0)).toContainText('Needs focus')
+  await expect(tabs.getByRole('radio').nth(1)).toContainText('Everything')
+  await tabs.getByRole('radio', { name: 'Needs focus', exact: true }).click()
   await ThreadListFilter.expectGroup(page, sidebar, 'Date')
   // Filter presets (b:xpvk): the trigger names the preset, not the filters it holds.
-  await expect(sidebar.getByRole('button', { name: 'Filter: Needs focus', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: Needs focus') })).toBeVisible()
 
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show group button', exact: true }).click()
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show filter button', exact: true }).click()
-  await ThreadListFilter.open(sidebar)
-  await expect(page.getByRole('menuitem', { name: /^Group:/u })).toHaveCount(0)
-  await expect(page.getByRole('menuitem', { name: /^Status:/u })).toHaveCount(0)
+  const filter = await ThreadListFilter.open(sidebar)
+  await expect(filter.getByRole('radiogroup', { name: 'Group by', exact: true })).toHaveCount(0)
+  await expect(filter.getByRole('region', { name: 'Status', exact: true })).toHaveCount(0)
   await ThreadListFilter.close(page)
 })
 
@@ -87,13 +87,13 @@ Then('the custom tabs and hidden controls survive reload', async ({ page }: { pa
 
   await recordAssertion(page, 'thread-sidebar-custom-view-order-and-visibility-survive-reload', async () => {
     const tabs = await ThreadListFilter.openViews(page, sidebar)
-    await expect(tabs.getByRole('menuitemradio')).toHaveCount(2)
-    await expect(tabs.getByRole('menuitemradio').nth(0)).toContainText('Needs focus')
-    await expect(tabs.getByRole('menuitemradio').nth(0)).toHaveAttribute('aria-checked', 'true')
-    await expect(tabs.getByRole('menuitemradio').nth(1)).toContainText('Everything')
-    await expect(tabs.getByRole('menuitemradio', { name: /^Working/ })).toHaveCount(0)
-    await expect(page.getByRole('menuitem', { name: /^Group:/u })).toHaveCount(0)
-    await expect(page.getByRole('menuitem', { name: /^Status:/u })).toHaveCount(0)
+    await expect(tabs.getByRole('radio')).toHaveCount(2)
+    await expect(tabs.getByRole('radio').nth(0)).toContainText('Needs focus')
+    await expect(tabs.getByRole('radio').nth(0)).toHaveAttribute('aria-checked', 'true')
+    await expect(tabs.getByRole('radio').nth(1)).toContainText('Everything')
+    await expect(tabs.getByRole('radio', { name: /^Working/ })).toHaveCount(0)
+    await expect(ThreadListFilter.panel(page).getByRole('radiogroup', { name: 'Group by', exact: true })).toHaveCount(0)
+    await expect(ThreadListFilter.panel(page).getByRole('region', { name: 'Status', exact: true })).toHaveCount(0)
     await ThreadListFilter.close(page)
 
     await openSidebarSettings(page)
@@ -110,15 +110,15 @@ Then('the custom tabs and hidden controls survive reload', async ({ page }: { pa
 const filterTrigger = (page: Page, name: string) => threadSidebar(page).getByRole('button', { name: `Filter: ${name}`, exact: true })
 
 const saveCurrentFiltersAs = async (page: Page, name: string): Promise<void> => {
-  const presets = await ThreadListFilter.openViews(page, threadSidebar(page))
-  await presets.getByRole('menuitem', { name: 'Save current filters as preset…', exact: true }).click()
+  // Save as… sits in the presets' ⋯ menu since round 28 (item 10).
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Save as new preset…')
   const dialog = page.getByRole('dialog', { name: 'Save filters as a preset' })
   await dialog.getByLabel('Preset name').fill(name)
   await dialog.getByRole('button', { name: 'Save preset', exact: true }).click()
   await expect(dialog).toHaveCount(0)
 }
 
-const statusLabels = ['All threads', 'Working', 'Needs attention', 'Archived'] as const
+const statusLabels = ['All threads', 'Working', 'Needs you', 'Archived'] as const
 
 When('two filter presets are saved from the Filter menu', async ({ page }: { page: Page }) => {
   const sidebar = threadSidebar(page)
@@ -139,9 +139,7 @@ Then('the presets switch from the Filter menu, the command palette and the brack
     await ThreadListFilter.selectView(page, sidebar, 'Busy')
     await expect(filterTrigger(page, 'Busy')).toBeVisible()
     // Busy kept its own filters when Stored was saved from its edits.
-    await ThreadListFilter.openSubmenu(page, sidebar, /^Status: /u)
-    await expect(page.getByRole('menuitemcheckbox', { name: 'Working', exact: true })).toHaveAttribute('aria-checked', 'true')
-    await ThreadListFilter.close(page)
+    await ThreadListFilter.expectStatus(page, sidebar, 'Working')
 
     await page.keyboard.press('Meta+K')
     const palette = page.getByRole('dialog', { name: 'Command palette' })
@@ -171,12 +169,10 @@ Then('an edited preset saves its changes and a deleted preset comes back with Un
   await recordAssertion(page, 'thread-sidebar-filter-presets-save-changes', async () => {
     await ThreadListFilter.selectSource(page, sidebar, '', 'Main threads')
     await expect(filterTrigger(page, 'Stored (edited)')).toBeVisible()
-    const presets = await ThreadListFilter.openViews(page, sidebar)
-    await presets.getByRole('menuitem', { name: 'Save changes to “Stored”', exact: true }).click()
+    await ThreadListFilter.openViews(page, sidebar)
+    await ThreadListFilter.panel(page).getByRole('button', { name: 'Save changes to “Stored”', exact: true }).click()
     await expect(filterTrigger(page, 'Stored')).toBeVisible()
-    await ThreadListFilter.openSubmenu(page, sidebar, /^Source: /u)
-    await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
-    await ThreadListFilter.close(page)
+    await ThreadListFilter.expectSource(page, sidebar, 'Main threads')
   })
   await recordAssertion(page, 'thread-sidebar-filter-presets-delete-undo', async () => {
     await ThreadListFilter.clickViewItem(page, sidebar, 'Delete…')
@@ -192,8 +188,8 @@ Then('an edited preset saves its changes and a deleted preset comes back with Un
     await expect(filterTrigger(page, 'Stored')).toBeVisible()
     const presets = await ThreadListFilter.openViews(page, threadSidebar(page))
     // A preset that lists working threads names its count too: "Busy (0)".
-    await expect(presets.getByRole('menuitemradio', { name: ThreadListFilter.viewName('Busy') })).toBeVisible()
-    await expect(presets.getByRole('menuitemradio', { name: ThreadListFilter.viewName('Stored') })).toHaveAttribute('aria-checked', 'true')
+    await expect(presets.getByRole('radio', { name: ThreadListFilter.viewName('Busy') })).toBeVisible()
+    await expect(presets.getByRole('radio', { name: ThreadListFilter.viewName('Stored') })).toHaveAttribute('aria-checked', 'true')
     await ThreadListFilter.close(page)
   })
   await finishJourneyAssertions(page)

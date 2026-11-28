@@ -9,39 +9,6 @@ import type { ErrorGroup, TraceStats } from './types.js'
 
 const numeric = 'dshx:text-right dshx:font-mono dshx:text-xs'
 
-/** One compact card per service: volume, error rate and p95, the strip above every tab. */
-export const ServiceStrip = (props: {
-  readonly stats: TraceStats
-  readonly onPick: (service: string) => void
-  readonly t: TracesTranslate
-}): JSX.Element | null => {
-  if (props.stats.services.length === 0) return null
-  return (
-    <div className="dshx:flex dshx:gap-2 dshx:overflow-x-auto dshx:pb-1" aria-label={props.t('tabOperations')}>
-      {props.stats.services.slice(0, 12).map(service => (
-        <button
-          key={service.service}
-          type="button"
-          onClick={() => props.onPick(service.service)}
-          className="dshx:flex dshx:min-w-36 dshx:shrink-0 dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent/40"
-        >
-          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-medium">
-            <ServiceDot service={service.service} />
-            <span className="dshx:min-w-0 dshx:truncate">{service.service}</span>
-          </span>
-          <span className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
-            <span>
-              <span className="dshx:font-mono dshx:text-sm dshx:text-foreground">{service.count}</span> {props.t('spans')}
-            </span>
-            <span className={service.errorCount > 0 ? 'dshx:text-destructive' : ''}>{TraceFormat.percent(service.errorRate)}</span>
-            <span>p95 {TraceFormat.duration(service.p95Ms)}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export const OperationsTable = (props: {
   readonly stats: TraceStats
   readonly onPick: (service: string, operation: string) => void

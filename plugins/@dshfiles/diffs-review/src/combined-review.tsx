@@ -1,10 +1,12 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { PatchView, parsePatchFiles, type PatchLineSelection } from '@dshfiles/plugin-ui/diff'
+import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ChevronLeft, ChevronRight, RefreshCw } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -42,12 +44,7 @@ const filesOf = (revision: RevisionReview): readonly RevisionFile[] => revision.
 
 const subject = (revision: RevisionReview): string => (revision.description.length === 0 ? '(no description)' : revision.description)
 
-const Counts = (props: { readonly added: number; readonly deleted: number }): JSX.Element => (
-  <>
-    <span className="dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-success">+{props.added}</span>
-    <span className="dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-destructive">−{props.deleted}</span>
-  </>
-)
+const Counts = (props: { readonly added: number; readonly deleted: number }): JSX.Element => <DiffStat added={props.added} removed={props.deleted} />
 
 /**
  * Several revisions reviewed in one panel. A selection may have gaps, and `jj diff` has no answer across a gap, so each
@@ -106,7 +103,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive" role="alert">
         <span className="dshx:min-w-0">{message}</span>
         <Button onClick={() => void query.refetch()} size="xs" variant="outline">
-          Try again
+          Retry
         </Button>
       </p>
     )
@@ -156,7 +153,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       {result.segments > 1 ? (
         <p className={HINT} role="status">
           {result.graphComplete === false
-            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here; select fewer or closer revisions to see the gaps.'
+            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here. Select fewer or closer revisions to see the gaps.'
             : 'These revisions are not adjacent, so each one is shown as its own change. Dashed lines mark revisions between them that are not in this review.'}
         </p>
       ) : null}
@@ -170,12 +167,12 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       ))}
       {marks.unavailable ? (
         <p className={HINT} role="status">
-          Viewed marks are kept by the diff-viewed plugin, which is not loaded. Add @dshfiles/diff-viewed to the profile to mark files.
+          To mark files viewed, enable the diff-viewed plugin in Plugins and restart DSH.
         </p>
       ) : null}
       {marks.error === null || marks.error === undefined ? null : (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
-          {errorMessage(marks.error, 'Viewed marks could not be saved; try again.')}
+          {errorMessage(marks.error, 'Viewed marks could not be saved. Try again.')}
         </p>
       )}
       {revisions.length === 0 ? <EmptyState>None of the selected revisions could be read. Select them again in the graph.</EmptyState> : null}
@@ -310,7 +307,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
               data-testid="combined-diff"
             >
               <PatchView
-                className="dshx:flex-1"
+                className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
                 empty={<p className={cn(HINT, 'dshx:p-3')}>This revision changes no file contents.</p>}
                 files={packageJson.textFiles}
                 focusPath={chosen?.commitId === current.commitId ? chosen.focusPath : null}

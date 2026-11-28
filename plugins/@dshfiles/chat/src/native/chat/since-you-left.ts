@@ -37,6 +37,12 @@ export const RECAP_FILE_CHIPS = 6
 
 export class SinceYouLeftRecapModel {
   /**
+   * dshfiles (unslop T10): whether the recap earns its card. One unseen Turn is on screen right below, so a card that
+   * says "1 turn" (and, when it failed, "1 failed" above "This turn failed") only repeats it.
+   */
+  static readonly worthShowing = (recap: Pick<SinceYouLeftRecap, 'turns'> | null): boolean => recap !== null && recap.turns > 1
+
+  /**
    * The recap for a thread opened with unseen Turns, or null when nothing unseen is known.
    * @param items - every known Turn, ascending (outline sequences and marks merged).
    */

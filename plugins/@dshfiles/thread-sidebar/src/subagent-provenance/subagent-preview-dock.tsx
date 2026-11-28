@@ -1,141 +1,243 @@
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { AgentRunStatusLabels } from '@dshfiles/plugin-ui/components/motion/agent-run-status'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
-import { ElapsedClock } from '@dshfiles/plugin-ui/components/motion/elapsed-clock'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
-import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings, type SubagentPreviewTranslate } from './subagent-live-preview.js'
-import { SubagentRunCard, subagentRunStepLabel, useSubagentRun } from './subagent-run-card.js'
-import { useSubagentStop } from './subagent-stop.js'
+import { WORK_COUNT_SEPARATOR, workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { launchOrdered } from '../thread-children.js'
+import { ToolSteps } from '../tool-steps.js'
+import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
+import { useSubagentRun } from './subagent-run.js'
+import { useSubagentState } from './subagent-state.js'
 
 type DockProps = Pick<PropsRuntime<'conversation.input.dock'>, 'useSessions' | 'useSessionStatus'>
 
 const ID_SEPARATOR = '\n'
 const ignoreTurnState = (): void => undefined
+/** Up to this many working children show as rows; more fold into one "N subagents" row. */
+const MAX_OPEN_ROWS = 3
 
-/** The card's fixed labels come from the same namespace as the row it replaces. */
-const runLabels = (input: { readonly t: SubagentPreviewTranslate; readonly armed: boolean; readonly label: string }): Partial<AgentRunStatusLabels> => ({
-  running: input.t('subagentPreviewWorking'),
-  done: input.t('subagentPreviewFinished'),
-  stopped: input.t('subagentPreviewInterrupted'),
-  failed: input.t('subagentPreviewFailedToStart'),
-  step: input.t('subagentRunStep'),
-  elapsed: input.t('subagentRunElapsed'),
-  stop: input.t(input.armed ? 'subagentPreviewConfirmStop' : 'subagentPreviewStop'),
-  collapse: input.t('subagentRunCollapse', { label: input.label }),
-})
+/**
+ * rich-composer's narrow phone bound (`LIVE_WORK_QUERY`): below it the composer folds every live row into one "Live
+ * work" disclosure, so that is the fold, and this dock keeps its rows mounted (council round 22, item 5).
+ */
+const LIVE_WORK_QUERY = '(max-width: 27.99rem)'
+const liveWorkQuery = (): MediaQueryList | undefined =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(LIVE_WORK_QUERY) : undefined
+const subscribeLiveWork = (notify: () => void): (() => void) => {
+  const list = liveWorkQuery()
+  list?.addEventListener('change', notify)
+  return () => list?.removeEventListener('change', notify)
+}
+const readLiveWork = (): boolean => liveWorkQuery()?.matches ?? false
+const readLiveWorkOnServer = (): boolean => false
 
+/** A fractional scroll position within this of an end still counts as the end. */
+const EDGE_SLACK = 1
+
+/**
+ * Council round 24, item 4: the dock says which of its edges can still scroll, `data-more-above` and `data-more-below`,
+ * so the phone composer fades only an edge with more rows past it (none when the rows fit). A DOM attribute, not React
+ * state: scrolling re-renders nothing.
+ */
+const markScrollEdges = (element: HTMLElement): void => {
+  const rest = element.scrollHeight - element.clientHeight - element.scrollTop
+  element.toggleAttribute('data-more-above', element.scrollTop > EDGE_SLACK)
+  element.toggleAttribute('data-more-below', rest > EDGE_SLACK)
+}
+
+/**
+ * The open row's height, for the phone composer: its dock frame shows two closed rows, and an open row (its feed and Stop)
+ * is taller, so the frame grows to at least the open row (rich-composer's `--dshfiles-dock-open-row` min-height). Only one
+ * row is open at a time, so the frame never holds more than that row.
+ */
+export const DOCK_OPEN_ROW_HEIGHT = '--dshfiles-dock-open-row'
+const markOpenRow = (element: HTMLElement): void => {
+  const row = element.querySelector<HTMLElement>(':scope > [data-dock-row-open]')
+  if (row === null) element.style.removeProperty(DOCK_OPEN_ROW_HEIGHT)
+  else element.style.setProperty(DOCK_OPEN_ROW_HEIGHT, `${row.offsetHeight}px`)
+}
+
+/** A callback ref that keeps the edges current on scroll, on a resize of the dock or any row, and as rows come and go. */
+const useScrollEdges = (): ((element: HTMLDivElement | null) => void) => {
+  const release = useRef<(() => void) | undefined>(undefined)
+  return useCallback((element: HTMLDivElement | null) => {
+    release.current?.()
+    release.current = undefined
+    if (element === null) return
+    const mark = (): void => {
+      markOpenRow(element)
+      markScrollEdges(element)
+    }
+    element.addEventListener('scroll', mark, { passive: true })
+    const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(mark) : undefined
+    const observeRows = (): void => {
+      sizes?.disconnect()
+      sizes?.observe(element)
+      for (const row of element.children) sizes?.observe(row)
+      mark()
+    }
+    const rows = typeof MutationObserver === 'function' ? new MutationObserver(observeRows) : undefined
+    rows?.observe(element, { childList: true })
+    observeRows()
+    release.current = () => {
+      element.removeEventListener('scroll', mark)
+      sizes?.disconnect()
+      rows?.disconnect()
+    }
+  }, [])
+}
+
+/**
+ * One working child as one compact row, whatever it is doing: `glyph · name · [mark] model · current step · elapsed ·
+ * Open`. The model is on the row itself (council round 17 B1.1), not only in the opened detail. The row never turns into
+ * a card while a tool is in flight (the card/row flip of C2); opening it shows the live preview and Stop. With `runCards`
+ * off (the `subagentRunCards` setting, "show the step and clock") the child is never held and the row shows its name and
+ * model only.
+ */
 const DockRow = (
-  props: DockProps & { readonly parentId: string; readonly childId: string; readonly preview: SubagentPreviewBindings; readonly runCards: boolean },
+  props: DockProps & {
+    readonly parentId: string
+    readonly childId: string
+    readonly preview: SubagentPreviewBindings
+    readonly runCards: boolean
+    readonly open: boolean
+    readonly onToggle: () => void
+  },
 ): JSX.Element => {
-  const { parentId, childId, preview, runCards } = props
-  const [open, setOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const { parentId, childId, preview, runCards, open } = props
+  const section = useRef<HTMLElement>(null)
+  // The frame takes the open row's height before paint; the row then scrolls whole into the frame (its snap start).
+  useLayoutEffect(() => {
+    const dock = section.current?.parentElement
+    if (dock === null || dock === undefined) return
+    markOpenRow(dock)
+    if (open) section.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [open])
   const label = props.useSessions(
     list =>
       list.projectionsBySession[SessionId(parentId)]?.values.subagentCatalog?.find(entry => entry.id === childId)?.label ??
       list.byId[SessionId(childId)]?.displayTitle ??
       childId,
   )
-  const state = subagentStateLabel(preview.t, 'working')
+  const state = useSubagentState({ childId, useSessions: props.useSessions, useSessionStatus: props.useSessionStatus })
   const run = useSubagentRun({ childId, enabled: runCards, retainChild: preview.retainChild, useSessions: props.useSessions })
-  const { stop, armed, requestStop, cancel } = useSubagentStop({ binding: run?.binding, t: preview.t })
-  const toggle = (): void => setOpen(value => !value)
-  const collapse = (): void => {
-    setCollapsed(true)
-    setOpen(false)
-  }
-  const summary = (input: {
-    readonly expanded: boolean
-    readonly toggleLabel: string
-    readonly elapsedFrom?: number
-    readonly onToggle: () => void
-  }): JSX.Element => (
-    <button
-      type="button"
-      aria-expanded={input.expanded}
-      aria-label={input.toggleLabel}
-      className="dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:hover:bg-accent dshx:pointer-coarse:h-11"
-      onClick={input.onToggle}
-    >
-      <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', input.expanded && 'dshx:rotate-90')} />
-      <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-      <span className="dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{preview.t('subagentPreviewKind')}</span>
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
-      {input.elapsedFrom === undefined ? null : (
-        <ElapsedClock
-          startedAt={input.elapsedFrom}
-          aria-label={preview.t('subagentRunElapsed')}
-          className="dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground"
-        />
-      )}
-      <span role="status" className="dshx:shrink-0">
-        <Badge variant="secondary">{state}</Badge>
-      </span>
-    </button>
-  )
+  const step = run.tool === undefined ? undefined : ToolSteps.ofName(run.tool)
+  const waiting = step?.waitsForAnswer === true
+  const stateLabel = waiting ? preview.t('subagentRunWaiting') : subagentStateLabel(preview.t, 'working')
   return (
+    // A row never shrinks (round 21 D2): in the dock's max-h-72 column six rows squeezed to 31px over their 44px touch
+    // row; whole rows overflow the column, which scrolls under its sticky fold row instead.
     <section
+      ref={section}
       aria-label={`${preview.t('subagentPreviewKind')}: ${label}`}
-      className={cn(
-        'dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:text-xs',
-        (run === undefined || collapsed) && 'dshx:bg-background dshx:border dshx:border-border',
-      )}
+      className="dshx-root dshx:group/dock-row dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
       data-dshfiles-live-preview="agent"
       data-dshfiles-live-preview-seat="dock"
       data-state="working"
+      data-dock-row-open={open ? '' : undefined}
+      data-waiting={waiting ? '' : undefined}
     >
-      {run === undefined ? (
-        summary({ expanded: open, toggleLabel: preview.t('subagentPreviewToggle', { label }), onToggle: toggle })
-      ) : collapsed ? (
-        summary({
-          expanded: false,
-          toggleLabel: preview.t('subagentRunExpand', { label }),
-          elapsedFrom: run.startedAt,
-          onToggle: () => setCollapsed(false),
-        })
-      ) : (
-        <>
-          <SubagentRunCard
-            run={run}
-            heading={label}
-            stepLabel={subagentRunStepLabel({ t: preview.t, tool: run.tool })}
-            openLabel={preview.t('subagentPreviewOpenThread')}
-            labels={runLabels({ t: preview.t, armed, label })}
-            onStop={requestStop}
-            onOpen={() => preview.openChild(childId)}
-            onCollapse={collapse}
+      {/* Council round 22, item 1: on a narrow pane (a phone) one line gave the name ~60px ("Check cr…") beside the model
+          and clock. There the row is two lines: line 1 the ring, the title over the whole width and ↗; line 2 at the
+          title's x the mark, model and · elapsed. 54px tall, over the 44pt touch row. */}
+      <div
+        className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:pointer-coarse:h-11 dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:min-h-[54px] dshx:@max-pane-narrow:items-stretch dshx:@max-pane-narrow:pointer-coarse:h-auto"
+        data-subagent-dock-row=""
+      >
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={preview.t('subagentPreviewToggle', { label })}
+          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:pl-2 dshx:text-left dshx:hover:bg-accent dshx:@max-pane-narrow:grid dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:grid-cols-[auto_minmax(0,1fr)] dshx:@max-pane-narrow:content-center dshx:@max-pane-narrow:gap-x-2 dshx:@max-pane-narrow:gap-y-0.5 dshx:@max-pane-narrow:py-2 dshx:@max-pane-narrow:pl-3"
+          onClick={props.onToggle}
+        >
+          <ChevronRightIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden', open && 'dshx:rotate-90')}
           />
-          <div className="dshx:flex dshx:items-center dshx:gap-1">
-            {armed ? (
-              <Button size="xs" variant="ghost" className="dshx:shrink" onClick={cancel}>
-                {preview.t('subagentPreviewKeepWorking')}
-              </Button>
-            ) : null}
-            <Button
-              size="xs"
-              variant="ghost"
-              aria-expanded={open}
-              aria-label={preview.t('subagentPreviewToggle', { label })}
-              className="dshx:ml-auto dshx:shrink dshx:text-muted-foreground"
-              onClick={toggle}
-            >
-              <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5', open && 'dshx:rotate-90')} />
-              <span className="dshx:@max-pane-narrow:sr-only">{preview.t('subagentRunDetails')}</span>
-            </Button>
-          </div>
-        </>
-      )}
-      {stop.kind === 'failed' ? (
-        <p className="dshx:mx-2 dshx:my-1 dshx:text-destructive">{preview.t('subagentPreviewStopFailed', { error: stop.message })}</p>
-      ) : null}
-      {open && !collapsed ? (
-        <div className="dshx:border-t dshx:border-border dshx:p-2">
-          <SubagentLivePreview {...preview} childId={childId} state="working" onTurnState={ignoreTurnState} showActions={run === undefined} />
+          <StatusGlyph label={stateLabel} status={waiting ? 'needs-you' : 'working'} />
+          <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium dshx:@max-pane-narrow:text-sm/5" data-subagent-dock-title="">
+            {label}
+          </span>
+          {/* One line with the title on a wide pane (`contents`), its own line under the title on a narrow one. */}
+          <span
+            className="dshx:contents dshx:@max-pane-narrow:col-start-2 dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:text-xs/4 dshx:@max-pane-narrow:text-muted-foreground"
+            data-subagent-dock-meta=""
+          >
+            {step === undefined ? null : (
+              <>
+                {/* On line 2 the step follows the clock, so the clock never truncates. */}
+                <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:inline">
+                  ·
+                </span>
+                <span
+                  className={cn(
+                    'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:@max-pane-narrow:order-last',
+                    waiting ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+                  )}
+                  data-subagent-run-step=""
+                >
+                  {waiting ? stateLabel : step.words}
+                </span>
+              </>
+            )}
+            {step === undefined ? <span className="dshx:flex-1 dshx:@max-pane-narrow:hidden" /> : null}
+            {run.route === undefined ? null : (
+              // Council round 22, item 10: on a wide pane the model is a fixed column after the name and its step, before
+              // a fixed clock seat and the fixed action column, so every model name starts on one x (the empty mark seat
+              // keeps a model without a family on it). It truncates its name; the mark stays.
+              <RouteModel
+                provider={run.route.provider}
+                model={run.route.model}
+                seat
+                className="dshx:ml-1 dshx:w-36 dshx:shrink-0 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:w-auto dshx:@max-pane-narrow:shrink"
+              />
+            )}
+            {!runCards ? null : state.since === undefined ? (
+              <span aria-hidden className="dshx:min-w-12 dshx:shrink-0 dshx:pr-1 dshx:@max-pane-narrow:hidden" data-subagent-dock-clock-seat="" />
+            ) : (
+              <>
+                {run.route === undefined ? null : (
+                  <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:inline" data-subagent-dock-separator="">
+                    ·
+                  </span>
+                )}
+                <LiveElapsed
+                  active
+                  className="dshx:min-w-12 dshx:shrink-0 dshx:pr-1 dshx:text-right dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:text-left"
+                  since={state.since}
+                />
+              </>
+            )}
+          </span>
+        </button>
+        {/* Council round 18 B1.2: one fixed action column across the dock (a job row's "Open in Processes ↗", 132px wide,
+            takes the same 8.5rem, right-aligned), so every row's tabular clock ends on one edge. A narrow pane drops the
+            label and the column. */}
+        <Button
+          size="xs"
+          variant="ghost"
+          className="dshx:mr-1 dshx:min-w-34 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:mr-0 dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:min-w-11 dshx:@max-pane-narrow:items-start dshx:@max-pane-narrow:justify-center dshx:@max-pane-narrow:self-stretch dshx:@max-pane-narrow:rounded-none dshx:@max-pane-narrow:pt-3"
+          data-live-work-action=""
+          onClick={() => preview.openChild(childId)}
+        >
+          {/* Council round 22, item 13: the arrow alone at rest, the words when the row is hovered or holds keyboard focus;
+              they are the button's name either way. They appear inside the fixed column, so nothing moves. A narrow pane
+              keeps the arrow alone. */}
+          <span className="dshx:sr-only dshx:@pane-narrow:group-hover/dock-row:not-sr-only dshx:@pane-narrow:group-has-[:focus-visible]/dock-row:not-sr-only">
+            {preview.t('subagentPreviewOpenThread')}
+          </span>
+          <ArrowUpRightIcon aria-hidden="true" />
+        </Button>
+      </div>
+      {open ? (
+        <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">
+          <SubagentLivePreview {...preview} childId={childId} state="working" onTurnState={ignoreTurnState} showOpenThread={false} />
         </div>
       ) : null}
     </section>
@@ -144,40 +246,56 @@ const DockRow = (
 
 /**
  * This thread's working subagents above the composer. A parent commonly ends its turn to wait for them, which folds the
- * delegation rows; this keeps each child in reach and clears as they go idle. Two or more fold into one sticky row,
- * "N subagents working", closed by default like background-jobs' dock; the reader's choice holds while children start
- * and finish. Both selectors read plain strings, so unrelated list and status updates do not re-render it.
- *
- * A working child with a known open turn, route and tool becomes the compact run card; every missing part keeps the
- * one-line row, so the card never invents a step, a model or a clock.
+ * delegation rows; this keeps each child in reach and clears as they go idle. Up to three children show as rows; four or
+ * more fold into one sticky "N subagents" row, closed by default like background-jobs' dock; the reader's choice holds
+ * while children start and finish. Both selectors read plain strings, so unrelated list and status updates do not
+ * re-render it.
  */
 export const SubagentPreviewDock = (
   props: DockProps & {
     readonly sessionId: string
     readonly preview: SubagentPreviewBindings
     readonly runCards: boolean
-    readonly count?: (count: number) => string
+    /**
+     * The fold row's one phrase under the phone's Live work header, "4 subagents working", from this plugin's table: never
+     * a count beside a word from another. A wide pane heads the fold "Live work · 4 working" itself.
+     */
+    readonly foldLabel?: (count: number) => string
   },
 ): JSX.Element | null => {
   const parentId = SessionId(props.sessionId)
-  const children = props.useSessions(list =>
-    (list.projectionsBySession[parentId]?.values.subagentCatalog ?? [])
-      .filter(entry => entry.mode !== 'external')
+  // One child order on every subagent surface (council round 22, item 12): launch order, as the list and the transcript
+  // read; the dock lists working children only, so none is failed.
+  const children = props.useSessions(list => {
+    const catalog = (list.projectionsBySession[parentId]?.values.subagentCatalog ?? []).filter(entry => entry.mode !== 'external')
+    const launchOrder = [...catalog].sort((left, right) => left.createdAt - right.createdAt).map(entry => entry.id)
+    return launchOrdered({ children: catalog, launchOrder, isFailed: () => false })
       .map(entry => entry.id)
-      .join(ID_SEPARATOR),
-  )
+      .join(ID_SEPARATOR)
+  })
   const working = props.useSessionStatus(statuses =>
     (children === '' ? [] : children.split(ID_SEPARATOR)).filter(id => statuses.get(SessionId(id))?.running === true).join(ID_SEPARATOR),
   )
-  // Two or more working children fold into one row (b:7rv2), the same row as background-jobs' dock; the reader's choice
-  // holds while children start and finish, and resets with the thread (the dock is keyed by its session).
+  // Four or more working children fold into one row (b:7rv2), the same row as background-jobs' dock; the reader's
+  // choice holds while children start and finish, and resets with the thread (the dock is keyed by its session).
   const [expanded, setExpanded] = useState(false)
+  // One row open at a time: opening another closes the first, so the phone frame grows to one row's detail at most.
+  const [openChild, setOpenChild] = useState<string | undefined>(undefined)
+  const underLiveWork = useSyncExternalStore(subscribeLiveWork, readLiveWork, readLiveWorkOnServer)
+  const scrollEdges = useScrollEdges()
   if (working === '') return null
   const list = working.split(ID_SEPARATOR)
-  const folded = list.length >= 2
-  const count = props.count?.(list.length) ?? String(list.length)
+  const folded = list.length > MAX_OPEN_ROWS
+  const t = props.preview.t
+  // Council round 23, item 3: the desktop fold reads "Live work · 6 working", the kit's one count formula (the dock
+  // lists working children only, so its failed clause is always empty).
+  const count = workCountLabel(
+    { working: list.length },
+    { working: value => t('threadSidebarWorkingCount', { count: value }), failed: value => t('threadSidebarFailedCount', { count: value }) },
+  )
   return (
     <div
+      ref={scrollEdges}
       aria-label={props.preview.t('subagentPreviewDock')}
       role="region"
       className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-col dshx:overflow-y-auto"
@@ -193,11 +311,33 @@ export const SubagentPreviewDock = (
         >
           <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', expanded && 'dshx:rotate-90')} />
           <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{`${count} ${subagentStateLabel(props.preview.t, 'working').toLocaleLowerCase()}`}</span>
-          <StatusGlyph status="working" decorative />
+          {/* Under the phone's Live work header (beside running jobs) the fold names its subagents; the first span holds
+              the count rich-composer's Live work reads. No trailing ring: each row leads with its own (item 3). */}
+          {underLiveWork ? (
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.foldLabel?.(list.length) ?? String(list.length)}</span>
+          ) : (
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+              <span className="dshx:font-medium dshx:text-foreground">{t('subagentDockTitle')}</span>
+              <span className="dshx:text-muted-foreground" data-subagent-dock-count="">
+                {WORK_COUNT_SEPARATOR}
+                {count}
+              </span>
+            </span>
+          )}
         </button>
       ) : null}
-      {!folded || expanded ? list.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />) : null}
+      {/* Under the phone's Live work fold the rows stay mounted: the composer hides this fold row while Live work holds
+          only subagents (one header, council round 22 item 5), and hides the rows behind it while it is closed. */}
+      {!folded || expanded || underLiveWork ? list.map(childId => (
+            <DockRow
+              key={childId}
+              {...props}
+              parentId={props.sessionId}
+              childId={childId}
+              open={openChild === childId}
+              onToggle={() => setOpenChild(current => (current === childId ? undefined : childId))}
+            />
+          )) : null}
     </div>
   )
 }

@@ -6,24 +6,24 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-552 features from 120 plugins.
+588 features from 121 plugins.
 
 ## Counts
 
 | Destination | agentToolOnly | attentionProvider | command | composerContribution | destinationSection | detail | entityProvider | infrastructure | rowAction | rowDecorator | settingsSection | statusItem | threadFacet | transcriptCard | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Threads |  |  |  |  | 12 | 1 | 1 |  | 17 | 2 |  | 1 |  |  | 34 |
+| Threads |  |  |  |  | 13 | 1 | 1 |  | 17 | 2 |  | 1 |  |  | 35 |
 | Inbox |  | 19 |  |  | 3 |  |  |  | 1 |  |  |  |  |  | 23 |
 | Land |  |  | 2 |  | 7 | 2 | 1 |  | 4 |  |  |  |  |  | 16 |
-| Work |  |  | 1 |  | 24 | 8 | 1 |  | 7 |  |  |  |  |  | 41 |
-| Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
-| Observe |  |  |  |  | 23 | 1 |  |  | 3 |  |  | 1 |  |  | 28 |
-| Knowledge |  |  |  |  | 8 | 4 | 1 |  | 2 |  |  |  |  |  | 15 |
-| Settings |  |  |  |  | 2 |  |  |  | 1 |  | 60 |  |  |  | 63 |
+| Work |  |  | 1 |  | 24 | 8 | 1 |  | 8 |  |  |  |  |  | 42 |
+| Agents |  |  |  |  | 6 |  | 1 |  |  |  |  |  |  |  | 7 |
+| Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
+| Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 69 |  |  |  | 73 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
-| Composer |  |  |  | 69 |  |  |  |  |  |  |  |  |  |  | 69 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 40 | 40 |
-| No place of its own | 28 |  | 21 |  |  |  | 1 | 126 |  |  |  | 10 |  |  | 186 |
+| Composer |  |  |  | 72 |  |  |  |  |  |  |  |  |  |  | 72 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
+| No place of its own | 29 |  | 22 |  |  |  | 1 | 139 |  |  |  | 10 |  |  | 201 |
 
 ## By current left-nav entry
 
@@ -34,16 +34,15 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Activity Timeline: Activity | Inbox, Observe | activity-timeline/activity-condensation → Inbox (attentionProvider)<br>activity-timeline/activity-feed → Observe (destinationSection)<br>activity-timeline/verification-receipts → Observe (destinationSection) |
 | Agent CLI threads | Knowledge | agentsview/agent-sessions-panel → Knowledge (destinationSection) |
 | Agent Toolkit: Capabilities | Thread panel | agent-toolkit/agent-toolkit-page → Thread panel (threadFacet) |
-| Agents | Agents | agents/agent-registry → Agents (destinationSection) |
+| Agents | Agents | agents/agent-colour → Agents (destinationSection)<br>agents/agent-registry → Agents (destinationSection)<br>agents/agent-tools-tree → Agents (destinationSection) |
 | AI Accounts: Accounts | Settings | ai-accounts/account-lifecycle → Settings (settingsSection)<br>ai-accounts/model-routing → Settings (settingsSection)<br>ai-accounts/reference-dashboard → Settings (settingsSection) |
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection)<br>background-jobs/outlived-jobs → Observe (rowAction) |
-| Backlog | Work, Inbox, Settings | backlog/acceptance-criteria → Work (destinationSection)<br>backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/agent-claims → Work (detail)<br>backlog/agent-run-state → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/capture-templates → Work (destinationSection)<br>backlog/due-dates → Work (destinationSection)<br>backlog/duplicate-merge → Work (destinationSection)<br>backlog/export-backlog → Settings (settingsSection)<br>backlog/gates-and-pull-requests → Work (destinationSection)<br>backlog/hide-agent-items → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/item-priority → Work (destinationSection)<br>backlog/item-timeline-lanes → Work (detail)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/peer-hosts → Settings (settingsSection)<br>backlog/project-agent-guidance → Work (destinationSection)<br>backlog/project-scope → Work (destinationSection)<br>backlog/ready-queue → Work (destinationSection)<br>backlog/recurring-items → Work (destinationSection)<br>backlog/revert-field-change → Work (detail)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/scheduled-rules → Work (destinationSection)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/shipped-digest → Work (destinationSection)<br>backlog/shipped-summary → Work (destinationSection)<br>backlog/short-item-references → Work (destinationSection)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/sub-issues → Work (detail)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Backlog | Work, Inbox, Settings | backlog/acceptance-criteria → Work (destinationSection)<br>backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/agent-claims → Work (detail)<br>backlog/agent-run-state → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/capture-templates → Work (destinationSection)<br>backlog/due-dates → Work (destinationSection)<br>backlog/duplicate-merge → Work (destinationSection)<br>backlog/export-backlog → Settings (settingsSection)<br>backlog/gates-and-pull-requests → Work (destinationSection)<br>backlog/hide-agent-items → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/item-priority → Work (destinationSection)<br>backlog/item-timeline-lanes → Work (detail)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/peer-hosts → Settings (settingsSection)<br>backlog/project-agent-guidance → Work (destinationSection)<br>backlog/project-scope → Work (destinationSection)<br>backlog/ready-queue → Work (destinationSection)<br>backlog/recurring-items → Work (destinationSection)<br>backlog/revert-field-change → Work (detail)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/scheduled-rules → Work (destinationSection)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/shipped-digest → Work (destinationSection)<br>backlog/shipped-summary → Work (destinationSection)<br>backlog/short-item-references → Work (destinationSection)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/sub-issues → Work (detail)<br>backlog/tag-colors → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Backlog: Items | Work, Settings | backlog/remote-sync → Work (rowAction)<br>backlog/remote-sync-settings → Settings (settingsSection) |
-| Component gallery | Knowledge | component-gallery/component-gallery-page → Knowledge (destinationSection) |
-| Hosts | Observe | multi-host/checkout-sync → Observe (destinationSection)<br>multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction) |
-| Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>activity-timeline/inbox-push → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>thread-sidebar/waiting-threads-page → Inbox (destinationSection)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
+| Hosts | Observe | multi-host/checkout-sync → Observe (destinationSection)<br>multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction)<br>multi-host/linked-machines → Observe (detail) |
+| Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>activity-timeline/inbox-push → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
 | Land | Land | jj-integration/thread-integration-attention-view → Land (destinationSection)<br>jj-integration/thread-integration-empty → Land (destinationSection)<br>jj-integration/thread-integration-row-details → Land (detail)<br>jj-integration/thread-workspaces-panel → Land (destinationSection) |
 | MCP Servers: Servers | Settings | mcp-servers/batch-server-actions → Settings (rowAction)<br>mcp-servers/oauth-authorization → Settings (settingsSection)<br>mcp-servers/registry-catalog → Settings (settingsSection)<br>mcp-servers/secret-catalog-credential-bindings → Settings (settingsSection)<br>mcp-servers/server-configuration → Settings (settingsSection) |
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
@@ -71,52 +70,56 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Add workspace › setup step | 1 | Composer 1 |
 | agent tool | 27 | No place of its own 22, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tool notify_user; in-app toast and system notification | 1 | No place of its own 1 |
-| agent tools | 5 | No place of its own 5 |
+| agent tools | 6 | No place of its own 6 |
+| agent tools contributed by configured plugins | 1 | No place of its own 1 |
+| Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) | 1 | Settings 1 |
 | agent tools traces_store_space, traces_reclaim_space | 1 | No place of its own 1 |
 | Backlog composer | 1 | Composer 1 |
 | Backlog settings › Remote sync › Add Jira connection (rendered by @dshfiles/backlog) | 1 | No place of its own 1 |
 | Backlog settings › Remote sync › Add Notion connection (rendered by @dshfiles/backlog) | 1 | No place of its own 1 |
 | chat transcript | 2 | Transcript 2 |
-| client | 16 | No place of its own 16 |
+| client | 17 | No place of its own 17 |
 | command palette | 1 | No place of its own 1 |
-| composer | 62 | Composer 60, Settings 1, Thread panel 1 |
+| command palette and New tab page | 1 | Inbox 1 |
+| composer | 65 | Composer 62, Settings 1, Thread panel 1, Transcript 1 |
 | composer ⋯ | 1 | Composer 1 |
 | composer and transcript | 1 | Threads 1 |
 | composer dock | 1 | Composer 1 |
+| composer dock while it runs; transcript | 1 | Transcript 1 |
 | conversation composer seat of a mirrored thread | 1 | Composer 1 |
 | conversation-view | 1 | Thread panel 1 |
 | conversation.chat.assistant-actions | 1 | Work 1 |
-| dialog | 3 | No place of its own 1, Settings 1, Thread panel 1 |
+| dialog | 5 | Settings 3, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
-| host | 67 | No place of its own 67 |
+| host | 77 | No place of its own 77 |
 | host and client | 1 | No place of its own 1 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | Inbox | 1 | Inbox 1 |
 | keyboard | 5 | No place of its own 5 |
-| left-nav | 121 | Work 36, Observe 23, Settings 16, Land 15, Inbox 14, Knowledge 7, Agents 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 123 | Work 37, Observe 24, Settings 16, Land 15, Inbox 13, Agents 6, Knowledge 6, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 12 | No place of its own 7, Thread panel 4, Settings 1 |
 | module | 1 | No place of its own 1 |
-| new-thread screen | 1 | Composer 1 |
+| new-thread screen | 2 | Composer 2 |
 | observe | 2 | Observe 2 |
 | Observe › Notifications | 1 | Observe 1 |
 | overlay | 4 | Agents 1, Knowledge 1, No place of its own 1, Work 1 |
-| palette | 13 | No place of its own 13 |
+| palette | 14 | No place of its own 14 |
 | phone top bar | 1 | Composer 1 |
 | plugins-page | 2 | No place of its own 1, Settings 1 |
-| rail | 10 | Knowledge 6, Settings 2, No place of its own 1, Work 1 |
+| rail | 13 | Knowledge 6, Settings 4, No place of its own 1, Threads 1, Work 1 |
 | right sidebar | 1 | Threads 1 |
 | right-pane | 10 | Thread panel 8, No place of its own 2 |
-| settings | 34 | Settings 32, No place of its own 2 |
+| settings | 41 | Settings 38, No place of its own 3 |
 | Settings | 1 | Settings 1 |
 | Settings › General › Appearance; agent tools theme_get / theme_set | 1 | Settings 1 |
 | Settings › General › Status bar | 1 | Settings 1 |
 | shell | 9 | No place of its own 6, Threads 3 |
-| sidebar | 5 | Settings 3, No place of its own 1, Work 1 |
-| sidebar footer | 1 | Threads 1 |
-| sidebar-footer | 2 | No place of its own 2 |
+| sidebar | 6 | No place of its own 2, Settings 2, Threads 1, Work 1 |
+| sidebar-footer | 1 | No place of its own 1 |
 | status-strip | 11 | No place of its own 8, Observe 2, Composer 1 |
 | terminal and composer | 1 | No place of its own 1 |
+| thread | 1 | Transcript 1 |
 | thread header | 1 | Thread panel 1 |
 | thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections) | 1 | Work 1 |
 | thread panel | 2 | Thread panel 2 |
@@ -126,7 +129,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-panel | 1 | Thread panel 1 |
 | threads | 1 | Threads 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 41 | Transcript 38, Inbox 1, Land 1, Thread panel 1 |
+| transcript | 42 | Transcript 39, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 17 | No place of its own 12, Thread panel 4, Settings 1 |
 
@@ -134,19 +137,20 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 
 ### Threads
 
-rail destination (default); 34 features.
+rail destination (default); 35 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
-| thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | shell: Navigation list (21 entries) and collapsed icon rail |
-| thread-sidebar/filter-presets: Save and switch thread list filter presets | destinationSection | thread-list: Filter menu › Presets |
+| thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout |
+| thread-sidebar/filter-presets: Save and switch thread list filter presets | destinationSection | thread-list: Filter panel › Presets |
 | thread-sidebar/live-working-activity: See what a working thread is doing right now | destinationSection | thread-list: working row second line; session header utilities; document title |
+| thread-sidebar/phone-drawer-navigation: Open the thread list as a drawer on a phone | destinationSection | shell: phone stack only (tab bar, full-screen list, Back) |
 | thread-sidebar/phone-stack-navigation: Navigate the phone as a stack | destinationSection | shell: phone tab bar only; the stage kept the desktop tab strip and no Back |
 | thread-sidebar/phone-tab-bar: Navigate from a bottom tab bar on a phone | destinationSection | shell: collapsed icon rail at phone width |
 | thread-sidebar/section-order: Group remote threads with each view | destinationSection | thread-list: Thread list settings › Remote group |
 | thread-sidebar/status-grouped-thread-list: See every thread grouped by what it needs from you | destinationSection | thread-list: All threads › Group: Status |
-| thread-sidebar/thread-children-and-links: Browse child sessions and share thread URLs | destinationSection | thread-list: child threads |
+| thread-sidebar/thread-children-and-links: Browse subagent threads and share thread links | destinationSection | thread-list: child threads |
 | thread-sidebar/thread-classification: Organize threads by workspace and status | destinationSection | left-nav: Thread Sidebar: Board |
 | thread-sidebar/thread-keyboard-navigation: Navigate and multi-select threads from the keyboard | destinationSection | thread-list: keyboard navigation |
 | thread-sidebar/thread-list-views: Configure saved thread views | destinationSection | thread-list: Thread list settings › Manage views |
@@ -161,17 +165,17 @@ rail destination (default); 34 features.
 | thread-sidebar/manual-unread: Keep selected threads manually unread | rowAction | thread-list: row menu › Mark unread |
 | thread-sidebar/no-folder-promotion: Turn a No folder thread into a project | rowAction | thread-list: No folder row › Turn into project |
 | thread-sidebar/open-thread-in-side-panel: Open a thread in the right side panel | rowAction | thread-list: row menu › Open in side panel |
-| thread-sidebar/project-header-chat: Start a chat from a project group header | rowAction | thread-list: project header › New chat |
-| thread-sidebar/rename-thread-title: Edit a thread title from its row menu | rowAction | thread-list: row menu › Edit title |
-| thread-sidebar/session-header-actions: Manage threads from the session header | rowAction | thread-header: Pin / More menu |
+| thread-sidebar/project-header-chat: Start a thread from a project header | rowAction | thread-list: project header › New chat |
+| thread-sidebar/rename-thread-title: Edit a thread title from its row menu | rowAction | thread-list: row menu › Rename |
+| thread-sidebar/session-header-actions: Manage a thread from its header | rowAction | thread-header: Pin / More menu |
 | thread-sidebar/thread-mute: Mute or snooze a thread | rowAction | thread-list: row menu › Mute |
 | thread-sidebar/thread-reference-mention: Mention another thread from its row, its tab, or a drag into the composer | rowAction | thread-list: row menu › Mention |
 | thread-sidebar/thread-referenced-by: See which threads reference one thread | rowAction | thread-list: row menu › Referenced by |
 | thread-sidebar/touch-row-menu: Open a thread's actions by touch | rowAction | thread-list: hover action strip and right-click menu only |
-| thread-transfer/thread-export: Export a thread to a portable .dshthread bundle | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
+| thread-transfer/thread-export: Export a thread to a file | rowAction | thread row menu: Export… (also command palette: Export this thread…) |
 | multi-host/logical-project-grouping: Group remote threads under matching local projects | rowDecorator | thread-list: remote threads under their local project |
-| thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify… |
-| cordis-cards/inventory-read-once: Cordis panel and cards read the inventory once per connection | statusItem | sidebar footer: Cordis panel, and Cordis tool cards in the transcript |
+| thread-sidebar/thread-subscriptions: Opt-in completion notices between threads | rowDecorator | threads: row context menu → Notify when finished |
+| cordis-cards/inventory-read-once: Plugin panel loads its list once | statusItem | sidebar: Cordis panel in the row under the list (Sidebar settings › Show the row under the list), and Cordis tool cards in the transcript |
 
 ### Inbox
 
@@ -179,28 +183,28 @@ rail destination; 23 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| activity-timeline/activity-condensation: Deterministic condensation and attention visibility | attentionProvider | left-nav: Activity Timeline: Activity › attention filter |
+| activity-timeline/activity-condensation: Grouped activity, errors kept visible | attentionProvider | left-nav: Activity Timeline: Activity › attention filter |
 | activity-timeline/attention-inbox: One attention inbox for everything that needs you | attentionProvider | Host contract: attention-api module and attention_* agent tools |
 | agent-questions/child-questions-inbox: Subagent questions in the Inbox, answerable in place | attentionProvider | left-nav: Inbox › Subagent question |
 | agent-questions/cross-thread-question-inbox: List and answer thread questions | attentionProvider | agent tool: list_thread_questions / answer_thread_question |
 | agent-questions/native-questions-inbox: Thread questions in the Inbox | attentionProvider | left-nav: Inbox › agent-questions.native-question |
-| agent-questions/parent-child-question: Ask and answer a child-agent question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
+| agent-questions/parent-child-question: Ask and answer a subagent's question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
 | ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
-| backlog/attention-inbox: Attention Inbox across items and threads | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
+| backlog/attention-inbox: Items that need you | attentionProvider | left-nav: Backlog › Triage view (links to the Inbox) |
 | backlog/backlog-inbox-items: Backlog requests in the Inbox | attentionProvider | left-nav: Inbox › backlog.attention |
 | hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
 | jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
 | thread-sidebar/auto-resume-after-restart: Resume threads a managed restart cut off | attentionProvider | activity: Resumed automatically after the restart |
-| thread-sidebar/finished-turn-attention: See finished turns on the Host until they are acknowledged | attentionProvider | thread-list: finished-turn unread marks |
+| thread-sidebar/finished-turn-attention: See finished turns until you open them | attentionProvider | thread-list: finished-turn unread marks |
 | thread-sidebar/finished-turn-inbox: Finished turns in the Inbox | attentionProvider | left-nav: Inbox › Turn finished |
 | thread-sidebar/interrupted-turn-threads: See threads a crash interrupted | attentionProvider | thread-list: interrupted threads |
 | thread-sidebar/usage-limit-group: Group provider-blocked threads under Usage limit | attentionProvider | thread-list: Usage limit group |
 | traces/alert-inbox-items: Firing alerts in the Inbox | attentionProvider | left-nav: Inbox › traces.alert-firing |
 | traces/alert-rules: Alert rules over stored telemetry | attentionProvider | left-nav: Traces: Explorer › Alerts |
 | activity-timeline/inbox-panel: Inbox page with one Needs you badge | destinationSection | left-nav: Inbox |
-| activity-timeline/inbox-push: Push blocking Inbox items to a device | destinationSection | left-nav: Inbox › Push blocking items to this device |
-| thread-sidebar/waiting-threads-page: See the threads waiting on you in one page | destinationSection | left-nav: Inbox › Waiting threads |
+| activity-timeline/inbox-push: Push blocking Inbox items to a device | destinationSection | left-nav: Inbox › More actions › Alerts on this device |
+| thread-sidebar/waiting-threads-page: See the threads waiting on you in one page | destinationSection | command palette and New tab page: Waiting threads (not a second row of the Inbox list) |
 | activity-timeline/inbox-opens-subject: Open an Inbox item's source in one click | rowAction | Inbox: Open on an item's subject |
 
 ### Land
@@ -210,25 +214,25 @@ rail destination; 16 features.
 | Feature | Surface | Today |
 | --- | --- | --- |
 | jj-integration/workspace-process-stop: Stop processes left in a thread workspace before removing it | command | left-nav: Revision graph › Clean up workspaces (row meta) |
-| jujutsu/workspace-cleanup: Clean up idle JJ workspaces | command | left-nav: Revision graph › Clean up workspaces |
-| jj-integration/thread-integration-attention-view: Thread integration prioritises what needs attention | destinationSection | left-nav: Land › Needs you |
-| jj-integration/thread-integration-empty: Thread integration with no thread workspaces | destinationSection | left-nav: Land › empty state |
-| jj-integration/thread-workspaces-panel: Thread integration control center | destinationSection | left-nav: Land |
+| jujutsu/workspace-cleanup: Clean up idle workspaces | command | left-nav: Revision graph › Clean up workspaces |
+| jj-integration/thread-integration-attention-view: Workspaces that need you come first | destinationSection | left-nav: Land › Needs you |
+| jj-integration/thread-integration-empty: No thread workspaces yet | destinationSection | left-nav: Land › empty state |
+| jj-integration/thread-workspaces-panel: Workspaces page | destinationSection | left-nav: Land |
 | jujutsu/graph-navigation: Locate landmarks and compare revision ancestry | destinationSection | left-nav: Revision graph › landmarks |
 | jujutsu/review-selection: Select revisions in the graph to review them together | destinationSection | left-nav: Revision graph › selection strip |
 | jujutsu/revision-graph: Browse and filter the revision graph | destinationSection | left-nav: Revision graph |
 | jujutsu/source-control: Describe and review the working copy in Source Control | destinationSection | left-nav: Source control |
-| jj-integration/thread-integration-row-details: Thread integration row details | detail | left-nav: Land › row details |
+| jj-integration/thread-integration-row-details: Workspace row details | detail | left-nav: Land › row details |
 | jujutsu/revision-detail-and-diff: Inspect revisions and changed files | detail | left-nav: Revision graph › revision detail |
 | jujutsu/chat-references: Open Jujutsu references from a chat message | entityProvider | transcript: jj: reference links |
-| jujutsu/previewed-revision-mutations: Preview and confirm repository mutations | rowAction | left-nav: Revision graph › revision menu |
+| jujutsu/previewed-revision-mutations: Preview and confirm repository changes | rowAction | left-nav: Revision graph › revision menu |
 | jujutsu/workspace-at-revision: Create a workspace at a revision | rowAction | left-nav: Revision graph › New workspace here |
 | jujutsu/workspace-overflow: Move a workspace from a shared revision | rowAction | left-nav: Revision graph › workspace overflow chip |
 | jujutsu/workspace-removal: Remove a workspace from the graph | rowAction | left-nav: Revision graph › Remove workspace |
 
 ### Work
 
-rail destination; 41 features.
+rail destination; 42 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -256,8 +260,8 @@ rail destination; 41 features.
 | backlog/shipped-summary: Summarize a shipped period with the triage model | destinationSection | left-nav: Backlog › Shipped › Summarize |
 | backlog/short-item-references: Name new items with a short alias | destinationSection | left-nav: Backlog (every item label, reference card, mention chip and agent tool) |
 | project-automations/project-automations: Start threads in a project on a schedule | destinationSection | rail: Work › Automations (already on the rail) |
-| schedule/catalog-read-reuse: Tasks and reminder catalogs keep their read until a schedule change | destinationSection | sidebar: Tasks page, task tabs and the Session header's reminders |
-| backlog/agent-claims: Agents claim items with a lease; you release them | detail | left-nav: Backlog › item detail › Owner · Delegate › Release |
+| schedule/catalog-read-reuse: Tasks and reminders load once | destinationSection | sidebar: Tasks page, task tabs and the Session header's reminders |
+| backlog/agent-claims: Agents claim items while they work on them | detail | left-nav: Backlog › item detail › Owner · Delegate › Release |
 | backlog/backlinks: See the backlog items that link to a thread or revision | detail | thread header ⋯ submenu (thread-sidebar ThreadMenuSections); jj panel revision details (jj-integration RevisionSections) |
 | backlog/board-links-and-history: Board, links, backlinks and history | detail | left-nav: Backlog › Board / item detail |
 | backlog/item-timeline-lanes: Conversation and work log in the item timeline | detail | left-nav: Backlog › item detail › Activity › Conversation / Work log |
@@ -269,36 +273,39 @@ rail destination; 41 features.
 | backlog/inline-title-edit: Rename an item in place | rowAction | left-nav: Backlog › rows |
 | backlog/multi-select-items: Select items in ranges and batch-edit them | rowAction | left-nav: Backlog › rows |
 | backlog/quote-reply: Quote a finished reply into a new backlog item | rowAction | conversation.chat.assistant-actions: Add to backlog |
-| backlog/remote-sync: Mirror backlog items in Linear, GitHub Issues, markdown files or a plugin provider | rowAction | left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips |
+| backlog/remote-sync: Sync items with Linear, GitHub Issues or Markdown files | rowAction | left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips |
 | backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog › row menu |
 | backlog/start-thread-from-item: Start a thread from an item | rowAction | left-nav: Backlog › Start thread |
-| backlog/tweet-context-enrichment: Retrieve public tweet context into a backlog item | rowAction | left-nav: Backlog › row menu › tweet context |
+| backlog/tag-colors: Choose a tag’s colour | rowAction | left-nav: Backlog › a tag chip on a feed row or in the item panel › Colour of #tag |
+| backlog/tweet-context-enrichment: Bring a tweet's text into an item | rowAction | left-nav: Backlog › row menu › tweet context |
 
 ### Agents
 
-rail destination; 5 features.
+rail destination; 7 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-communication/agent-directory: Discover Agents and workspace channels | destinationSection | left-nav: Messages |
-| agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
-| agent-communication/passive-messaging: Store and browse passive messages | destinationSection | left-nav: Messages |
-| agents/agent-registry: Manage persistent agents | destinationSection | left-nav: Agents |
+| agent-communication/agent-directory: Find running agents | destinationSection | left-nav: Messages |
+| agent-communication/human-browser: Send direct messages from the Messages panel | destinationSection | left-nav: Messages › post |
+| agent-communication/passive-messaging: Store and browse agent messages | destinationSection | left-nav: Messages |
+| agents/agent-colour: Colour an agent | destinationSection | left-nav: Agents |
+| agents/agent-registry: Manage agents | destinationSection | left-nav: Agents |
+| agents/agent-tools-tree: Choose an agent's tools, subagents and projects | destinationSection | left-nav: Agents › agent editor › Tools, Delegation, Default for projects |
 | agents/agent-mention-preview: Preview an agent from its mention | entityProvider | overlay: shared reference preview card (input-trigger entity registry), agent kind |
 
 ### Observe
 
-rail destination; 28 features.
+rail destination; 29 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| activity-timeline/activity-feed: Unified agent activity feed | destinationSection | left-nav: Activity Timeline: Activity |
-| activity-timeline/verification-receipts: Inspect verification receipts in the Activity Timeline | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
+| activity-timeline/activity-feed: Activity feed | destinationSection | left-nav: Activity Timeline: Activity |
+| activity-timeline/verification-receipts: Check results in the activity feed | destinationSection | left-nav: Activity Timeline: Activity › receipt detail |
 | ai-accounts/quota-dashboard: Read provider quota and usage status | destinationSection | status-strip: Quota › usage popover |
-| ai-accounts/quota-forecast: Forecast when each account runs out, whether a kind kept an account free, and the order to use them in | destinationSection | left-nav: AI Accounts: Quota forecast |
+| ai-accounts/quota-forecast: Forecast when each account runs out | destinationSection | left-nav: AI Accounts: Quota forecast |
 | ai-accounts/usage-history-and-pricing: Review usage history and cost forecasts | destinationSection | left-nav: AI Accounts: Usage history |
-| background-jobs/jobs-board: Cross-Session background jobs board | destinationSection | left-nav: Background Jobs: Jobs |
-| background-jobs/processes-page: Observe › Processes: jobs, dev servers and RAM on one page | destinationSection | observe: Processes |
+| background-jobs/jobs-board: Background jobs across threads | destinationSection | left-nav: Background Jobs: Jobs |
+| background-jobs/processes-page: Processes: jobs, dev servers and RAM | destinationSection | observe: Processes |
 | multi-host/checkout-sync: Sync a jj checkout on another host | destinationSection | left-nav: Hosts › Sync checkout |
 | multi-host/fleet-update: Update every host from the Hosts page | destinationSection | left-nav: Hosts › Update hosts |
 | multi-host/host-management: Manage hosts on a dedicated page | destinationSection | left-nav: Hosts |
@@ -312,27 +319,27 @@ rail destination; 28 features.
 | usage/usage-activity-report: Tool and skill analytics | destinationSection | left-nav: Usage › Tools & Jev |
 | usage/usage-charts: Usage charts | destinationSection | left-nav: Usage › Charts |
 | usage/usage-jev-card: Jev API usage card | destinationSection | left-nav: Usage › Charts › Jev |
-| usage/usage-quota-tab: Usage › Quota: account quota, history and forecast in the Usage page | destinationSection | observe: Usage › Quota |
+| usage/usage-quota-tab: Quota in the Usage page | destinationSection | observe: Usage › Quota |
 | usage/usage-request-log: Request log | destinationSection | left-nav: Usage › Requests |
-| worktree-memory/memory-board: Process memory and Node origins | destinationSection | left-nav: Worktree Memory: RAM |
+| worktree-memory/memory-board: Process RAM | destinationSection | left-nav: Worktree Memory: RAM |
 | multi-host/host-settings: Weight Auto placement and fetch before new threads | detail | left-nav: Hosts › Edit host |
+| multi-host/linked-machines: Link machines without SSH, both ways | detail | left-nav: Hosts › Link this machine, Pair a machine |
 | background-jobs/batch-stop-jobs: Stop a selection of running jobs | rowAction | left-nav: Background Jobs: Jobs › batch stop |
 | background-jobs/outlived-jobs: Jobs that outlived their turn | rowAction | left-nav: Background Jobs: Jobs › outlived its turn |
 | multi-host/isolated-runtime-views: Open the host's own DSH UI | rowAction | left-nav: Hosts › Open host UI |
-| worktree-memory/orphan-scratch-hosts: Orphaned scratch DSH Hosts | statusItem | status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts |
+| worktree-memory/orphan-scratch-hosts: Leftover test copies of DSH | statusItem | status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts |
 
 ### Knowledge
 
-rail destination; 15 features.
+rail destination; 14 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agentsview/agent-sessions-panel: Agent CLI sessions browser | destinationSection | left-nav: Agent CLI threads |
-| component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | left-nav: Component gallery |
+| agentsview/agent-sessions-panel: Claude Code and Codex history | destinationSection | left-nav: Agent CLI threads |
 | memory/memory-panel: Browse and clean up memory in the Memory panel | destinationSection | left-nav: Memory |
 | memory/usage-telemetry: Show what memory costs and whether it holds up | destinationSection | left-nav: Memory › Analytics |
 | onboarding/getting-started: See what this setup can do and what it still needs on one page | destinationSection | rail: Knowledge › Getting started; palette: Getting started |
-| references/session-references: Attach named outside directories and git repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
+| references/session-references: Attach outside folders and repositories to a thread | destinationSection | agent tool: reference_* and /reference (no UI) |
 | resource-packs/local-properties: Typed packs on referenced resources | destinationSection | left-nav: Resource Packs: Resources (not mounted) |
 | whiteboard/project-whiteboards: Project whiteboards | destinationSection | left-nav: Whiteboard |
 | onboarding/pack-change: Enable or disable a plugin pack after an exact preview | detail | rail: Knowledge › Getting started › Packs › Enable pack / Disable pack |
@@ -345,56 +352,64 @@ rail destination; 15 features.
 
 ### Settings
 
-rail destination (bottom); 63 features.
+rail destination (bottom); 73 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | capabilities-hub/capabilities-hub: Open the manager for skills, MCP servers or plugins from one page | destinationSection | rail: Settings › Capabilities hub (already on the rail) |
-| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Plugin guide (already on the rail) |
+| component-gallery/component-gallery-page: Browse every shared component on one page | destinationSection | rail: Settings › Developer › Component gallery |
+| plugin-guide/plugin-guide: Browse where a plugin can extend DSH | destinationSection | rail: Settings › Developer › Plugin guide |
 | mcp-servers/batch-server-actions: Batch enable, disable and remove MCP servers | rowAction | left-nav: MCP Servers: Servers › batch actions |
-| ai-accounts/account-lifecycle: Manage provider account drafts | settingsSection | left-nav: AI Accounts: Accounts |
+| ai-accounts/account-lifecycle: Edit and remove accounts | settingsSection | left-nav: AI Accounts: Accounts |
+| ai-accounts/antigravity-accounts: Use a Google AI plan through the Antigravity CLI | settingsSection | dialog: Add AI account › Antigravity |
 | ai-accounts/failure-recovery: Recover failed account requests per failure kind | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/luna-reserve-routing: Route exhausted Luna accounts through Reserve | settingsSection | settings: AI Accounts › failure recovery |
 | ai-accounts/model-routing: Curate models and choose account routes | settingsSection | left-nav: AI Accounts: Accounts › Models |
 | ai-accounts/quick-account-setup: Connect an account without leaving the chat | settingsSection | dialog: Add AI account |
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
+| ai-accounts/stalled-stream-fallback-setting: Turn on the fallback chain for stalled streams | settingsSection | settings: AI Accounts › Failure recovery › Fall back on stalled streams |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
-| backlog/export-backlog: Export the backlog to JSONL or an SQLite copy | settingsSection | left-nav: Backlog › Backlog settings › Export |
+| ai-accounts/vibe-acp-bridge: Run Vibe with DSH's tools through its ACP server | settingsSection | settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge |
+| ai-accounts/vibe-cli-route: Spend the Vibe & Studio allowance through the Vibe CLI | settingsSection | dialog: Add AI account › Vibe CLI |
+| backlog/export-backlog: Export the backlog to a file | settingsSection | left-nav: Backlog › Backlog settings › Export |
 | backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
-| backlog/peer-hosts: Share one backlog across Hosts | settingsSection | left-nav: Backlog › Backlog settings › Hosts |
-| backlog/remote-sync-settings: Configure remote sync connections and bindings, and import remote items | settingsSection | left-nav: Backlog: Items › Backlog settings › Remote sync |
+| backlog/peer-hosts: Share one backlog across hosts | settingsSection | left-nav: Backlog › Backlog settings › Hosts |
+| backlog/remote-sync-settings: Set up remote sync and import items | settingsSection | left-nav: Backlog: Items › Backlog settings › Remote sync |
 | chat/view-mode: Choose Summary, Normal or Verbose for tool work | settingsSection | settings: general › view mode |
 | conversation-cleanup/conversation-cleanup: Permanently clean up done or archived threads | settingsSection | Settings: Thread cleanup |
 | frame-layout/status-bar-settings: Show, hide and reorder status bar items | settingsSection | Settings › General › Status bar |
 | jj-integration/project-main-branch: Choose a project's main branch | settingsSection | settings: Projects › Main branch |
 | loopback-access/network-access-settings: Choose how DSH is reachable | settingsSection | settings: Network access |
-| mcp-endpoint/mcp-endpoint-settings: Issue the MCP token and copy the Claude Code command | settingsSection | settings: MCP endpoint |
+| mcp-endpoint/mcp-endpoint-settings: Issue an MCP token and connect a client | settingsSection | settings: MCP endpoint |
 | mcp-servers/oauth-authorization: Authorize remote OAuth servers | settingsSection | left-nav: MCP Servers: Servers › OAuth |
 | mcp-servers/registry-catalog: Search curated providers and the MCP Registry | settingsSection | left-nav: MCP Servers: Servers › registry |
-| mcp-servers/secret-catalog-credential-bindings: Bind server headers and environment to Secret Catalog references | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
+| mcp-servers/secret-catalog-credential-bindings: Use secrets for MCP server credentials | settingsSection | left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers |
 | mcp-servers/server-configuration: Manage local and remote MCP server definitions | settingsSection | left-nav: MCP Servers: Servers |
-| multi-host/runtime-directory: Register and identify local DSH runtimes | settingsSection | composer: Run on Local › Add host |
+| multi-host/runtime-directory: Add and identify hosts | settingsSection | composer: Run on Local › Add host |
+| opencode-compat/plugin-loader: Load OpenCode server plugins | settingsSection | settings: dshfiles-opencode-compat |
 | policies/deny-policies: Deny tool calls outright, after permissions | settingsSection | agent tool: policies_list (no UI) |
-| secret-catalog/alias-mutations: Create, edit, rename, and remove aliases safely | settingsSection | left-nav: Secrets › Add with details |
+| secret-catalog/alias-mutations: Create, edit, rename and remove secrets | settingsSection | left-nav: Secrets › Add with details |
 | secret-catalog/backlog-jev-setup: Add a Jev key from the Backlog setting | settingsSection | plugins-page: View @dshfiles/backlog › Jev secret |
 | secret-catalog/bounded-secret-reveal: Reveal on click and copy without revealing | settingsSection | left-nav: Secrets › reveal |
 | secret-catalog/inline-quick-add: Add a secret inline under the list | settingsSection | left-nav: Secrets › Add secret |
 | secret-catalog/inline-reference-setup: Create and bind from a secret-reference field | settingsSection | settings: secret-reference fields › Bind |
 | secret-catalog/reference-repair: Repair a secret reference that does not resolve | settingsSection | settings: secret-reference fields › repair |
-| secret-catalog/scoped-alias-catalog: Browse aliases by scope and environment | settingsSection | left-nav: Secrets |
+| secret-catalog/scoped-alias-catalog: Browse secrets by scope and environment | settingsSection | left-nav: Secrets |
 | settings-models/models-settings: Models settings and provider onboarding | settingsSection | settings: Models section |
-| settings-shell/dsh-release-notice: DSH release notice and TL;DR | settingsSection | sidebar: Settings trigger release mark › General |
+| settings-shell/dsh-release-notice: DSH release notice and summary | settingsSection | sidebar: Settings trigger release mark › General |
+| settings-shell/dshfiles-plugins-page: Plugins by category | settingsSection | settings: Plugins › Plugins by category |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
 | settings-shell/open-config-menu: Open the configuration file elsewhere | settingsSection | settings: Open configuration file |
 | settings-shell/plugin-enablement-tools: List and switch plugin entries, from Settings or an Agent | settingsSection | settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled |
 | settings-shell/plugin-settings-controls: Plugin settings with real controls | settingsSection | settings: plugin pages |
 | settings-shell/settings-json-editor: Edit plugin settings as JSON | settingsSection | settings: plugin page › JSON |
+| settings-shell/settings-origin-distinction: Tell DSH defaults from plugin categories | settingsSection | settings: source filter heading the category list, origin badge in the page header |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
-| settings-shell/settings-shell-port: Native Settings shell, ported | settingsSection | sidebar: Account menu › Settings |
+| settings-shell/settings-shell-port: Settings shell | settingsSection | rail: Settings; palette: Settings: General |
 | settings-shell/settings-tab: One Settings page in the stage | settingsSection | settings: the Settings page in the stage |
 | settings-shell/settings-task-groups: Settings grouped by task, with deep links | settingsSection | settings: task groups in the Settings navigation |
-| settings-shell/settings-workbench-panels: One dockable Settings hub with real navigation and forms | settingsSection | main-tabs: New tab › Settings |
+| settings-shell/settings-workbench-panels: Dock Settings as one panel | settingsSection | main-tabs: New tab › Settings |
 | settings-shell/shared-jev-key: Set the Jev key once | settingsSection | settings: Tools & MCP › Jev › Key |
 | settings-subagent/subagent-settings: Subagent settings | settingsSection | settings: Plugins › Subagent |
 | settings-web-search/web-search-settings: Web search settings | settingsSection | settings: Plugins › Web search |
@@ -402,14 +417,16 @@ rail destination (bottom); 63 features.
 | thread-share/thread-share-link: Share a thread as a read-only link | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-publish: Publish share pages through a time-bounded tunnel | settingsSection | settings: Thread sharing |
 | thread-share/thread-share-snapshot-export: Freeze a snapshot or download a self-contained HTML export | settingsSection | settings: Thread sharing |
-| thread-sidebar/idle-archive-policy: Automatically settle eligible idle threads | settingsSection | settings: Thread sidebar › idle policy |
+| thread-sidebar/idle-archive-policy: Mark idle threads done | settingsSection | settings: Thread sidebar › idle policy |
 | thread-sidebar/layout-mode: One sidebar layout: the rail and list as a movable pane | settingsSection | sidebar: the rail and list (Workbench Sidebar pane) |
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Notifications › Thread notifications |
-| thread-sidebar/settled-auto-archive: Archive a settled thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
+| thread-sidebar/reminder-wake: Wake a done or archived thread for its reminder | settingsSection | settings: Thread sidebar › Reminder wake |
+| thread-sidebar/settled-auto-archive: Archive a done thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
 | ui-styles/appearance-theme: Appearance theme: presets, palette and fonts | settingsSection | Settings › General › Appearance; agent tools theme_get / theme_set |
-| web-fetch-readable/readable-web-fetch: Answer ctx.web fetches across redirects with the readable article | settingsSection | settings: dshfiles-web-fetch-readable |
-| web-search-brave/brave-web-search: Answer ctx.web searches with Brave Web Search | settingsSection | settings: Brave web search |
+| ui-styles/saved-themes: Saved and gallery themes | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
+| web-fetch-readable/readable-web-fetch: Fetch pages as readable articles | settingsSection | settings: dshfiles-web-fetch-readable |
+| web-search-brave/brave-web-search: Search the web with Brave | settingsSection | settings: Brave web search |
 | workbench/dockable-panel-layouts: Arrange plugin panels in independent layouts | settingsSection | workbench: Pane options › Layouts |
 | workspace-folder-picker/project-settings-section: Read a project's declared settings | settingsSection | settings: Projects |
 
@@ -422,12 +439,12 @@ facets of the active thread; 32 features.
 | agent-toolkit/agent-toolkit-page: Agent toolkit page | threadFacet | left-nav: Agent Toolkit: Capabilities |
 | agent-toolkit/thread-context-facet: See what a thread loads into its context | threadFacet | thread panel: Context tab |
 | annotations/preview-file: Annotate an HTML preview | threadFacet | dialog: annotate an HTML preview |
-| background-jobs/thread-jobs-facet: Thread panel Jobs facet | threadFacet | workbench: Choose a view › Thread panels › Jobs |
-| btw/btw-side-chat: /btw side chat | threadFacet | right-pane: btw tab |
+| background-jobs/thread-jobs-facet: Jobs tab in the thread panel | threadFacet | workbench: Choose a view › Thread panels › Jobs |
+| btw/btw-side-chat: Side chat with /btw | threadFacet | right-pane: btw tab |
 | diff-viewed/review-file-markers: Mark review files as viewed | threadFacet | right-pane: native review tab › Viewed |
 | diffs-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
 | diffs-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
-| diffs-review/changed-image-preview: See changed images in a review instead of a dropped binary file | threadFacet | right-pane: Changes, Review page |
+| diffs-review/changed-image-preview: See changed images in a review | threadFacet | right-pane: Changes, Review page |
 | diffs-review/changes-facet: Review a thread's changes in its Changes facet | threadFacet | right-pane: Changes |
 | diffs-review/combined-revisions: Review several selected revisions together | threadFacet | right-pane: Changes › Revisions |
 | diffs-review/diff-line-comments: Comment on diff lines as chips in the next message | threadFacet | right-pane: Changes › diff line selection |
@@ -438,23 +455,23 @@ facets of the active thread; 32 features.
 | editor/file-links: Open file links in the editor | threadFacet | main-tabs: New tab › Workspace files › file row |
 | editor/thread-artifacts: Edit thread artifacts | threadFacet | main-tabs: New tab › Artifacts |
 | editor/workspace-editor: Browse and edit workspace files | threadFacet | main-tabs: New tab › Files |
-| jj-integration/rebase: Integrate a thread into the bookmark | threadFacet | thread-header: Own workspace › Integrate |
-| jj-integration/thread-workspace-menu: Thread workspace control in the conversation header | threadFacet | thread-header: Own workspace menu |
-| jujutsu/composer-context: See project and Jujutsu workspace context in the composer | threadFacet | thread header: Changes pill |
+| jj-integration/rebase: Land a thread on its bookmark | threadFacet | thread-header: Own workspace › Integrate |
+| jj-integration/thread-workspace-menu: Workspace control in the thread header | threadFacet | thread-header: Own workspace menu |
+| jujutsu/composer-context: See a thread's changes in its header | threadFacet | thread header: Changes pill |
 | preview/agent-browser: Agent browser | threadFacet | thread panel: Agent browser |
 | preview/preview-browser: Agent preview browser | threadFacet | agent tool: preview_open / preview_screenshot |
 | preview/thread-dev-servers: Thread dev servers | threadFacet | thread-header: Dev servers and previews |
-| project-checks/native-hook-receipts: Show native hook invocation records | threadFacet | composer: Project checks › hook events |
+| project-checks/native-hook-receipts: Show hook runs | threadFacet | composer: Project checks › hook events |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
-| traces/thread-traces-tab: Per-thread Traces facet | threadFacet | thread-panel: Traces / Requests facets |
-| usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
+| traces/thread-traces-tab: Traces tab in the thread panel | threadFacet | thread-panel: Traces / Requests facets |
+| usage/thread-cost-facet: Cost tab in the thread panel | threadFacet | workbench: Choose a view › Thread panels › Cost |
 | workbench/phone-thread-panel-sheet: Open the thread panel as a bottom sheet on a phone | threadFacet | workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab |
-| workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal: Terminal |
+| workbench/terminal-pages: Open native terminals from any pane's view chooser | threadFacet | main-tabs: New tab › Terminal |
 | workbench/thread-facets: Open thread facets from any pane's view chooser | threadFacet | workbench: Choose a view › Thread panels |
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 69 features.
+run row, chips, `/` and `@` sources; 72 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -463,16 +480,18 @@ run row, chips, `/` and `@` sources; 69 features.
 | agent-plan/pinned-step: Current plan step pinned beside the composer | composerContribution | composer: plan chip beside plan mode |
 | agent-preset/draft-preset-selection: Choose an agent preset before typing | composerContribution | composer: agent mode chip, shown for a non-default preset or from ⋯ › Agent mode… (b:4v6p) |
 | agents/agent-mentions: Mention an agent where a thread starts | composerContribution | composer: @agent mention |
+| agents/composer-agent: Start a new thread as the project's default agent | composerContribution | composer: new-thread agent chip |
+| agents/thread-tools: See and switch a running thread's tools | composerContribution | composer: Tools control |
 | ai-accounts/idle-cache-warning: Warn before re-sending an idle thread past its prompt-cache lifetime | composerContribution | composer: meter line |
-| ai-accounts/thread-account-switch: Use a sidebar account for this thread without reselecting its model | composerContribution | status-strip: Quota › Use this account for this thread |
+| ai-accounts/thread-account-switch: Use another account for this thread | composerContribution | status-strip: Quota › Use this account for this thread |
 | annotations/backlog-composers: Annotate from Backlog composers | composerContribution | Backlog composer: Annotate an element |
 | annotations/chrome-picker: Pick on any page in a DSH-owned Chrome | composerContribution | composer: ⋯ › Point at UI… › DSH-owned Chrome |
 | annotations/pick-element: Pick an element and add it to the draft | composerContribution | composer: ⋯ › Point at UI… (/annotate); a count chip while annotations are open |
 | backlog/backlog-mentions: Mention backlog items with @ | composerContribution | composer: @b: mentions |
-| btw/btw-command-chip: Persisted /btw command chip | composerContribution | composer: /btw chip |
-| input-trigger/codex-at-tokens: Codex-style @ token targeting | composerContribution | composer: @ menu |
+| btw/btw-command-chip: Keep a /btw draft after a reload | composerContribution | composer: /btw chip |
+| input-trigger/codex-at-tokens: Pick what an @ mention targets | composerContribution | composer: @ menu |
 | input-trigger/command-chip-restore: Restore a persisted command chip | composerContribution | composer: command chips |
-| input-trigger/command-slash-entries: Slash entries for dshx commands | composerContribution | composer: / menu |
+| input-trigger/command-slash-entries: Slash entries for commands | composerContribution | composer: / menu |
 | jj-integration/git-thread-workspaces: Thread workspaces in git-only repositories | composerContribution | composer: run row Workspace segment |
 | jj-integration/new-thread-preparation: New thread prepares its destination while the draft is written | composerContribution | composer: New thread draft |
 | jj-integration/new-thread-project-default: New thread returns to its project | composerContribution | composer: new-thread destination bar |
@@ -486,10 +505,11 @@ run row, chips, `/` and `@` sources; 69 features.
 | model-effort-picker/model-fallbacks: Edit the model fallback chain from the composer picker | composerContribution | composer: model picker › Fallback chain |
 | model-effort-picker/model-fan-out-gesture: Select several models to fan out | composerContribution | composer: model picker fan-out selection |
 | model-effort-picker/model-selection: Search and select account models | composerContribution | composer: model picker |
-| model-selection/draft-model-selection: Choose a model before typing in a new conversation | composerContribution | composer: draft model selection |
+| model-selection/draft-model-selection: Choose a model before typing in a new thread | composerContribution | composer: draft model selection |
 | multi-host/remote-interactions: Answer a remote agent's questions and approvals in this client | composerContribution | conversation composer seat of a mirrored thread |
 | multi-host/remote-thread-references: Mention remote threads safely | composerContribution | composer: @t: remote threads |
 | multi-host/session-routing: Use the native composer for remote threads | composerContribution | composer: Run on Local chip |
+| onboarding/starter-tasks: First tasks for your project on the new-thread screen | composerContribution | new-thread screen: suggestion cards |
 | project-checks/trusted-actions: Run trusted project checks | composerContribution | composer: Project checks |
 | prompt-stash/draft-attachment-retention: Keep draft attachments across thread navigation | composerContribution | composer: draft attachments |
 | prompt-stash/guarded-composer-insertion: Insert prompt text without submitting | composerContribution | composer: Prompts › insert |
@@ -504,48 +524,51 @@ run row, chips, `/` and `@` sources; 69 features.
 | queue-reorder/send-later: Send a message later | composerContribution | composer ⋯: Send later…; dock: Scheduled messages |
 | rich-composer/composer-run-row: Run row, send states and meter line | composerContribution | composer: pickers in the card’s bottom bar of a new thread; summary chip on the meter line |
 | rich-composer/draft-reference-restore: Restore draft reference chips from plain text | composerContribution | composer: restored draft references |
+| rich-composer/held-send: Send once the attachments finish uploading | composerContribution | composer: held Send and its status line |
 | rich-composer/image-attachment-reference: Add inline references for image attachments | composerContribution | composer: image references |
 | rich-composer/image-reference-mentions: Reuse image references and open the selected image | composerContribution | composer: image reference chips |
 | rich-composer/large-paste-file: Attach a large paste as a text file | composerContribution | composer: large paste as file |
-| rich-composer/paste-session-mentions: Paste session mentions as reference chips | composerContribution | composer: pasted thread mentions |
-| rich-composer/phone-thread-menu: Open a scoped phone thread menu | composerContribution | phone top bar: Thread menu |
+| rich-composer/paste-session-mentions: Paste thread mentions as chips | composerContribution | composer: pasted thread mentions |
+| rich-composer/phone-thread-menu: Thread menu on a phone | composerContribution | phone top bar: Thread menu |
 | rich-composer/prompt-recall: Recall earlier prompts with ArrowUp | composerContribution | composer: ArrowUp recall |
-| send-after-upload/send-after-upload: Send when the attachment upload finishes | composerContribution | composer: Sending when upload finishes pill |
 | session-controller/turn-admission: Limit how many threads run at once | composerContribution | composer dock: Waiting for a free slot; Settings › General: Running threads limit |
 | session-undo/turn-rewind: Rewind to before any recorded turn, files included | composerContribution | composer: Rewind to an earlier turn |
 | session-undo/turn-undo-redo: Undo and redo a turn: conversation and files together | composerContribution | composer: Undo last turn |
 | thread-sidebar/hero-suggestions: Resume, Review and Inbox cards on the new-thread screen | composerContribution | new-thread screen: suggestion cards |
 | thread-sidebar/skill-mentions: Find human-invocable skills from @ autocomplete | composerContribution | composer: @ skills |
-| tool-meta/approval-card: The native approval request as a risk card | composerContribution | composer: pending approval request |
-| workspace-folder-picker/directory-only-mode: Start directly in the Host folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
+| tool-meta/approval-card: Approval requests as a risk card | composerContribution | composer: pending approval request |
+| workspace-folder-picker/directory-only-mode: Start in the folder browser | composerContribution | Hosts › Add folder (directory-only picker) |
 | workspace-folder-picker/keyboard-folder-selection: Select project folders with keyboard navigation | composerContribution | composer: Choose project › keyboard rows |
 | workspace-folder-picker/project-clone: Add a project by cloning a repository | composerContribution | composer: Choose project › Add folder › Clone repository |
 | workspace-folder-picker/project-create: Create a new project | composerContribution | composer: Choose project › Add folder › New project |
-| workspace-folder-picker/project-registration-removal: Remove a project registration | composerContribution | composer: Choose project › Remove |
+| workspace-folder-picker/project-registration-removal: Remove a project | composerContribution | composer: Choose project › Remove |
 | workspace-folder-picker/registered-project-search: Search projects and browse folder paths | composerContribution | composer: Choose project › search |
 | workspace-folder-picker/unregistered-recent-folders: Offer recent folders not yet registered as projects | composerContribution | composer: Choose project › Recent |
-| workspace-folder-picker/workspace-folder-add-flow: Add workspaces from the folder browser | composerContribution | composer: Choose project › Add folder |
+| workspace-folder-picker/workspace-folder-add-flow: Add projects from the folder browser | composerContribution | composer: Choose project › Add folder |
 | workspace-folder-picker/workspace-folder-setup: Inspect a folder before adding it | composerContribution | Add workspace › setup step |
-| workspace-nav/new-thread-composer: Open a New thread's composer before the Host creates its Session | composerContribution | composer: New thread draft |
+| workspace-nav/new-thread-composer: Open a new thread's composer at once | composerContribution | composer: New thread draft |
 
 ### Transcript
 
-cards inline in the active thread; 40 features.
+cards inline in the active thread; 44 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
-| agent-plan/failure-card: Retry and Ask to fix under failed turns | transcriptCard | transcript: turn error row |
-| agent-plan/plan-card: Plan card for todo_write | transcriptCard | transcript: todo_write tool card |
-| agent-questions/question-card-layout: Steady countdown and compact native question card | transcriptCard | transcript: native question card |
-| agent-questions/root-timed-questions: Root timed questions keep the Agent working | transcriptCard | transcript: native question card |
+| activity-timeline/thread-question-strip: Answer a subagent's question in its parent thread | transcriptCard | thread: above the composer while a subagent's question waits |
+| agent-plan/failure-card: Ask to fix on a failed turn | transcriptCard | transcript: failed turn action row |
+| agent-plan/plan-card: Plan card for the agent's to-do list | transcriptCard | transcript: todo_write tool card |
+| agent-questions/question-card-layout: Steady countdown on question cards | transcriptCard | transcript: native question card |
+| agent-questions/root-timed-questions: Timed questions keep the agent working | transcriptCard | transcript: native question card |
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
+| ai-accounts/stalled-stream-recovery: Explain turns stopped by a stalled model stream | transcriptCard | transcript: failed turn › stalled-stream advice |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
-| background-jobs/transcript-job-preview: Live job preview in the transcript and above the composer | transcriptCard | transcript: under the tool card that started the job; composer dock while it runs |
+| background-jobs/transcript-job-preview: Live job preview in the transcript and above the composer | transcriptCard | composer dock while it runs; transcript: under the tool card that started the job once it finished |
 | backlog/jev-secret-setup: Set up a missing Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | chat/find-in-thread: Find text anywhere in a long thread | transcriptCard | transcript: find bar over the thread |
 | chat/folded-work: A finished turn folds its work under one Worked for row | transcriptCard | transcript: turn process row |
 | chat/image-links: Open image links in the gallery | transcriptCard | transcript: image links |
-| chat/resume-interrupted: Resume the latest stopped task | transcriptCard | transcript: Resume beside a stopped task |
+| chat/inline-annotations: See annotations beside the passage they quote, sent or draft | transcriptCard | transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window |
+| chat/resume-interrupted: Resume the latest stopped turn | transcriptCard | transcript: Resume beside a stopped task |
 | chat/retry-failed-turn: Retry a turn that failed before any reply | transcriptCard | transcript: Retry beside a failed turn |
 | chat/route-change-markers: Mark where the model or effort changed | transcriptCard | transcript: route-change row |
 | chat/run-folds: Runs of background jobs and subagents fold into one summary row | transcriptCard | transcript: summary row in place of the first row of the run |
@@ -555,91 +578,96 @@ cards inline in the active thread; 40 features.
 | chat/windowed-transcript: Open a thread on its latest messages | transcriptCard | transcript: windowed rendering |
 | deliverables/changed-files-card: Changed-files card and review tab | transcriptCard | chat transcript: the card under a turn that edited files, and the review tab it opens |
 | deliverables/changed-image-preview: Changed images preview instead of the binary placeholder | transcriptCard | chat transcript: a changed image row's hover preview in the Edited files card, and the review tab |
-| html-render/html-page-card: Agent-published HTML page as a sandboxed card | transcriptCard | transcript: html_render card |
+| html-render/html-page-card: HTML page from the agent as a card | transcriptCard | transcript: html_render card |
 | html-render/html-preview-card: Workspace HTML file shown as a sandboxed card | transcriptCard | transcript: html_preview card |
-| jj-integration/turn-end-integrate: Integrate from the end of a turn | transcriptCard | transcript: turn tail › Land on main › revisions |
+| jj-integration/turn-end-integrate: Land from the end of a turn | transcriptCard | transcript: turn tail › Land on main › revisions |
 | mermaid-diagrams/chat-diagram: Mermaid diagrams in the conversation | transcriptCard | transcript: mermaid code fence |
 | secret-catalog/agent-secret-request: Let an agent ask the user to store a secret | transcriptCard | transcript: turn tail › Secret request |
 | secret-catalog/backlog-jev-chat-setup: Set up a Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | session-undo/turn-checkpoint: Each turn names the jj revision its edits left, with Restore to here | transcriptCard | transcript: reply More actions menu |
 | test-runs/bash-stack-trace: Stack traces under failed commands | transcriptCard | transcript: Stack trace card under a bash call |
-| test-runs/test-run-card: Vitest runs as a test-results card | transcriptCard | transcript: Vitest results card |
+| test-runs/test-run-card: Vitest runs as a test results card | transcriptCard | transcript: Vitest results card |
 | thread-sidebar/subagent-live-preview: Live subagent preview in the transcript and above the composer | transcriptCard | transcript: subagent tool row; composer dock while the child works |
 | tool-meta/file-diff-card: File edits as collapsible diffs | transcriptCard | transcript: file edit as a collapsible diff |
 | tool-meta/read-code-card: File reads as a syntax-highlighted code card | transcriptCard | transcript: file read as a code card |
-| tool-meta/tool-call-timing: Start time and duration on every tool call | transcriptCard | transcript: tool call timing |
+| tool-meta/tool-call-timing: How long each tool call took | transcriptCard | transcript: tool call timing |
 | traces/trace-transcript-links: Span ↔ transcript links | transcriptCard | transcript: Open the trace of turn |
 | turn-summary/turn-summary-line: A summary footer under each finished turn | transcriptCard | transcript: turn summary footer |
 | turn-summary/turn-walkthrough: A walkthrough under a turn that changed code | transcriptCard | transcript: turn walkthrough row |
 | user-questions/answered-question-stays-closed: An answered question form stays closed while its reply waits for admission | transcriptCard | transcript: question form |
+| user-questions/keyboard-answer: Answer a question by keyboard | transcriptCard | composer: question card |
 | user-questions/markdown-question: Markdown questions with sandboxed HTML previews | transcriptCard | transcript: question form |
 | web-fetch-readable/web-citations: Source chips under web_search and web_fetch results | transcriptCard | transcript: web_search / web_fetch rows |
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 186 features.
+palette commands, status items, agent tools, infrastructure; 201 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-communication/durable-inbox: Read and acknowledge direct messages | agentToolOnly | agent tool: dshx_comm_inbox / dshx_comm_ack |
 | agent-questions/bounded-batch-resolution: Resolve feedback in bounded batches | agentToolOnly | agent tool: resolve_parent_feedback |
-| agent-questions/question-expiry: Resolve question expiry safely | agentToolOnly | agent tool: ask_parent_question expiry |
-| agent-questions/revision-pinned-feedback: Submit and resolve anchored Markdown feedback | agentToolOnly | agent tool: submit_markdown_feedback |
-| annotations/extension-intake: Intake annotations from the browser extension | agentToolOnly | agent tool: annotations_intake (browser extension) |
+| agent-questions/question-expiry: Handle an expired question | agentToolOnly | agent tool: ask_parent_question expiry |
+| agent-questions/revision-pinned-feedback: Give anchored feedback on a document | agentToolOnly | agent tool: submit_markdown_feedback |
+| annotations/extension-intake: Receive annotations from the browser extension | agentToolOnly | agent tool: annotations_intake (browser extension) |
 | annotations/source-resolution: Resolve an element to its source | agentToolOnly | agent tool: annotations_source |
-| apply-patch/apply-patch-tool: Edit a file the Agent inspected without the native read tool | agentToolOnly | agent tool: apply_patch |
+| apply-patch/apply-patch-tool: Edit a file with literal replacements | agentToolOnly | agent tool: apply_patch |
 | backlog/agent-write-confirmation: Agents confirm bulk and destructive backlog writes | agentToolOnly | agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete |
-| fff-search/resident-grep-glob: Answer agent grep and glob from a resident fff index | agentToolOnly | agent tool: grep / glob |
+| fff-search/resident-grep-glob: Faster grep and glob for agents | agentToolOnly | agent tool: grep / glob |
 | goal-stall-guard/bounded-goal-continuation: Extend or close goals within bounded policy | agentToolOnly | agent tool: extend_goal_budget / complete_blocked_goal |
 | html-render/page-screenshot: Agent screenshot of its own published page | agentToolOnly | agent tool: html_render_screenshot |
 | memory/memory-tools: Search, read and note memory from any agent | agentToolOnly | agent tool: memory_search / memory_read / memory_note |
-| multi-host/remote-delegation: Delegate a task to another machine | agentToolOnly | agent tool: multi_host_delegate |
+| multi-host/remote-delegation: Delegate a task to another host | agentToolOnly | agent tool: multi_host_delegate |
 | onboarding/feature-reach: Ask how to get to a feature | agentToolOnly | agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started |
 | pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools: pull_request_link, pull_request_watch, pull_request_list |
-| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias |
+| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
 | settings-shell/settings-inspect-tool: Inspect a setting's default, override and source | agentToolOnly | agent tool: settings_inspect |
 | thread-sidebar/agent-user-notification: Agent sends the user a notification | agentToolOnly | agent tool notify_user; in-app toast and system notification |
 | thread-sidebar/navigation-counter: Count destination and section opens | agentToolOnly | agent tool: shell_navigation_counts / shell_navigation_reset |
-| thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an Agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
-| tool-ask-user/markdown-question-guidance: ask_user_question tells the model that questions are markdown | agentToolOnly | agent tool: ask_user_question |
-| tool-bash/bash-tool: bash tool | agentToolOnly | agent tool: bash |
-| tool-fs/file-tools: read, write, edit and read_image tools | agentToolOnly | agent tools: read, write, edit, read_image |
-| tool-subagent/live-model-selection-policy: Subagent model routes follow the saved setting in running threads | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
+| thread-sidebar/queued-message-tools: Remove, steer or edit a queued message as an agent | agentToolOnly | agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit |
+| tool-ask-user/markdown-question-guidance: The agent knows questions can use Markdown | agentToolOnly | agent tool: ask_user_question |
+| tool-bash/bash-tool: Shell commands for the agent | agentToolOnly | agent tool: bash |
+| tool-fs/file-tools: Read, write and edit files | agentToolOnly | agent tools: read, write, edit, read_image |
+| tool-subagent/live-model-selection-policy: Subagent models follow your setting | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
+| tool-subagent/subagent-agent-argument: subagent starts a child as a configured agent | agentToolOnly | agent tools: subagent (agent argument), list_subagent_models (agent listing) |
 | tweet-context/public-post-context: Fetch public X post, photos, video samples, and thread posts | agentToolOnly | agent tool: tweet_context |
-| usage/usage-otel-export: OTLP metrics export | agentToolOnly | agent tool: usage_otel_metrics |
+| usage/usage-otel-export: Export usage as metrics | agentToolOnly | agent tool: usage_otel_metrics |
 | whiteboard/agent-diagrams: Agent-drawn diagrams | agentToolOnly | agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore |
 | agent-toolkit/agent-toolkit-palette: Open the agent toolkit from the command palette | command | palette: Open the agent toolkit |
 | btw/btw-side-question-entry-points: Open a side question from the palette, a shortcut or the composer | command | palette: Ask a side question (btw) |
 | command-palette/ask-dsh: Ask DSH from an empty palette | command | palette: Ask DSH |
 | command-palette/command-effective-keys: Commands show the keys they answer to | command | palette: Commands › keys |
-| command-palette/contributed-commands: List commands other plugins contribute through dshx | command | palette: Commands |
+| command-palette/contributed-commands: List commands from every plugin | command | palette: Commands |
 | command-palette/palette-prefix-routing: Route prefixed searches to the right content | command | palette: prefixes |
 | command-palette/palette-search: Search threads and workspace files | command | palette: Threads / Files search |
+| frame-layout/zen-mode: Zen mode: only the thread and its composer | command | palette: Zen mode |
 | main-tabs/new-tab-page: Open a new tab with suggestions of what to show | command | main-tabs: New tab |
 | main-tabs/tab-keyboard: Jump between tabs from the keyboard | command | keyboard: tab jumps |
 | pull-requests/github-pull-request-create: Create a GitHub pull request from a thread | command | palette: Create pull request from this thread (dialog) |
-| shortcuts/panel-selection-chords: Select native panels with keyboard shortcuts | command | keyboard: Mod+N / Mod+, |
+| shortcuts/panel-selection-chords: Shortcuts that leave text fields and the terminal alone | command | keyboard: every bound chord |
 | shortcuts/scoped-key-layers: Single keys, sequences and scoped keys | command | keyboard: J / K / E / ? / G then I |
 | shortcuts/shortcut-cheat-sheet: Keyboard shortcut sheet | command | keyboard: ? / Mod+/ |
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |
-| thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar-footer: More menu |
+| thread-sidebar/footer-more-menu: Reach Settings, sidebar pages, and hidden footer actions from both More menus | command | sidebar: More in the row under the list (Sidebar settings › Show the row under the list) and the Workbench Navigation view's More menu |
 | thread-sidebar/moved-to-map: Find where a former sidebar page went | command | palette: Where did a page go? |
 | thread-sidebar/multi-model-fan-out: Send one prompt to several models | command | palette: Send to several models… |
 | thread-sidebar/palette-search-history: Search threads, files, and recent navigation | command | thread-list: Search threads |
 | thread-sidebar/prompt-links: Open a prefilled new thread from a prompt link | command | url: ?prompt= link |
-| thread-sidebar/rail-actions: Restart DSH, Copy DSH URL and Pair a phone on the rail above Settings | command | rail: DSH actions above Settings; phone: More › DSH |
-| thread-transfer/thread-import: Import a .dshthread bundle as a new thread | command | command palette: Import thread… |
+| thread-sidebar/rail-actions: Copy the DSH address and pair a phone from the rail | command | rail: DSH actions above Settings; phone: More › DSH |
+| thread-transfer/thread-import: Import a thread from a file | command | command palette: Import thread… |
 | input-trigger/entity-registry: One mention and reference-preview registry | entityProvider | overlay: shared reference preview card; composer: @ menu groups |
 | agent-loop/output-limit-continuation: Continue a reply cut at the output-token limit | infrastructure | host: no UI |
-| agent-loop/settled-stream-size: Store a settled attempt's replay metadata once | infrastructure | host: no UI |
+| agent-loop/settled-stream-size: Store reply metadata once | infrastructure | host: no UI |
 | agent-loop/tool-argument-limit: Stop a runaway tool call | infrastructure | host: no UI |
-| agent-telemetry/agent-turn-spans: GenAI spans for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
-| agent-telemetry/auxiliary-and-wait-spans: Purpose model calls and wait spans | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agent-telemetry/agent-turn-spans: Traces for every agent turn | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agent-telemetry/auxiliary-and-wait-spans: Spans for side model calls and waits | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/content-capture: Metadata only unless content capture is switched on | infrastructure | settings: Agent telemetry › capture content |
 | agent-telemetry/nested-tool-spans: Plugin work nests under the tool and model call that caused it | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/span-cost: List-price cost on model spans | infrastructure | host: OTel spans (read in transcript: Traces view) |
 | agent-telemetry/subagent-traces: Subagents join their parent's trace | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agents/agent-tool-access: An agent decides its threads' tools | infrastructure | host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree |
+| agents/subagent-agents: A subagent starts as a configured agent | infrastructure | host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools |
 | backlog/capture-project-target: File a thread capture under its project | infrastructure | host: capture project resolution |
 | backlog/lifecycle-signals: Move items from thread and revision signals | infrastructure | host: thread and revision signals |
 | backlog/shared-activity: Backlog work in the Activity timeline | infrastructure | host: backlog.* events into left-nav: Activity Timeline: Activity |
@@ -655,117 +683,128 @@ palette commands, status items, agent tools, infrastructure; 186 features.
 | context-compaction/bounded-compaction: Bounded compaction summaries | infrastructure | host: no UI |
 | context-compaction/compaction-threshold: Next automatic compaction for a thread | infrastructure | host: threshold API and agent tool |
 | context-compaction/idle-compaction: Idle compaction before cache expiry | infrastructure | host: timer, no UI |
+| context-compaction/loaded-skills: Loaded skills kept in compaction checkpoints | infrastructure | host: appended to the checkpoint summary, no UI |
 | context-compaction/overflow-recognition: Provider context-overflow recognition | infrastructure | host: agent request-error listener, no UI |
-| cordis-client-runner/inspect-manifest-once: Publish the Client inspect manifest once per connection | infrastructure | client: dynamic Cordis package runner (no UI) |
-| credential-port/secret-credential-port: One Host service port for credentials kept in a secrets catalog | infrastructure | host: library |
-| dialogs/app-dialogs: App dialogs for every plugin | infrastructure | dialog: app confirm, alert and toast primitives |
-| dialogs/app-toasts: App toasts for every plugin | infrastructure | toast: app toast stack |
-| diff-viewed/host-owned-view-state: Retain viewed marks on the Host | infrastructure | host: diff_viewed storage |
+| cordis-client-runner/inspect-manifest-once: Publish the page's plugin list once | infrastructure | client: dynamic Cordis package runner (no UI) |
+| credential-port/secret-credential-port: One way to read credentials from a secrets catalog | infrastructure | host: library |
+| dialogs/app-dialogs: Dialogs for every plugin | infrastructure | dialog: app confirm, alert and toast primitives |
+| dialogs/app-toasts: Toasts for every plugin | infrastructure | toast: app toast stack |
+| diff-viewed/host-owned-view-state: Keep viewed marks across browsers | infrastructure | host: diff_viewed storage |
 | diff-viewed/revision-range-marks: One viewed-marks store for turns and revision ranges | infrastructure | host: diff_viewed storage |
 | diffs-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: diffs-review reviewed record |
-| editor/session-screen-contract: Session screen and workspace files for other plugins | infrastructure | client: SessionScreen contract |
+| editor/session-screen-contract: Open thread and workspace files for other plugins | infrastructure | client: SessionScreen contract |
 | editor/workspace-file-index: Index workspace files with bounded traversal | infrastructure | host: workspace file index |
 | frame-layout/collapsed-state-persistence: Persist the collapsed sidebar | infrastructure | shell: collapsed sidebar |
-| frame-layout/panel-seats: Hand the frame's regions to plugin surfaces | infrastructure | shell: frame regions |
+| frame-layout/panel-seats: Main area and side panels | infrastructure | shell: frame regions |
 | frame-layout/panel-width-persistence: Persist the frame's dragged panel widths | infrastructure | shell: panel widths |
 | frame-layout/phone-navigation-seat: Give the stage the full width on a phone | infrastructure | shell: frame columns at phone width |
 | frame-layout/status-strip: One status strip at the bottom of the frame | infrastructure | shell: status strip |
 | frame-layout/status-strip-restore: Bring back hidden status items in place | infrastructure | status-strip: Show hidden status items |
-| git-cli/git-cli-run: One Effect service that runs the git CLI | infrastructure | host: library |
+| git-cli/git-cli-run: Run git safely | infrastructure | host: library |
 | git-worktrees/git-file-snapshots: Snapshot and restore a git workspace's files | infrastructure | host: git file snapshots |
-| git-worktrees/git-thread-worktrees: Isolate threads in git worktrees | infrastructure | settings: git worktree isolation (opt-in) |
+| git-worktrees/git-thread-worktrees: Give threads a workspace in plain git projects | infrastructure | settings: git worktree isolation (opt-in) |
 | goal-stall-guard/pause-stalled-goals: Pause goals after consecutive empty rounds | infrastructure | host: goal rounds |
-| goal-tool/continued-form-goal-authority: Accept admitted continued-form answers as direct goal authority | infrastructure | host: goal tool fork |
-| hmr-gate/host-reload: Experimental in-process Host reload for opted-in plugins | infrastructure | host: hmr-gate deferral |
-| image-preview/image-preview-response: One guarded way to serve and show a changed image | infrastructure | host and client: library |
-| jev/jev-ask: Ask Jev one Noul question and record its usage | infrastructure | host: library |
-| jj-cli/jj-cli-run: One Effect service that runs the Jujutsu CLI | infrastructure | host: library |
-| jj-cli/jj-cli-view-reads: Operation-head cache for jj view reads | infrastructure | host: library |
-| jujutsu/panel-scopes: Keep one repository per Jujutsu tab, thread and dock | infrastructure | left-nav: Revision graph › per-tab repository |
+| goal-tool/continued-form-goal-authority: Answers to a timed question count as your request | infrastructure | host: goal tool fork |
+| hmr-gate/host-reload: Reload a plugin without restarting DSH | infrastructure | host: hmr-gate deferral |
+| hmr-gate/update-timing: Plugin updates wait for a hidden or idle moment | infrastructure | client: hmr-gate frame handling |
+| image-preview/image-preview-response: Show a changed image safely | infrastructure | host and client: library |
+| jev/jev-ask: Ask Jev a yes or no question | infrastructure | host: library |
+| jj-cli/jj-cli-run: Run Jujutsu safely | infrastructure | host: library |
+| jj-cli/jj-cli-view-reads: Cache repeated Jujutsu reads | infrastructure | host: library |
+| jujutsu/panel-scopes: Keep one repository per Jujutsu tab | infrastructure | left-nav: Revision graph › per-tab repository |
 | loopback-access/localhost-with-lan: Keep localhost available when LAN access is enabled | infrastructure | host: loopback listeners |
-| main-tabs/backlog-capture-with-thread-tab: Typing in Backlog with a kept thread tab | infrastructure | main-tabs: kept thread tab focus |
+| main-tabs/backlog-capture-with-thread-tab: Typing in Backlog keeps the current tab | infrastructure | main-tabs: kept thread tab focus |
 | main-tabs/main-view-tabs: Browser-like tabs above the main view | infrastructure | main-tabs: tab strip |
 | main-tabs/tab-persistence: Keep tabs across reloads, per project or globally | infrastructure | main-tabs: tab persistence |
-| main-tabs/workbench-semantics-provider: One tab semantics provider for Workbench and standalone fallback | infrastructure | main-tabs: tab semantics |
+| main-tabs/workbench-semantics-provider: Tabs shared with the Workbench | infrastructure | main-tabs: tab semantics |
 | mcp-endpoint/mcp-endpoint: Drive DSH threads from an outside agent over MCP | infrastructure | host: /mcp endpoint |
+| mcp-endpoint/mcp-endpoint-plugin-tools: Expose plugin tools to MCP clients | infrastructure | host: /mcp endpoint |
 | memory/start-block: Start every thread with one frozen memory block | infrastructure | host: memory start block in the system prompt |
-| memory/thread-digests: Digest idle threads from DSH's own session logs | infrastructure | host: memory digests |
-| multi-host/ssh-runtime-connection: Connect to an SSH-managed runtime | infrastructure | host: SSH runtime tunnels |
+| memory/thread-digests: Digest idle threads from their logs | infrastructure | host: memory digests |
+| multi-host/ssh-runtime-connection: Connect to a host over SSH | infrastructure | host: SSH runtime tunnels |
+| opencode-compat/plugin-tools: Run OpenCode plugin tools and tool hooks | infrastructure | agent tools contributed by configured plugins |
+| opencode-compat/skills-context-storage: OpenCode skills, context hooks and storage | infrastructure | settings: dshfiles-opencode-compat |
 | optmem-core/bounded-utf8-text: Count, clip, and paginate UTF-8 text by bytes | infrastructure | host: library |
 | optmem-core/credential-redaction: Redact credentials before data reaches persistence | infrastructure | host: library |
 | optmem-core/deterministic-view-and-summary: Build deterministic views | infrastructure | host: library |
 | optmem-core/memory-tree-addressing: Address complete nodes in a hierarchical memory tree | infrastructure | host: library |
+| phone-access/phone-edge-routes: Share the phone address with other plugins | infrastructure | host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes) |
 | phone-access/phone-sign-in-qr: Print a phone sign-in QR for a trusted HTTPS origin | infrastructure | host: startup terminal output |
-| phone-pairing/phone-pairing: Pair a phone over a self-provisioned HTTPS tunnel | infrastructure | host: loopback gateway, terminal QR and the sidebar footer's pairing popover |
+| phone-pairing/phone-pairing: Pair a phone over a self-provisioned HTTPS tunnel | infrastructure | host: loopback gateway, terminal QR and the rail's Pair a phone dialog |
 | plugin-ui/debounced-client-values: Debounce fast-changing client input | infrastructure | client: library |
-| plugin-ui/query-client-binding: Provide host-backed client queries | infrastructure | client: library |
-| plugin-ui/schema-validated-persistent-values: Persist schema-validated client values | infrastructure | client: library |
+| plugin-ui/query-client-binding: Load data from DSH in plugin views | infrastructure | client: library |
+| plugin-ui/schema-validated-persistent-values: Remember checked values in the browser | infrastructure | client: library |
 | plugin-ui/shared-motion: Animate components with one shared motion layer | infrastructure | client: library |
-| plugin-ui/touch-targets: Give kit controls a 44px touch target | infrastructure | client: library |
+| plugin-ui/touch-targets: Touch-sized controls | infrastructure | client: library |
 | plugin-ui/typed-forms-and-accessible-tables: Compose validated forms and accessible data tables | infrastructure | client: library |
-| preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
+| preview/render-html: Offline HTML screenshots for other plugins | infrastructure | host: preview-render contract |
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
-| request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
+| pwa/installable-app: Install the Web UI as an app on the phone | infrastructure | host: served manifest, icon routes and index head |
+| request-messages/dispatch-request-messages: Let plugins adjust each model request | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
-| rich-composer/workbench-conversation-views: Dock an independently bound Conversation view | infrastructure | workbench: docked Conversation views |
+| rich-composer/sent-annotations: Keep sent annotations across browsers | infrastructure | host: plugin storage per Session · client: Composer annotations |
+| rich-composer/workbench-conversation-views: Dock a thread view | infrastructure | workbench: docked Conversation views |
 | session-controller/drive-threads: Drive threads from another plugin | infrastructure | host: sessions API |
 | session-controller/lean-session-follow: Send the browser only what a thread renders | infrastructure | host: session event stream |
 | session-controller/live-model-catalog: The model picker follows connected account changes | infrastructure | host: model catalog cache |
-| session-log-window/bounded-session-log-window: Read a stored Session log by its window, not its whole event list | infrastructure | host: library |
-| session-persistence-jsonl/tool-catalog-dedupe: Store a Session's request-header tool catalog once | infrastructure | host: no UI |
+| session-log-window/bounded-session-log-window: Read part of a thread log without loading all of it | infrastructure | host: library |
+| session-persistence-jsonl/tool-catalog-dedupe: Store a thread's tool list once | infrastructure | host: no UI |
 | session-search/find-in-thread: Find every match in one thread | infrastructure | host: session-search findInThread API and session_find_in_thread tool |
 | session-search/prompt-history: Search the prompts sent across threads | infrastructure | host: session-search promptHistory API (read by @dshfiles/prompt-stash) |
-| session-search/worker-session-search: Serve session search from a worker-owned index | infrastructure | host: session search index |
-| session-source-port/session-source-registry: One Host port for Sessions that live on another runtime | infrastructure | host: library |
-| shared-runtime/shared-client-runtime: Share the client UI runtime | infrastructure | client: shared runtime |
-| shared-streams/shared-event-sources: One EventSource per URL across tabs | infrastructure | client: shared EventSource |
-| sidebar-right/addressable-resources: Dock genuine session resources as workbench panels | infrastructure | right-pane: native resources as workbench panels |
+| session-search/worker-session-search: Search threads in the background | infrastructure | host: session search index |
+| session-source-port/session-source-registry: Threads that live on another host | infrastructure | host: library |
+| shared-runtime/shared-client-runtime: Share one copy of the UI code | infrastructure | client: shared runtime |
+| shared-streams/shared-event-sources: One live connection per address across tabs | infrastructure | client: shared EventSource |
+| sidebar-right/addressable-resources: Dock files, diffs and terminals as panels | infrastructure | right-pane: native resources as workbench panels |
 | sidebar-terminal/terminal-excerpts: Add terminal selection to chat | infrastructure | terminal and composer |
 | sqlite-store/sqlite-store-lock-wait: Lock-wait spans | infrastructure | host: library |
-| sqlite-store/sqlite-store-open: One SqlClient layer for a plugin-owned SQLite file | infrastructure | host: library |
+| sqlite-store/sqlite-store-open: Open a plugin's own database safely | infrastructure | host: library |
 | sqlite-store/sqlite-store-space: Free pages go back to the disk | infrastructure | host: library |
-| storage-domain/lazy-domain-hydration: Hydrate a per-record domain one record at a time | infrastructure | host: no UI |
+| storage-domain/lazy-domain-hydration: Load stored records one at a time | infrastructure | host: no UI |
 | storage-json/lazy-per-record-reads: Read one stored JSON record without loading the whole unit | infrastructure | host: no UI |
-| subprocess-local/group-exit-backoff: Wait for detached process groups without probing every 15 ms | infrastructure | host: no UI |
+| subprocess-local/group-exit-backoff: Wait for background processes cheaply | infrastructure | host: no UI |
 | thread-sidebar/sidebar-folders: Folders of plugin panels on the rail | infrastructure | sidebar: the rail's folders (agent tools sidebar_*) |
-| thread-sidebar/thread-inventory-reads: Read the thread inventory only while it is on screen | infrastructure | thread-list: inventory reads |
-| thread-sidebar/workbench-sidebar-assemblies: Dock the actual sidebar content assemblies | infrastructure | main-tabs: New tab › Thread Sidebar views |
+| thread-sidebar/thread-inventory-reads: Read workspaces only while the list is visible | infrastructure | thread-list: inventory reads |
+| thread-sidebar/workbench-sidebar-assemblies: Dock sidebar views as tabs | infrastructure | main-tabs: New tab › Thread Sidebar views |
+| tool-search/agent-tool-access: Tools per agent: enabled and pinned | infrastructure | host: agent tool tool_search_access; contract module @dshfiles/tool-search/access |
 | tool-search/progressive-tool-disclosure: Search and disclose tools per agent | infrastructure | host: tool search (not mounted) |
+| tool-subagent/child-turn-guard: Keep a delegated child working when its turn hands the task back | infrastructure | host: delegated child turns |
 | traces/browser-interaction-traces: Browser interaction traces | infrastructure | host: browser interaction spans |
-| traces/event-loop-stalls: Host event-loop stalls | infrastructure | host: probe; agent tool traces_stalls |
-| traces/otlp-receiver: Local OTLP/HTTP receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
+| traces/event-loop-stalls: DSH stalls | infrastructure | host: probe; agent tool traces_stalls |
+| traces/otlp-receiver: Built-in trace receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
 | traces/store-space: Span store space and Reclaim | infrastructure | agent tools traces_store_space, traces_reclaim_space |
-| turn-summary/turn-marks-projection: Per-Turn facts for the turn map and Since you left | infrastructure | host: session projection |
+| turn-summary/turn-marks-projection: Turn facts for the turn map and Since you left | infrastructure | host: session projection |
 | ui-styles/one-shared-stylesheet: One shared plugin stylesheet | infrastructure | client: shared stylesheet |
 | ui-styles/touch-platform-baseline: Touch platform baseline | infrastructure | client: shared stylesheet |
-| usage/usage-index: Incremental request and tool index from session logs | infrastructure | host: usage ledger |
+| usage/usage-index: Usage index from thread logs | infrastructure | host: usage ledger |
 | vcs-provider-port/vcs-detection: Which VCS owns a path | infrastructure | host: library |
 | vcs-provider-port/vcs-provider-resolution: One port for version-control providers | infrastructure | host: library |
-| whiteboard/xstate-diagram: xstate machine diagrams | infrastructure | module: @dshfiles/whiteboard/xstate-diagram |
+| vcs-provider-port/workspace-attribution: Which project a thread belongs to | infrastructure | host: library |
+| whiteboard/xstate-diagram: State machine diagrams | infrastructure | module: @dshfiles/whiteboard/xstate-diagram |
 | workbench/all-region-drag: Drag panels across centre right and bottom | infrastructure | workbench: panel drag |
-| workbench/conversation-header: Keep the original conversation toolbar and child views inside each thread | infrastructure | thread-header: conversation toolbar |
+| workbench/conversation-header: Keep the thread header inside each thread | infrastructure | thread-header: conversation toolbar |
 | workbench/early-panel-registration: Queue panel-open requests before mount | infrastructure | workbench: panel registration |
 | workbench/global-dock: Keep one docking surface in the right column and a bottom panel | infrastructure | workbench: right pane and bottom panel |
 | workbench/last-right-tab-close: Close the right pane when its final tab closes | infrastructure | workbench: right pane |
 | workbench/layout-recovery: Recover all panes and semantic tabs | infrastructure | workbench: Pane options › Reset layout |
-| workbench/main-conversation: Workbench as the main conversation surface | infrastructure | workbench: main conversation tab |
+| workbench/main-conversation: Workbench as the main thread view | infrastructure | workbench: main conversation tab |
 | workbench/main-panel-sources: Choose plugin views and one Settings hub | infrastructure | main-tabs: New tab chooser |
 | workbench/main-tab-parity: Keep preview pin unread and close semantics in Dockview tabs | infrastructure | workbench: tab semantics |
-| workbench/native-resource-panels: Host native preview diff and terminal resources as panels | infrastructure | right-pane: native preview, diff and terminal resources |
+| workbench/native-resource-panels: Previews, diffs and terminals as panels | infrastructure | right-pane: native preview, diff and terminal resources |
 | workbench/nested-surfaces: Split panes into Dockview groups and restore legacy layouts | infrastructure | workbench: Pane options › Split |
-| workbench/sidebar-preview-tab: Account Preview is a regular movable docked view | infrastructure | workbench: Quota tab |
+| workbench/sidebar-preview-tab: Account preview is a movable tab | infrastructure | workbench: Quota tab |
 | workbench/single-tab-rows: Hide a single tab row without hiding its view | infrastructure | workbench: Hide tab row |
 | workbench/window-floating: Root-pane windows float across the application | infrastructure | workbench: Float panel |
-| ai-accounts/active-chat-account: See which account serves the active chat | statusItem | status-strip: Quota meters |
-| ai-accounts/disabled-account-preview: Keep disabled accounts visible and toggle routing from the usage popover | statusItem | status-strip: Quota popover |
+| ai-accounts/active-chat-account: See which account serves this thread | statusItem | status-strip: Quota meters |
+| ai-accounts/disabled-account-preview: Turn an account on or off from the usage popover | statusItem | status-strip: Quota popover |
 | ai-accounts/extra-usage-guard: Stop at the plan limits instead of drawing paid extra usage | statusItem | status-strip: Quota popover › account card › Use extra usage |
 | frame-layout/status-item-open: Click a status item to open its page | statusItem | shell: status strip |
-| hmr-gate/plugins-row: Plugin updates waiting for a Host restart | statusItem | plugins-page: View HMR updates |
-| hmr-gate/restart-status-item: Held-back bundles join the one restart notice | statusItem | status-strip: Restart pending |
+| hmr-gate/plugins-row: Plugin updates waiting for a restart | statusItem | plugins-page: View HMR updates |
+| hmr-gate/restart-status-item: Waiting updates join the restart notice | statusItem | status-strip: Restart pending |
 | thread-sidebar/auto-restart-when-idle: Restart by itself to apply updates when idle | statusItem | status-strip: Restarting to apply updates |
 | thread-sidebar/client-reload-banner: Offer a page reload when the running client bundles are behind | statusItem | sidebar-footer: client reload banner |
-| thread-sidebar/pending-host-restart: Warn when a host restart is required | statusItem | status-strip: Restart pending |
+| thread-sidebar/pending-host-restart: Warn when DSH needs a restart | statusItem | status-strip: Restart pending |
 | thread-sidebar/working-status-item: See how many threads are working in the status strip | statusItem | status-strip: N working |
 
 ## Ambiguous choices

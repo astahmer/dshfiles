@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { createTestClient } from '@dshfiles/dshx/testing'
 import { PhoneThreadMenu, usePhoneThreadTool } from './phone-thread-menu.tsx'
@@ -10,6 +13,7 @@ import { createEditor } from 'lexical'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { createSnapshotStore, type SnapshotSelectorHook, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ComposerBarProps, ConversationContentProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps } from './native/contract/slots.ts'
 import { ConversationSessionHeader } from './native/skeleton/ConversationSession.tsx'
@@ -310,6 +314,28 @@ describe('fixed Conversation content factory composition', () => {
     expect(widthFallbacks.get('embedded')).not.toBe(ConversationWidthControls)
   })
 
+  it('draws its own More button only while no thread menu lists those actions', () => {
+    const { header } = fixture('header-more')
+    const renderFactorySlot = vi.fn<ConversationSessionHeaderSlotProps['renderFactorySlot']>(() => null)
+    const moreButtons = (): number => renderFactorySlot.mock.calls.filter(([name]) => name === 'contextMenu.button').length
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBeGreaterThan(0)
+    // The thread menu takes the actions over (DESIGN.md: the thread header is one row with one ⋯).
+    let release: (() => void) | undefined
+    act(() => {
+      release = ThreadViewsModel.hostHeaderMenu()
+    })
+    renderFactorySlot.mockClear()
+    act(() => root.render(<ConversationSessionHeader {...header} renderFactorySlot={renderFactorySlot} />))
+    expect(moreButtons()).toBe(0)
+    act(() => release?.())
+    expect(moreButtons()).toBeGreaterThan(0)
+  })
+
   it('keeps the title editor responsive after a rename fails', async () => {
     const { header } = fixture('rename-a')
     const rename = vi.fn<ConversationSessionHeaderSlotProps['rename']>().mockRejectedValueOnce(new Error('Host refused')).mockResolvedValue(undefined)
@@ -421,6 +447,31 @@ describe('fixed Conversation content factory composition', () => {
     expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
   })
 
+  it('moves into the phone top bar on a phone turned sideways too (unslop U8)', () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    // 844x390 with a coarse pointer: only the landscape clause of the phone shell rule matches.
+    const sideways = (query: string): boolean => query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)')
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: sideways(query), media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const a = fixture('phone-sideways')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() => root.render(<ConversationSessionHeader {...a.header} />))
+    expect(document.body.querySelector('[data-conversation-phone-bar] button[aria-label="session.menu"]')).not.toBeNull()
+    // Every phone-shell rule of the stage keys on the same media list as the shell itself.
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/ConversationRoot.module.css'), 'utf8')
+    const phoneBlocks = [...css.matchAll(/@media ([^{]*639\.98px[^{]*)\{/gu)].map(match => (match[1] ?? '').trim())
+    expect(phoneBlocks.length).toBeGreaterThan(0)
+    for (const block of phoneBlocks) expect(block).toBe('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)')
+  })
+
   it('portals no phone bar for a conversation that is not on screen (kept-alive panels stacked their pills)', () => {
     const releaseHost = ThreadViewsModel.host()
     dispose.push(releaseHost)
@@ -484,6 +535,140 @@ describe('fixed Conversation content factory composition', () => {
     act(() => proxy?.click())
     expect(opened).toHaveBeenCalledOnce()
     expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+  })
+
+  // Council round 35 P2 (Opus, Fable): the ⋯ sheet names its thread, and a tool row may carry a 20px icon in the ink, a
+  // trailing detail in the tertiary ink and a chevron when it opens another surface. All three are optional: a tool that
+  // sets none renders as before, a bare label.
+  it('names the thread at the top of the ⋯ sheet and draws a tool\'s icon, detail and chevron only when it sets them', async () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    const Plain = () => <button {...usePhoneThreadTool({ id: 'test/plain', label: 'Show usage and cost', open: vi.fn() }).triggerProps}>Usage</button>
+    const Full = () => (
+      <button {...usePhoneThreadTool({ id: 'test/tools', label: 'Tools', detail: '@dsh', opens: true, icon: <svg data-test-icon="" />, open: vi.fn() }).triggerProps}>
+        Tools
+      </button>
+    )
+    const a = fixture('Fix invoice tax rounding')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    await act(async () =>
+      root.render(
+        <Scope value="phone-rows-reader">
+          <ConversationSessionHeader {...a.header} />
+          <Plain />
+          <Full />
+        </Scope>,
+      ),
+    )
+    act(() => document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')?.click())
+    const sheet = document.body.querySelector('[data-conversation-phone-sheet]')
+    // The thread's title heads the sheet, as the row menu's sheet does (council round 34, B9).
+    const title = sheet?.querySelector('[data-phone-sheet-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    expect(sheet?.querySelector('[data-phone-sheet-title]')).toBe(sheet?.children[1])
+    const rows = [...(sheet?.querySelectorAll<HTMLButtonElement>('[data-phone-thread-tool-proxy]') ?? [])]
+    const plain = rows.find(row => row.textContent === 'Show usage and cost')
+    expect(plain).toBeDefined()
+    expect(plain?.querySelector('[data-phone-sheet-tool-icon]')).toBeNull()
+    expect(plain?.querySelector('[data-phone-sheet-tool-detail]')).toBeNull()
+    expect(plain?.querySelector('[data-phone-sheet-tool-chevron]')).toBeNull()
+    const full = rows.find(row => row.querySelector('[data-test-icon]') !== null)
+    expect(full?.querySelector('[data-phone-sheet-tool-icon] [data-test-icon]')).not.toBeNull()
+    expect(full?.querySelector('[data-phone-sheet-tool-icon]')?.getAttribute('aria-hidden')).toBe('true')
+    expect(full?.querySelector('[data-phone-sheet-tool-detail]')?.textContent).toBe('@dsh')
+    // The detail and the chevron end the row, in that order.
+    const chevron = full?.querySelector('[data-phone-sheet-tool-chevron]')
+    expect(chevron).not.toBeNull()
+    expect(full?.lastElementChild).toBe(chevron)
+    expect(chevron?.previousElementSibling?.hasAttribute('data-phone-sheet-tool-detail')).toBe(true)
+    // Its name says the tool and the detail, with a pause between them; a bare label names itself.
+    expect(full?.textContent).toBe('Tools@dsh')
+    expect(full?.getAttribute('aria-label')).toBe('Tools, @dsh')
+    expect(plain?.hasAttribute('aria-label')).toBe(false)
+  })
+
+  // Council round 13 C5 hides the passive meter line on a phone; its readings (activity, tokens, cost) must stay
+  // reachable. The thread bar's ⋯ sheet lists them, and picking that row lays the line out expanded, focus on its toggle.
+  it('reaches the hidden meter line\'s readings from the phone thread sheet, by touch or keyboard', async () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    const a = fixture('phone-details')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    await act(async () =>
+      root.render(
+        <Scope value="phone-details-reader">
+          <ConversationSessionHeader {...a.header} />
+          <ConversationContent {...a.props} />
+        </Scope>,
+      ),
+    )
+    const line = element.querySelector('[data-meter-line]')
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(false)
+    act(() => document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')?.click())
+    const row = [...document.body.querySelectorAll<HTMLButtonElement>('[data-conversation-phone-sheet] [data-phone-thread-tool-proxy]')].find(
+      button => button.textContent === 'runRow.moreDetails',
+    )
+    expect(row).toBeDefined()
+    // A real button: Tab reaches it and Enter or Space activates it like a tap.
+    expect(row?.tagName).toBe('BUTTON')
+    await act(async () => row?.click())
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(true)
+    const toggle = line?.querySelector<HTMLButtonElement>('[data-meter-more]')
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(toggle)
+    // Its own toggle folds the line away again. On a phone the folded line (and the toggle) leaves the page, so focus
+    // goes back to the thread bar's ⋯ it came from instead of dropping to the page (jsdom draws no boxes, as the
+    // hidden line draws none).
+    // A tap: WebKit does not focus the button it activates.
+    act(() => toggle?.blur())
+    act(() => toggle?.click())
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(false)
+    expect(document.activeElement).toBe(document.body.querySelector('[data-conversation-phone-bar] [data-phone-thread-menu]'))
   })
 
   it('keeps draft tools visible without a reachable menu launcher', async () => {
@@ -650,5 +835,49 @@ describe('fixed Conversation content factory composition', () => {
     // The composer publishes on every content change; a draft keystroke must not
     // reach the Conversation body, whose View re-render costs the transcript.
     expect(viewRenders.count).toBe(mountedViewRenders)
+  })
+
+  // Council round 34 B7: a subagent's thread is in no workspace's sessionIds, so its footer named no project ("In the
+  // project · 1 ahead of main") while its parent's read "BA billing-api · …". It takes its nearest ancestor's project.
+  it("names a child thread's project through its parent, with the project's mark", () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    const parent = SessionId('parent-thread')
+    const middle = SessionId('middle-child')
+    const child = SessionId('child-thread')
+    const summary = (id: SessionId) => ({ id, displayTitle: String(id), running: false, retainedBy: {}, blank: false, updatedAt: 0 })
+    const childOf = (id: SessionId, parentId: SessionId) => ({ ...summary(id), parentId, origin: 'subagent' as const })
+    const { props } = fixture('child-thread')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(
+        <ConversationContent
+          {...props}
+          useSessions={selected({
+            ids: [parent, middle, child],
+            byId: { [parent]: summary(parent), [middle]: childOf(middle, parent), [child]: childOf(child, middle) },
+            phase: 'ready' as const,
+            projectionsBySession: {},
+          })}
+          useWorkspaces={selected({
+            phase: 'ready' as const,
+            items: [{ workspaceId: WorkspaceId('w-billing'), path: '/srv/billing-api', title: 'billing-api', sessionIds: [parent], createdAt: '', updatedAt: '' }],
+            archivedSessionIds: [],
+            pinnedSessionIds: [],
+            state: 'idle' as const,
+            error: null,
+          })}
+          renderSlot={(name: string, owner: Partial<InputZone> & { readonly runSummary?: ReactNode }, options?: { readonly children?: ReactNode }) =>
+            name === 'conversation.composer.bar' ? <output data-bar="">{owner.runSummary}</output> : (options?.children ?? null)
+          }
+        />,
+      ),
+    )
+    const chip = element.querySelector('[data-run-summary]')
+    expect(chip?.textContent).toContain('billing-api')
+    expect(chip?.querySelector('[data-slot="project-mark"]')).not.toBeNull()
   })
 })

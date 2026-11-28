@@ -6,7 +6,7 @@ export const NETWORK_LOCALE_NAMESPACE = 'dshfiles.loopback-access'
 export const networkEnglish = {
   networkAccess: 'Network access',
   description:
-    'Choose how this DSH is reachable. Localhost access stays enabled. Saving stages preferences; it does not restart DSH or change the current connection.',
+    'Choose how this DSH is reachable. Localhost access stays enabled. Saving stages preferences. It does not restart DSH or change the current connection.',
   lanEnabled: 'LAN access',
   lanHint: 'Allow other devices to connect through one specific local address.',
   bindAddress: 'LAN address',
@@ -24,8 +24,8 @@ export const networkEnglish = {
   saved: 'Preferences saved. The current connection has not changed.',
   saveFailed: 'Could not save network preferences.',
   loading: 'Reading network access…',
-  unavailable: 'Network settings are unavailable. Restart or update DSH to load the matching Host plugin.',
-  retry: 'Try again',
+  unavailable: 'Network settings did not load. Update DSH or restart it, then reopen this page.',
+  retry: 'Retry',
   readOnly: 'Network preferences are read-only in this deployment.',
   unsupported: 'This launcher does not support managed network preferences.',
   setup: 'This profile has custom network configuration. Update its startup wiring and restart DSH to use these controls.',
@@ -58,7 +58,7 @@ const zh = {
   saved: '偏好设置已保存。当前连接未改变。',
   saveFailed: '无法保存网络偏好设置。',
   loading: '正在读取网络访问设置…',
-  unavailable: '网络设置不可用。请重启或更新 DSH 以加载匹配的 Host 插件。',
+  unavailable: '网络设置未加载。请更新或重启 DSH，然后重新打开此页面。',
   retry: '重试',
   readOnly: '此部署中的网络偏好设置为只读。',
   unsupported: '此启动器不支持托管网络偏好设置。',

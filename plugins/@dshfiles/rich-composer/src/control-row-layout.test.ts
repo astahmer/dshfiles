@@ -220,3 +220,85 @@ describe('a resize the collapse caused itself', () => {
     stop()
   })
 })
+
+describe('Send positioned outside the line (unslop phone 6)', () => {
+  it('does not count Send, which a narrow card seats beside the row, so a bar that fits keeps the mode words', () => {
+    // + · "Can edit" · ⋯ · model fit 292px; Send (36px) sits against the card, outside the row's box.
+    const row = rowOf({ available: 292, expanded: [44, 105, 32, 95, 36], compact: [44, 30, 32, 95, 36], icon: [44, 30, 32, 32, 36] })
+    const send = row.lastElementChild
+    if (!(send instanceof HTMLElement)) throw new Error('the row has no Send')
+    send.style.position = 'absolute'
+    const stop = observeControlRow(row)
+    expect(row.hasAttribute('data-model-compact')).toBe(false)
+    stop()
+  })
+})
+
+describe("a phone's bar (unslop r5 C3)", () => {
+  it('takes the mark step even when the words would fit, so the model is its brand mark and the mode its icon', () => {
+    // The phone bar shrank the model seat instead of overflowing, so no step ever applied and the chip read "gpt-…".
+    const row = rowOf({ available: 292, expanded: [44, 105, 32, 95], compact: [44, 30, 32, 95], icon: [44, 30, 32, 32] })
+    const stop = observeControlRow(row, { markStep: () => true })
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    expect(row.hasAttribute('data-model-mark')).toBe(true)
+    // The mark is the icon: the CPU glyph step stays for a model without one.
+    expect(row.hasAttribute('data-model-icon')).toBe(false)
+    stop()
+  })
+
+  // Round five C1 (council round 5): the mark alone read as an unnamed glyph; the bar names the model beside its mark and
+  // keeps "Can edit" while they fit, and drops both words (data-model-mark-tight) only when the line would wrap.
+  it('keeps the words beside the mark while the bar fits, and marks a bar that would wrap as tight', () => {
+    const fits = rowOf({ available: 292, expanded: [44, 105, 32, 95], compact: [44, 90, 32, 96], icon: [44, 30, 32, 32] })
+    const stopFits = observeControlRow(fits, { markStep: () => true })
+    expect(fits.hasAttribute('data-model-mark')).toBe(true)
+    expect(fits.hasAttribute('data-model-mark-tight')).toBe(false)
+    stopFits()
+    const tight = rowOf({
+      available: 200,
+      expanded: [44, 105, 32, 95],
+      compact: [44, 90, 32, 96],
+      icon: [44, 30, 32, 32],
+      wraps: row => !row.hasAttribute('data-model-mark-tight'),
+    })
+    const stopTight = observeControlRow(tight, { markStep: () => true })
+    expect(tight.hasAttribute('data-model-mark')).toBe(true)
+    expect(tight.hasAttribute('data-model-mark-tight')).toBe(true)
+    stopTight()
+  })
+
+  it('names the model beside its mark, truncated at 96px, and hides the name only on a tight bar', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { dirname, resolve } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
+    // Council round 18 C3: the picker draws the kit's ModelMark (`[data-model-mark]`) where it drew its own `svg[data-brand]`.
+    const marked = ':global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark])))'
+    expect(css).toContain(`.row[data-model-mark] ${marked} :global([data-model-picker-text]) {\n  max-width: 96px;`)
+    expect(css).toContain(`.row[data-model-mark-tight] ${marked} :global([data-model-picker-text])`)
+    expect(css).not.toContain('.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand]))')
+  })
+
+  it('leaves a wider bar to the content-sized steps', () => {
+    const row = rowOf({ available: 600, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const stop = observeControlRow(row, { markStep: () => false })
+    expect(row.hasAttribute('data-model-mark')).toBe(false)
+    expect(row.hasAttribute('data-model-compact')).toBe(false)
+    stop()
+  })
+
+  it('draws the model trigger as its 16px brand mark in a 24px chip, and only when it has a mark', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { dirname, resolve } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
+    const trigger = '.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark])))'
+    expect(css).toContain(`${trigger} {\n  min-width: 0;\n  gap: 0;\n  padding-inline: 4px;`)
+    // Council picker round 1, N8: the account tag stays on the phone bar, so an account swap shows.
+    expect(css).not.toContain(`${trigger} :global([data-model-picker-provider])`)
+    expect(css).toContain(`${trigger} > svg:last-child`)
+    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(:is\(svg\[data-brand\], \[data-model-mark\]\)\) \{\s*width: 16px;\s*height: 16px;/)
+    // Zero-width plugin anchors each cost a gap, so the mark step drops them like the icon step: + · mode · ⋯ · model.
+    expect(css).toMatch(/\.row:is\(\[data-model-icon\], \[data-model-mark\]\) \.standardControls \{\s*column-gap: 0;/)
+  })
+})

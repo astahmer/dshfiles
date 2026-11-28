@@ -7,6 +7,7 @@ import { useChatNavigation, type ChatNavigation, type ChatNavigationInput } from
 import { useChatReading, type ChatReadingState } from './use-chat-reading.ts'
 import { useChatViewport } from './use-chat-viewport.ts'
 import type { FlowMotionRows } from './flow-motion.ts'
+import { ownInputOf } from './follow-policy.ts'
 
 /** Committed content and Session operations used to reconcile scroll ownership. */
 export interface ChatScrollInput extends ChatNavigationInput {
@@ -18,6 +19,8 @@ export interface ChatScrollInput extends ChatNavigationInput {
   readonly submissionId: string | null
   /** The latest visible submission steers the running Turn instead of opening a new one. */
   readonly submissionSteers: boolean
+  /** Key of the question or approval the open thread waits on; its answer counts as the reader's own input. */
+  readonly pendingInteraction: string | null
   readonly running: boolean
   /** Enable the browser-local delayed-fold experiment and its input reveal animation. */
   readonly deferCompletedTurns: boolean
@@ -55,7 +58,7 @@ interface ChatScrollState extends ChatReadingState {
  */
 export function useChatScroll(input: ChatScrollInput): ChatScrollState {
   const {
-    isOpen, order, firstSeq, lastKey, lastIsUser, steeringId, submissionId, submissionSteers, running,
+    isOpen, order, firstSeq, lastKey, lastIsUser, steeringId, submissionId, submissionSteers, pendingInteraction, running,
     deferCompletedTurns, loadedTurns, chatScroll, hasMore, loadingOlder, historyLoadStatus,
     loadOlder, consumeOlder, loadThrough, transcriptView, unread,
   } = input
@@ -88,11 +91,8 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     const current = content.current.input
     if (!current.isOpen && !content.current.opened) return
     const previous = content.current.applied
-    const steeringInput = current.steeringId !== null && current.steeringId !== previous?.steeringId
-      && current.steeringId !== previous?.submissionId
-    const submissionInput = current.submissionId !== null && current.submissionId !== previous?.submissionId
-      && current.submissionId !== previous?.steeringId
-    const ownInput = (current.lastIsUser && current.lastKey !== previous?.lastKey) || steeringInput || submissionInput
+    // dshfiles (round three F6): an answered question is own input too, so its reply comes into view.
+    const { own: ownInput, steering: steeringInput, submission: submissionInput } = ownInputOf(previous, current)
     if (reading.pending && !ownInput) return
     content.current.applied = current
     if (current.isOpen && !content.current.opened) {
@@ -145,16 +145,31 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
         reading.onScrollEnd(outer)
         navigation.requestHistoryCheck()
       },
-      interact: () => { navigation.readerInteracted() },
+      interact: () => {
+        viewport.dropUnreadLanding()
+        navigation.readerInteracted()
+      },
       history: () => {
         setHistoryInputHeld(viewport.historyInputHeld)
         if (content.current.opened) navigation.requestHistoryCheck()
       },
-      intent: () => { cancelPendingFollow(); reading.interruptFollow() },
+      intent: () => {
+        viewport.dropUnreadLanding()
+        cancelPendingFollow()
+        reading.interruptFollow()
+      },
       resize: () => {
         if (!content.current.opened) return
         navigation.requestHistoryCheck()
         if (navigation.contentCommitted()) {
+          navigation.reconcile()
+          return
+        }
+        // dshfiles (unslop r5 C1): an unread landing the range could not reach on open keeps its place as the Turn's
+        // tail mounts below it, instead of the policy following the new floor.
+        const held = viewport.resumeUnreadLanding()
+        if (held !== null) {
+          reading.acceptNavigation(held)
           navigation.reconcile()
           return
         }
@@ -178,7 +193,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
   useLayoutEffect(() => {
     const previous = content.current.input
     content.current.input = {
-      order, lastKey, lastIsUser, steeringId, submissionId, submissionSteers, running, loadedTurns,
+      order, lastKey, lastIsUser, steeringId, submissionId, submissionSteers, pendingInteraction, running, loadedTurns,
       chatScroll, deferCompletedTurns, transcriptView, unread, ...navigationInput,
     }
     if (!deferCompletedTurns) {
@@ -206,8 +221,8 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     })
   }, [
     viewport, reading, processContent, navigationInput, isOpen, order, lastKey, lastIsUser,
-    steeringId, submissionId, submissionSteers, running, loadedTurns, chatScroll, deferCompletedTurns, transcriptView,
-    cancelPendingFollow, unread,
+    steeringId, submissionId, submissionSteers, pendingInteraction, running, loadedTurns, chatScroll, deferCompletedTurns,
+    transcriptView, cancelPendingFollow, unread,
   ])
 
   const previousView = useRef(transcriptView)

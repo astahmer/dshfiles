@@ -44,7 +44,9 @@ export const EntityRow = React.forwardRef<HTMLDivElement, EntityRowProps>(functi
             data-slot="entity-row-title"
             className={cn(
               'dshx:min-w-0 dshx:text-sm dshx:break-words',
-              status !== undefined && WorkStatusModel.isWorkStatus(status) && WorkStatusModel.isEmphasized(status) && 'dshx:font-semibold',
+              status !== undefined && WorkStatusModel.isWorkStatus(status) && WorkStatusModel.isEmphasized(status)
+                ? 'dshx:font-semibold'
+                : selected && 'dshx:font-selected',
               (status === 'stopped' || (status !== undefined && WorkStatusModel.isWorkStatus(status) && WorkStatusModel.isMuted(status))) &&
                 'dshx:text-muted-foreground',
             )}
@@ -83,7 +85,7 @@ export const EntityRow = React.forwardRef<HTMLDivElement, EntityRowProps>(functi
       className={cn(
         'dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:transition-colors',
         onSelect !== undefined && 'dshx:hover:bg-accent/60',
-        selected && 'dshx:bg-accent',
+        selected && 'dshx:bg-selected-wash dshx:selected-marker',
         className,
       )}
       {...props}

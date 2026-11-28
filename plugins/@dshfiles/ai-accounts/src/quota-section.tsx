@@ -41,7 +41,7 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
       <h4 className="dshx:mt-5 dshx:text-sm dshx:font-medium">Remaining quota over time</h4>
       <QuotaHistoryChart
         ariaLabel={`Remaining quota over the last ${String(historyDays)} days`}
-        emptyMessage="Not enough history yet. Quota is recorded on an interval; check back shortly."
+        emptyMessage="Not enough history yet. Quota is recorded on an interval. Check back shortly."
         height={200}
         points={history}
       />

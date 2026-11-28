@@ -867,6 +867,9 @@ const startAccountsHost = (input: {
     const announced = JSON.stringify([sourceFile, candidates, enabled.map(([id]) => catalogState.discovered(id) ?? null)])
     const unchanged = announced === announcedRoutes
     announcedRoutes = announced
+    // The adapter names each provider from `profiles` while the registry swaps its routes, so the new profiles must be in
+    // place first: built afterwards, an account shown after start was named by its instance id until the next refresh.
+    profiles = buildProfiles(nextRoutes, sourceFile)
     if (adapterRegistration === undefined) {
       if (providers.length > 0) adapterRegistration = llm.registerAdapter(providers, adapter)
     } else if (!unchanged) {

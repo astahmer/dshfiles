@@ -91,11 +91,13 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
   await openGlobalPanel(page, 'Usage')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
-  // Cost is the first tab (Phase 5: Cost · Quota · Requests · Tools); the log is Requests.
+  // Overview is the first tab (Overview · Quota · Requests · Tools); the log is Requests.
   await page.getByRole('tab', { name: 'Requests', exact: true }).click()
-  await page.getByRole('radio', { name: 'Custom', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
-  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
+  // A healthy index keeps Re-index in the page ⋯ (council round 8, D1).
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Re-index thread logs', exact: true }).click()
   await expect(page.getByText(/ of the latest \d+ requests$/)).toBeVisible()
   await expect.poll(async () => logRows(page).count(), { timeout: 30_000 }).toBeGreaterThan(200)
 })
@@ -141,9 +143,13 @@ Then('the status chips, the search and the purpose filter narrow the log', async
   await page.getByRole('textbox', { name: 'Search requests', exact: true }).fill('other')
   await recordAssertion(page, 'usage-search-narrows-by-project', () => expect.poll(async () => logRows(page).count()).toBe(4))
   await page.getByRole('textbox', { name: 'Search requests', exact: true }).fill('')
-  await page.getByRole('group', { name: 'Purpose' }).getByRole('button', { name: 'Compaction', exact: true }).click()
+  await page.getByRole('button', { name: 'Purpose: All', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Compaction', exact: true }).click()
+  await page.keyboard.press('Escape')
   await recordAssertion(page, 'usage-purpose-filter-keeps-compactions', () => expect.poll(async () => logRows(page).count()).toBe(7))
-  await page.getByRole('group', { name: 'Purpose' }).getByRole('button', { name: 'All', exact: true }).click()
+  await page.getByRole('button', { name: 'Purpose: Compaction', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'All', exact: true }).click()
+  await page.keyboard.press('Escape')
 })
 
 Then('a failed request opens the thread that made it', async ({ page }: { page: Page }) => {
@@ -158,9 +164,9 @@ Then('a failed request opens the thread that made it', async ({ page }: { page: 
 })
 
 When('the Charts tab is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Cost', exact: true }).click()
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click()
   try {
-    await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
+    await expect(page.getByText('Usage over time', { exact: true })).toBeVisible()
   } catch (error) {
     process.stdout.write(`Usage charts diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}\n`)
     throw error

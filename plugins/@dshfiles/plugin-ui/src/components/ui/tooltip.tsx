@@ -3,11 +3,35 @@ import { cn } from '../../lib/utils.js'
 import { KeyHint } from './kbd.js'
 import { Tooltip as TooltipPrimitive } from 'radix-ui'
 
-function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />
+/**
+ * A tooltip waits 400ms, so passing the pointer over a toolbar does not flash labels, and its neighbours then open at
+ * once for 300ms. A surface that must label instantly (a dense icon rail) passes its own `delayDuration`.
+ */
+function TooltipProvider({ delayDuration = 400, skipDelayDuration = 300, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} skipDelayDuration={skipDelayDuration} {...props} />
 }
 
+const NO_HOVER = '(hover: none)'
+
+const noHoverQuery = (): MediaQueryList | undefined => (typeof window === 'undefined' || !(window.matchMedia instanceof Function) ? undefined : window.matchMedia(NO_HOVER))
+
+const subscribeNoHover = (onChange: () => void): (() => void) => {
+  const query = noHoverQuery()
+  query?.addEventListener('change', onChange)
+  return () => query?.removeEventListener('change', onChange)
+}
+
+const readNoHover = (): boolean => noHoverQuery()?.matches === true
+const serverNoHover = (): boolean => false
+
+/**
+ * Where nothing can hover (`(hover: none)`: a phone, a tablet without a pointer) a tooltip does not open by itself: a tap
+ * focuses its trigger, or WebKit replays it as a hover, and the label then stays over the content it was meant to explain
+ * (round four, item 4). An owner that controls `open` still decides.
+ */
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  const noHover = React.useSyncExternalStore(subscribeNoHover, readNoHover, serverNoHover)
+  if (noHover && props.open === undefined) return <TooltipPrimitive.Root data-slot="tooltip" {...props} open={false} />
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 

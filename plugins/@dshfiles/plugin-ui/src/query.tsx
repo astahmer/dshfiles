@@ -2,7 +2,8 @@ import { apiResource, resourceStore, type ApiResourceOptions } from '@dshfiles/d
 import type { AnyApiMethodDefinition, ApiClient, ApiClientInput, ApiClientOutput } from '@dshfiles/dshx/api'
 import { keepPreviousData, QueryClient } from '@tanstack/query-core'
 import { QueryClientProvider, queryOptions, type QueryKey } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { HostConnection } from './lib/host-connection.js'
 import { retryOnceUnlessTimedOut } from './lib/host-request.js'
 
 export * from '@tanstack/react-query'
@@ -33,9 +34,37 @@ export const pluginQueryClient = (): QueryClient => {
   return pluginQueryClientInstance
 }
 
-export const PluginQueryProvider = (props: { readonly client?: QueryClient; readonly children: ReactNode }): JSX.Element => (
-  <QueryClientProvider client={props.client ?? pluginQueryClient()}>{props.children}</QueryClientProvider>
-)
+/**
+ * One watcher per client, however many providers share it (every slot of a bundle mounts one): when DSH answers again
+ * after `reconnecting` or `offline` (lib/host-connection), the client invalidates its queries once, so open views
+ * refetch what they missed without a reload.
+ */
+const connectionWatchers = new WeakMap<QueryClient, { holders: number; readonly stop: () => void }>()
+
+const watchHostConnection = (client: QueryClient): (() => void) => {
+  const existing = connectionWatchers.get(client)
+  if (existing !== undefined) existing.holders += 1
+  else {
+    const stop = HostConnection.subscribe(state => {
+      if (state === 'online') void client.invalidateQueries()
+    })
+    connectionWatchers.set(client, { holders: 1, stop })
+  }
+  return () => {
+    const watcher = connectionWatchers.get(client)
+    if (watcher === undefined) return
+    watcher.holders -= 1
+    if (watcher.holders > 0) return
+    watcher.stop()
+    connectionWatchers.delete(client)
+  }
+}
+
+export const PluginQueryProvider = (props: { readonly client?: QueryClient; readonly children: ReactNode }): JSX.Element => {
+  const client = props.client ?? pluginQueryClient()
+  useEffect(() => watchHostConnection(client), [client])
+  return <QueryClientProvider client={client}>{props.children}</QueryClientProvider>
+}
 
 /**
  * TanStack options whose `queryFn` reads through the page-wide dshx resource store, so a `useQuery` site shares one

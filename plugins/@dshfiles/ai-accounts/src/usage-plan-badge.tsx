@@ -1,9 +1,10 @@
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { AccountLabels } from './account-labels.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 
 export const UsagePlanBadge = (props: { readonly plan: string | null }): JSX.Element | null => {
-  const plan = props.plan?.trim()
-  if (!plan) return null
+  if (!props.plan?.trim()) return null
+  const plan = AccountLabels.planLabel(props.plan)
   return (
     <TooltipProvider delayDuration={500}>
       <Tooltip>

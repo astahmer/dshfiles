@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { backlogLabel, withBacklogRefs } from './backlog-refs.js'
+import { backlogLabel, withBacklogRefs, openBacklogViewMenu, openBacklogCapture } from './backlog-refs.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 /**
@@ -16,7 +16,7 @@ const searchInput = (page: Page) => page.getByRole('textbox', { name: 'Search ba
 const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
 const capture = (page: Page) => page.getByRole('textbox', { name: 'Capture', exact: true })
 const captureSuggestions = (page: Page) => page.getByRole('listbox', { name: 'Suggestions', exact: true })
-const inbox = (page: Page) => page.getByRole('region', { name: 'Inbox', exact: true })
+const inbox = (page: Page) => page.getByRole('region', { name: 'Triage', exact: true })
 const inboxRow = async (page: Page, id: number) => inbox(page).getByRole('listitem', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
 const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog items' })
 const viewButton = (page: Page, name: string) => page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name, exact: true })
@@ -188,28 +188,31 @@ Then('the Projects overview is shown', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
 
-const agentItemsToggle = (page: Page) => page.getByRole('button', { name: 'Hide agent items', exact: true })
+const agentItemsToggle = async (page: Page) => {
+  await openBacklogViewMenu(page)
+  return page.getByRole('button', { name: 'Hide agent items', exact: true })
+}
 
 Then('the Backlog hides agent items and the feed shows {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-hide-agent-items-default', async () => {
-    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
+    await expect(await agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
     await expect(feed(page)).toContainText(title)
   })
 })
 
 When('agent items are shown in the Backlog', async ({ page }: { page: Page }) => {
-  await agentItemsToggle(page).click()
+  await (await agentItemsToggle(page)).click()
 })
 
 Then('the Backlog shows agent items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-hide-agent-items-off', async () => {
-    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
+    await expect(await agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
   })
 })
 
 Then('the Backlog hides agent items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-hide-agent-items-per-view', async () => {
-    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
+    await expect(await agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -220,7 +223,7 @@ When('the Backlog Feed view is opened again', async ({ page }: { page: Page }) =
 
 Then('the Feed still shows agent items', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-hide-agent-items-remembered', async () => {
-    await expect(agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
+    await expect(await agentItemsToggle(page)).toHaveAttribute('aria-pressed', 'false')
   })
   await finishJourneyAssertions(page)
 })
@@ -248,6 +251,7 @@ Then('searching {string} lists only {string}', async ({ page }: { page: Page }, 
 })
 
 When('the current search is saved as the Backlog view {string}', async ({ page }: { page: Page }, name: string) => {
+  await openBacklogViewMenu(page)
   await page.getByRole('button', { name: 'Saved views', exact: true }).click()
   const field = page.getByRole('textbox', { name: 'View name', exact: true })
   await field.fill(name)
@@ -263,6 +267,7 @@ When('the Board view is opened after clearing the search', async ({ page }: { pa
 })
 
 When('the saved Backlog view {string} is applied', async ({ page }: { page: Page }, name: string) => {
+  await openBacklogViewMenu(page)
   await page.getByRole('button', { name: 'Saved views', exact: true }).click()
   await page
     .getByRole('dialog')
@@ -281,6 +286,7 @@ Then('the saved view reopens the Feed filtered to {string}', async ({ page }: { 
 })
 
 When('the saved Backlog view {string} is deleted', async ({ page }: { page: Page }, name: string) => {
+  await openBacklogViewMenu(page)
   await page.getByRole('button', { name: 'Saved views', exact: true }).click()
   const deleteButton = page.getByRole('button', { name: `Delete view ${name}`, exact: true })
   await deleteButton.hover()
@@ -289,7 +295,8 @@ When('the saved Backlog view {string} is deleted', async ({ page }: { page: Page
 
 Then('no saved views are listed', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-saved-view-deleted', async () => {
-    await expect(page.getByRole('dialog')).toContainText('No saved views yet')
+    // The View menu and the saved-views list are both open popovers; the list is the one that says it is empty.
+    await expect(page.getByRole('dialog').filter({ hasText: 'No saved views yet' })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
@@ -320,7 +327,8 @@ Then('backlog item b:{int} is referenced by {string}', async ({ page }: { page: 
     await expect(feed(page)).toContainText(title)
     await feed(page)
       .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
-      .getByText(`${await backlogLabel(page, id)}`, { exact: true })
+      // The feed shows the id on hover; the row's time is its mention handle and opens it like the id did.
+      .locator('[data-backlog-mention-handle]')
       .click()
     await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(title)
   })

@@ -50,32 +50,34 @@ export const HostHooksLive = Layer.effectDiscard(
   }),
 )
 
+const counted = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`
+
 /** `/rebase` in a thread's composer: the same guarded land as the Integrate button, for the Session that typed it. */
 export const rebaseCommand = defineCommand({
   name: 'rebase',
-  description: 'Rebase this thread workspace onto the configured bookmark.',
+  description: 'Land this thread’s work on the project’s main branch.',
   handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
     if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: 'Usage: /rebase' }
     const controller = invocation.agent.ctx.get('sessionController')
     if (controller === undefined) return { kind: 'error', text: 'The Session controller is unavailable.' }
     const sessions = await controller.list({ projections: [] }, invocation.signal)
     const path = sessions.items.find(session => session.sessionId === invocation.agent.id)?.cwd
-    if (path === undefined || path.length === 0) return { kind: 'error', text: 'This Session has no working directory; there is nothing to rebase.' }
+    if (path === undefined || path.length === 0) return { kind: 'error', text: 'This thread has no folder, so there is nothing to land. Start a thread in a project to use /rebase.' }
     const api = createHostApiClient(invocation.agent.ctx, jjIntegrationApi, '@dshfiles/jj-integration')
     const { thread } = await api.threadAt({ path }, { signal: invocation.signal })
-    if (thread === null) return { kind: 'error', text: 'This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.' }
+    if (thread === null) return { kind: 'error', text: 'This thread works in the project checkout, so there is nothing to land. Start a thread in its own workspace to use /rebase.' }
     const result = await api.land({ path: thread.path, sessionId: String(invocation.agent.id) }, { signal: invocation.signal })
-    if (result.status === 'landed') return { kind: 'success', text: `Landed ${String(result.revisions.length)} revision(s) on ${result.bookmark}.` }
+    if (result.status === 'landed') return { kind: 'success', text: `Landed ${counted(result.revisions.length, 'revision')} on ${result.bookmark}.` }
     if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to land; the workspace now sits on ${result.bookmark}.` }
     if (result.status === 'needs-description')
       return {
         kind: 'error',
-        text: `Rebase refused: ${String(result.revisions.length)} revision(s) need real descriptions. Describe them and run /rebase again.`,
+        text: `Not landed: ${counted(result.revisions.length, 'revision')} still ${result.revisions.length === 1 ? 'needs a real description' : 'need real descriptions'}. Describe ${result.revisions.length === 1 ? 'it' : 'them'} and run /rebase again.`,
       }
-    const agentAsked = result.agentAsked ? " The thread's agent was asked to fix them and rebase again." : ''
+    const agentAsked = result.agentAsked ? " The thread's agent was asked to fix them and land again." : ''
     return {
       kind: 'error',
-      text: `Rebase onto ${result.bookmark} stopped with conflicts in ${String(result.files.length)} file(s). Resolve them in the thread workspace and run /rebase again.${agentAsked}`,
+      text: `Landing on ${result.bookmark} stopped with conflicts in ${counted(result.files.length, 'file')}. Resolve them in the thread workspace and run /rebase again.${agentAsked}`,
     }
   },
 })

@@ -3,6 +3,7 @@
  * `@dshfiles/thread-sidebar/thread-row-actions` dshx module, so a contributor imports this token and none of the
  * sidebar's runtime; the sidebar renders whatever is registered, and nothing when no plugin adds a row.
  */
+import type { ComponentType } from 'react'
 import { defineRegistry } from '@dshfiles/dshx/client'
 
 export interface ThreadRowActionTarget {
@@ -16,6 +17,8 @@ export interface ThreadRowActionTarget {
 export interface ThreadRowAction {
   readonly id: string
   readonly label: string | (() => string)
+  /** A 16px icon for the row; every row of the thread menu leads with one, so a row without it gets a neutral mark. */
+  readonly icon?: ComponentType<{ readonly 'aria-hidden'?: boolean }>
   readonly order?: number
   /** Hide the row for this thread; shown when omitted. */
   readonly isAvailable?: (target: ThreadRowActionTarget) => boolean

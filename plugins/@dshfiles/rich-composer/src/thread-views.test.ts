@@ -37,3 +37,41 @@ describe('thread views as thread-panel facets', () => {
     expect(ThreadViewsModel.facetKind('a/b c')).toBe('dshfiles-thread-view.a-b-c')
   })
 })
+
+describe('the thread header menu, folded into the one thread menu', () => {
+  it('says the native More button is hosted only while a thread menu lists its actions', () => {
+    const listener = vi.fn()
+    const off = ThreadViewsModel.subscribe(listener)
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(false)
+    const release = ThreadViewsModel.hostHeaderMenu()
+    const releaseSecond = ThreadViewsModel.hostHeaderMenu()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(true)
+    release()
+    release()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(true)
+    releaseSecond()
+    expect(ThreadViewsModel.headerMenuHosted()).toBe(false)
+    // Two hosts and two real releases; releasing the same host twice is a no-op.
+    expect(listener).toHaveBeenCalledTimes(4)
+    off()
+  })
+
+  it('hands a thread menu the actions the owner resolves, and nothing without an owner', () => {
+    expect(ThreadViewsModel.headerMenuAvailable()).toBe(false)
+    expect(ThreadViewsModel.headerMenu('s1')).toBeUndefined()
+    const selected: string[] = []
+    const withdraw = ThreadViewsModel.provideHeaderMenu(sessionId => ({
+      subscribe: () => () => undefined,
+      actions: () => [{ id: `${sessionId}/copy`, label: 'Copy Session as Markdown', iconKey: 'session-log-download.copy' }],
+      select: id => selected.push(id),
+      dispose: () => undefined,
+    }))
+    expect(ThreadViewsModel.headerMenuAvailable()).toBe(true)
+    const menu = ThreadViewsModel.headerMenu('s1')
+    expect(menu?.actions()).toEqual([{ id: 's1/copy', label: 'Copy Session as Markdown', iconKey: 'session-log-download.copy' }])
+    menu?.select('s1/copy')
+    expect(selected).toEqual(['s1/copy'])
+    withdraw()
+    expect(ThreadViewsModel.headerMenu('s1')).toBeUndefined()
+  })
+})

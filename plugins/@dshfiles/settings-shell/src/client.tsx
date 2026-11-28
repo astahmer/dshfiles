@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type PropsRenderSlots, type SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   createApiClient,
   defineClient,
@@ -27,9 +27,10 @@ import {
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { LayoutListIcon } from '@dshfiles/plugin-ui/icons'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -40,40 +41,43 @@ import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/cli
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
 import { SettingsDocumentStore } from './native/document-action.js'
 import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
-import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
+import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GENERAL_HEADINGS, GeneralGroupHeading, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
+import { LanguageCoverageNote } from './native/language-note.js'
 import { HostReleasePrompt } from './native/host-release-prompt.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
 import { ConnectionBanner } from './native/connection-banner.js'
-import { probeHost, ReachabilityModel, type ReachabilityState } from './native/reachability.js'
-import { isMobileDevice } from '@deepseek-ai/dsh-client-ui-primitives'
-
-const REACHABILITY_PROBE_MS = 20_000
-const REACHABILITY_CONFIRM_MS = 5_000
+import { startHostReachability } from './native/connection-strip.js'
 import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/shell-root.js'
 import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
-import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
+import { bundleLabelsOf, LabelLanguages, namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { DshfilesPluginsPage, PluginListLauncher } from './dshfiles-plugins-page.js'
+import { OriginFilterBar } from './origin-filter-bar.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries, type SettingsOriginFilter } from './settings-groups.js'
+import { SettingsNavigationModel } from './navigation-state.js'
+import { SettingsNavigation, type SettingsNavigationService, type SettingsNavigationState } from './settings-navigation.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
-import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
+import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget, type ShellEvent } from './shell-machine.js'
+import { TAB_STRIP_SLOTS, tabStripLoaded } from './tab-strip.js'
 import { PORTED_FROM } from './upstream.js'
+import { SettingsIcons } from './settings-icons.js'
 import {
   createSettingsHubRouter,
   createSettingsWorkbenchHub,
   registerSettingsWorkbenchPanels,
   settingsWorkbenchPanelId,
+  type SettingsHubShown,
   type SettingsOpenRequest,
 } from './workbench-panels.js'
 
@@ -82,7 +86,6 @@ const SETTINGS_PANEL_ID = 'dshfiles-settings'
 /** Plugins by category as a stage panel the sidebar can pin. */
 const PLUGIN_LIST_PANEL_ID = 'dshfiles-plugin-list'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
-const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const PUBLISH_SETTLE_MS = 250
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 
@@ -157,7 +160,10 @@ export default defineClient({
   inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules', 'remoteAccess'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
-    // A newer DSH release is a quiet banner above the General rows, not a preference row (visual refresh T4.4).
+    // A Settings page with its own tab names itself there with its Settings row's glyph and tone (round nine B2).
+    for (const place of SettingsIcons.pagePlaces()) metadata?.plugin?.add(TabPlaceGlyphs, place)
+    // A newer DSH release is a quiet banner after the General rows, not a preference row (visual refresh T4.4); it
+    // arrives after the first paint, so it sits where it moves nothing (round three item 30).
     const ReleaseBanner = decorate((props: { readonly t: ShellTranslate }) => (
       <PluginQueryProvider>
         <DshReleaseBanner t={props.t} />
@@ -230,27 +236,42 @@ export default defineClient({
     const installLabels = (rows: readonly BundleLabel[]): void => {
       const next = new Map<string, NamespaceLabel>()
       for (const row of rows) {
-        // A package name is no title; without manifest text the page falls back to the schema or the id.
-        const resolvedTitle = row.title === undefined ? '' : ctx.locale.resolveText(row.title)
-        next.set(row.rowId, {
-          title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
-          description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
-          bundleName: row.bundleName,
-          official: row.official,
-        })
+        // The bundle names who ships the namespace (stock DSH or a plugin) for the Settings source filter.
+        next.set(row.rowId, { ...namespaceLabelOf(row, text => ctx.locale.resolveText(text)), bundleName: row.bundleName, official: row.official })
       }
       labels.set(next)
     }
     const labelsApi = createApiClient(ctx, settingsShellApi, metadata?.packageId)
     ctx.inject(['remote.pluginManager'], scoped => {
-      // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
-      // that method existed is asked the old way.
-      void (async () => {
+      // The Host caches these labels: core's listBundles reads every plugin's files on each call. It answers in the
+      // active language chain only (one or two of eight languages); a language change reads that chain. A Host started
+      // before `namespaceLabels` sends every language once, and one older still is asked the old way.
+      let requestedChain: string | null = null
+      let everyLanguage = false
+      const load = async (): Promise<void> => {
+        const chain = LabelLanguages.chainOf(ctx.locale.getSnapshot())
+        const key = chain.join('>')
+        if (everyLanguage || key === requestedChain) return
+        requestedChain = key
+        const trimmed = await labelsApi.safe.namespaceLabels({ languages: chain })
+        if (trimmed.ok) {
+          if (requestedChain === key) installLabels(trimmed.value)
+          return
+        }
+        everyLanguage = true
         const cached = await labelsApi.safe.bundleLabels()
         if (cached.ok) return installLabels(cached.value)
         const result = await scoped.remote.pluginManager.listBundles()
         if (result.ok) installLabels(bundleLabelsOf(result.value))
-      })()
+      }
+      void load()
+      scoped.effect(
+        () =>
+          ctx.locale.subscribe(() => {
+            void load()
+          }),
+        'settings-shell: bundle labels follow the language',
+      )
     })
 
     const describe = ctx.configForms.describe()
@@ -475,14 +496,18 @@ export default defineClient({
       openSettingsTarget: target => openSettingsTarget(target),
     }
 
+    // The frame's `shell.beforeMain` region is frame-layout's declaration, which this plugin does not depend on: the
+    // ledger itself is keyed by plain strings, so it is read through that face.
+    const slotLedger: Pick<SlotCore, 'entriesOfSlot' | 'subscribe'> = ctx.slots
     const mainTabsLoaded: ObservableSnapshot<boolean> = {
-      getSnapshot: () => ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
-      subscribe: listener => ctx.slots.subscribe('shell.overlay', listener),
+      getSnapshot: () => tabStripLoaded(slot => slotLedger.entriesOfSlot(slot).map(entry => entry.options.id)),
+      subscribe: listener => {
+        const disposers = TAB_STRIP_SLOTS.map(slot => slotLedger.subscribe(slot, listener))
+        return () => disposers.forEach(dispose => dispose())
+      },
     }
 
     const deps: ShellRootDeps = {
-      connectionState: connection.state,
-      reconnect: () => connection.reconnect(),
       desktopUpdate,
       shortcuts: ctx.shortcuts.catalog,
       onboardingSteps,
@@ -492,6 +517,92 @@ export default defineClient({
       closeSettings: () => actor.send({ type: 'close' }),
       openSection: sectionId => openSettings(sectionId),
     }
+
+    // One Settings navigation (council round 4 B1): the side column draws the category list while it shows, and the
+    // stage page drops its own. `columns` counts the columns attached now.
+    const columns = createSnapshotStore(0)
+    // With the Workbench, Settings opens as its pane (the hub), which keeps its own category and search.
+    const hubShown = createSnapshotStore<SettingsHubShown | undefined>(undefined)
+    // The All / DSH / Plugins filter the stage page, a docked pane and the side column share: one list, one filter.
+    const originFilter = createSnapshotStore<SettingsOriginFilter>('all')
+    let navigationInputs: readonly unknown[] = []
+    let navigationLast: SettingsNavigationState | undefined
+    const navigationSnapshot = (): SettingsNavigationState => {
+      const snapshot = actor.getSnapshot()
+      const grouped = groups.getSnapshot()
+      const entries = sectionEntries.getSnapshot()
+      const catalog = ctx.shortcuts.catalog.getSnapshot()
+      const hub = hubShown.getSnapshot()
+      // The column lists the categories the shown page keeps; the stage page and a docked pane share the one filter.
+      const filter = hub === undefined ? originFilter.getSnapshot() : hub.originFilter
+      const open = hub !== undefined || snapshot.matches('tab')
+      const sectionId = hub === undefined ? snapshot.context.sectionId : hub.activeId
+      const query = hub === undefined ? snapshot.context.query : hub.query
+      const inputs = [grouped, entries, catalog, open, sectionId, query, filter]
+      if (navigationLast !== undefined && inputs.every((value, index) => value === navigationInputs[index])) return navigationLast
+      const counts =
+        query.trim() === ''
+          ? undefined
+          : SettingsSearch.search({
+              query,
+              sections: searchRows(grouped),
+              pages: SettingsGroups.searchablePages(grouped),
+              entries,
+              shortcuts: shortcutsFor(catalog),
+            }).counts
+      navigationInputs = inputs
+      navigationLast = SettingsNavigationModel.state({ groups: SettingsGroups.filterByOrigin(grouped, filter), open, sectionId, counts })
+      return navigationLast
+    }
+    /** While searching, a category with matches scrolls the results to them, as the page's own list did. */
+    const scrollToResults = (ids: readonly string[]): boolean => {
+      const found = ids
+        .flatMap(id => [...document.querySelectorAll<HTMLElement>(`[data-settings-view] [data-results-page="${CSS.escape(id)}"]`)])
+        .find(element => element.checkVisibility?.() !== false)
+      if (found === undefined || found === null) return false
+      found.scrollIntoView({ block: 'start' })
+      return true
+    }
+    /** The filter at the head of the side column: the shown page, stage or docked, lists what it keeps. */
+    const ColumnOriginFilter = (): JSX.Element => {
+      const grouped = useObservable(groups)
+      const filter = useObservable(originFilter)
+      return <OriginFilterBar counts={SettingsGroups.originCounts(grouped)} onChange={next => originFilter.set(next)} t={t} value={filter} />
+    }
+    const navigation: SettingsNavigationService = {
+      OriginFilter: ColumnOriginFilter,
+      state: {
+        get: navigationSnapshot,
+        subscribe: listener => {
+          const disposers = [
+            subscribeActor(listener),
+            groups.subscribe(listener),
+            sectionEntries.subscribe(listener),
+            ctx.shortcuts.catalog.subscribe(listener),
+            hubShown.subscribe(listener),
+            originFilter.subscribe(listener),
+          ]
+          return () => disposers.forEach(dispose => dispose())
+        },
+      },
+      select: id => {
+        const entry = SettingsGroups.entryFor(groups.getSnapshot(), id)
+        if (entry?.opens !== undefined) return openPanel(entry.opens)
+        const ids = entry === undefined ? [id] : [entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)]
+        if (navigationSnapshot().searching && scrollToResults(ids)) return
+        openSettings(id)
+      },
+      attach: () => {
+        columns.set(columns.getSnapshot() + 1)
+        let attached = true
+        return () => {
+          if (!attached) return
+          attached = false
+          columns.set(columns.getSnapshot() - 1)
+        }
+      },
+    }
+    metadata?.plugin?.provide(SettingsNavigation, navigation)
 
     /** Everything the Settings page shows, minus its frame and close button: the stage page and the docking hub share it. */
     const settingsViewProps = (input: {
@@ -513,15 +624,13 @@ export default defineClient({
       shortcuts: input.shortcuts,
       renderSlot: input.renderSlot,
       pluginPages: SettingsGroups.searchablePages(input.groups),
-      renderPluginPage: (page: PluginSettingsPage, nested: boolean, meta) => (
+      renderPluginPage: (page: PluginSettingsPage, heading: PluginPageHeading) => (
         <PluginSettingsPageView
-          bundleName={meta?.bundleName}
-          entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
+          entry={<PluginEntryCard namespace={page.ns} page={page.title} t={input.t} />}
           form={formFor(page.ns)}
-          groupLabel={meta?.groupLabel}
           key={page.pageId}
-          nested={nested}
-          origin={meta?.origin}
+          heading={heading}
+          namedByNavigation
           page={page}
           t={input.t}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
@@ -533,6 +642,8 @@ export default defineClient({
       sectionOwner,
       t: input.t,
       onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
+      // A phone's Back returns to the category list (round five B6): the page forgets its category.
+      onBack: () => actor.send({ type: 'back' }),
       onReveal: entry => actor.send({ type: 'reveal', sectionId: entry.sectionId, target: entry.target }),
       onSearch: (next: string) => actor.send({ type: 'search', query: next }),
       openPanel,
@@ -553,6 +664,8 @@ export default defineClient({
         void describe.ensure()
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
+      const columnNavigation = useObservable(columns) > 0
+      const filter = useObservable(originFilter)
       if (!open || host === null) return null
       const view = settingsViewProps({
         renderSlot: props.renderSlot,
@@ -566,7 +679,16 @@ export default defineClient({
         shortcuts: shortcutsFor(catalog),
       })
       // With main-tabs the strip closes the tab; without it the header keeps a way back to the previous view.
-      return <SettingsTab {...view} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} />
+      return (
+        <SettingsTab
+          {...view}
+          columnNavigation={columnNavigation}
+          host={host}
+          onClose={tabsLoaded ? undefined : deps.closeSettings}
+          onOriginFilter={next => originFilter.set(next)}
+          originFilter={filter}
+        />
+      )
     }
 
     // The sidebar.settings entry remains the only settings.section declarer. Panels borrow its renderer; they never
@@ -596,6 +718,9 @@ export default defineClient({
                 return request
               },
               closeSettings: deps.closeSettings,
+              columns,
+              report: shown => hubShown.set(shown),
+              originFilter: { observable: originFilter, set: next => originFilter.set(next) },
               view: input =>
                 settingsViewProps({
                   ...input,
@@ -635,7 +760,7 @@ export default defineClient({
       return (
         <PluginQueryProvider>
           <PluginSettingsPageView
-            entry={<PluginEntryCard namespace={props.page.ns} t={t} />}
+            entry={<PluginEntryCard namespace={props.page.ns} page={props.page.title} t={t} />}
             form={formFor(props.page.ns)}
             page={props.page}
             t={t}
@@ -761,9 +886,10 @@ export default defineClient({
             group: 'command',
             run: () => openSettings(),
           }),
-          // One row per Settings entry, named by the entry and its group, never by the package behind it.
+          // One row per Settings entry, named by the entry and its group, never by the package behind it. A Pages row
+          // opens another plugin's page, which has its own palette row.
           ...groups.getSnapshot().flatMap(({ group, entries }) =>
-            entries.map(entry =>
+            entries.filter(entry => entry.opens === undefined).map(entry =>
               addPaletteAction({
                 id: `@dshfiles/settings-shell/section/${entry.id}`,
                 label: () => t('palette.section', { section: entry.label }),
@@ -822,50 +948,15 @@ export default defineClient({
       )
     }
 
-    // Reachability: probe on resume, on `online`, and every 20 s while a phone page is visible (the socket alone misses a
-    // tunnel that silently drops packets). A probe that finds the Host again after an outage reconnects the stale socket.
-    const reachability = createSnapshotStore<ReachabilityState>(ReachabilityModel.initial)
-    const probeNow = (): void => {
-      if (reachability.getSnapshot().probing) return
-      reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void (async () => {
-        const reachable = await probeHost()
-        const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
-        reachability.set(next.state)
-        if (next.recovered) connection.reconnect()
-        // One miss is not an outage yet (a phone just woke); confirm it soon instead of a full interval later.
-        if (!reachable && next.state.probe !== 'unreachable') setTimeout(probeNow, REACHABILITY_CONFIRM_MS)
-      })()
-    }
-    ctx.effect(() => {
-      const visible = (): boolean => document.visibilityState === 'visible'
-      const onVisibility = (): void => {
-        if (visible()) probeNow()
-      }
-      const interval = setInterval(() => {
-        if (visible() && (isMobileDevice() || reachability.getSnapshot().probe === 'unreachable')) probeNow()
-      }, REACHABILITY_PROBE_MS)
-      document.addEventListener('visibilitychange', onVisibility)
-      window.addEventListener('online', probeNow)
-      return () => {
-        clearInterval(interval)
-        document.removeEventListener('visibilitychange', onVisibility)
-        window.removeEventListener('online', probeNow)
-      }
-    }, 'dshfiles-settings-shell: host reachability')
+    // The page's one connection state: the socket plus a Host probe (the socket alone misses a tunnel that silently drops
+    // packets), published through the kit's HostConnection and drawn by the one strip below.
+    const hostReachability = startHostReachability({ connectionState: connection.state, reconnect: () => connection.reconnect() })
+    ctx.effect(() => hostReachability.dispose, 'dshfiles-settings-shell: host reachability')
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(
         { name: 'shell.overlay', id: 'dshfiles-connection-banner', order: 10, locale: SHELL_LOCALE_NAMESPACE },
         (props: { readonly t: ShellTranslate }) => (
-          <ConnectionBanner
-            t={props.t}
-            reachability={reachability}
-            connectionState={connection.state}
-            retry={() => {
-              probeNow()
-              connection.reconnect()
-            }}
-          />
+          <ConnectionBanner t={props.t} strip={hostReachability.strip} reachability={hostReachability.reachability} retry={hostReachability.retry} />
         ),
       ),
     )
@@ -974,6 +1065,26 @@ export default defineClient({
         ),
       ),
     )
+    // Round three item 30: right under core's Language row (order 0), what a language other than English and 中文 covers.
+    const subscribeLocale = (listener: () => void): (() => void) => ctx.locale.subscribe(listener)
+    const activeLocale = (): string => ctx.locale.getSnapshot().active
+    ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dshfiles-language-note', order: 1, locale: SHELL_LOCALE_NAMESPACE },
+        (props: { readonly t: ShellTranslate }) => (
+          <LanguageCoverageNote locale={useSyncExternalStore(subscribeLocale, activeLocale, activeLocale)} t={props.t} />
+        ),
+      ),
+    )
+    // Council round 6 B5: General's transcript rows under one heading, and the rows after them under the next.
+    for (const heading of GENERAL_HEADINGS) {
+      ctx.slots.inject('settings.general.item', () =>
+        ctx.slots.register(
+          { name: 'settings.general.item', id: heading.id, order: heading.order, locale: SHELL_LOCALE_NAMESPACE },
+          (props: { readonly t: ShellTranslate }) => <GeneralGroupHeading first={heading.first} label={props.t(heading.key)} />,
+        ),
+      )
+    }
     // A second view of the installed plugins, beside DSH core's Plugins manager: a Settings section and a stage panel.
     const PluginsByCategory = (props: { readonly onOpenSettings?: ((sectionId: string) => void) | undefined }): JSX.Element => {
       const grouped = useObservable(groups)

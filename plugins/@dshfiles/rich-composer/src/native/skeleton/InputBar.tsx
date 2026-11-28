@@ -38,11 +38,15 @@ import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
+import { usePhoneThreadTool } from '../../phone-thread-menu.tsx'
+import { GaugeIcon } from '@dshfiles/plugin-ui/icons'
+import { RpcFailure } from '../../rpc-failure.ts'
+import { useTriggerMenuRoom } from '../../trigger-menu-room.ts'
 import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
 import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { AnnotationsPill } from './AnnotationsPill.tsx'
-import { observeControlRow } from './control-row-layout.ts'
+import { observeControlRow, PHONE_BAR_QUERY } from './control-row-layout.ts'
 import css from './InputBar.module.css'
 
 const noSubscription = (): (() => void) => () => {}
@@ -102,9 +106,10 @@ const ComposerAlert = ({ text, onDone }: { readonly text: string; readonly onDon
  */
 function SendGlyph({ mode }: { readonly mode: 'stop' | 'steer' | 'queue' | 'send' }) {
   if (mode === 'stop') {
+    // Council round 25, item 6: a 10px ink square in the quiet ghost circle.
     return (
-      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-        <rect x="3.5" y="3.5" width="9" height="9" rx="2" fill="currentColor" />
+      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" aria-hidden data-stop-glyph="">
+        <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
       </svg>
     )
   }
@@ -176,6 +181,35 @@ export const InputBar = memo(function InputBar({
   const planActive = useProjection('plan', plan => plan !== undefined && (plan.pending ? !plan.active : plan.active))
   // The narrow meter line's ⋯: its readings on a second line (b:gyk7).
   const [metaExpanded, setMetaExpanded] = useState(false)
+  // Council round 13 C5: a phone hides the passive meter line, so its readings are a row of the thread bar's ⋯ sheet.
+  // Picking it lays the line out expanded (the phone rule shows an expanded line) and focuses the line's toggle, which
+  // folds it away again.
+  const meterMoreRef = useRef<HTMLButtonElement | null>(null)
+  const focusMeterMore = useRef(false)
+  usePhoneThreadTool({
+    id: '@dshfiles/rich-composer/thread-details',
+    label: t('runRow.moreDetails'),
+    icon: <GaugeIcon />,
+    open: () => {
+      focusMeterMore.current = true
+      setMetaExpanded(true)
+    },
+    available: variant === 'composer' && sessionId !== undefined,
+  })
+  // Folding the line from its toggle: where the folded line leaves the page (a phone), focus returns to the
+  // thread bar's ⋯ the readings were opened from, instead of dropping to the page (or raising the keyboard).
+  const refocusAfterFold = useRef(false)
+  useEffect(() => {
+    if (metaExpanded && focusMeterMore.current) {
+      focusMeterMore.current = false
+      meterMoreRef.current?.focus()
+    }
+    if (metaExpanded || !refocusAfterFold.current) return
+    refocusAfterFold.current = false
+    const toggle = meterMoreRef.current
+    if (toggle !== null && toggle.getClientRects().length > 0) return
+    document.querySelector<HTMLElement>('[data-conversation-phone-bar] [data-phone-thread-menu]')?.focus()
+  }, [metaExpanded])
   // Absent (undefined: no frame yet) and cleared (null) both mean no goal.
   const hasGoal = useProjection('goal', goal => goal != null)
   // Session-maybe: the machine faces are absent together while no session is
@@ -234,7 +268,8 @@ export const InputBar = memo(function InputBar({
     }
     showToast(error.code === 'session/attachment-invalid' || error.code === 'subagent/attachment-invalid'
       ? attachmentErrorText(t, error.details.reason, imageLimits)
-      : `${error.message} (${error.code})`)
+      // dshfiles (round four D7): one sentence from the kit's error copy, never the endpoint or the code.
+      : RpcFailure.sentence({ subject: 'Your message', error, kept: t('error.promptKept') }))
   }, [promptError, showToast, t, imageLimits])
   useEffect(() => {
     if (notice?.level === 'error') showToast(notice.text)
@@ -243,9 +278,14 @@ export const InputBar = memo(function InputBar({
   useLayoutEffect(() => {
     const row = rowRef.current
     if (row === null) return
-    return observeControlRow(row, { iconStep: () => !row.classList.contains(css.rowHero ?? '') })
+    const hero = (): boolean => row.classList.contains(css.rowHero ?? '')
+    // Unslop r5 C3: a started thread's bar on a phone shows the model as its brand mark and the mode as its icon.
+    const phone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_BAR_QUERY).matches
+    return observeControlRow(row, { iconStep: () => !hero(), markStep: () => !hero() && phone() })
   }, [])
   const cardRef = useRef<HTMLDivElement | null>(null)
+  // dshfiles (round four R12): the `@`/`/` list stays between the top bar and the keyboard on a phone.
+  useTriggerMenuRoom(cardRef)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const continuable = subagent?.address.mode === 'continuable'
@@ -594,10 +634,13 @@ export const InputBar = memo(function InputBar({
   // button (no pending upload) over a non-empty draft that is neither a
   // claimed command nor a `/` line headed for adjudication — so it never
   // describes a delivery the click cannot or does not perform; every other
-  // state keeps plain Send. A continuable child keeps Send primary and
-  // exposes Stop independently, and so does a running session while a
-  // message waits for the Host.
-  const primaryStops = running && subagent === null && !sending && (empty || blocked !== undefined)
+  // state keeps plain Send. A continuable child exposes Stop independently
+  // once a draft brings Send back, and so does a running session while a
+  // message waits for the Host. dshfiles (council round 25, item 6): with
+  // nothing to send, a running continuable child shows the one Stop in
+  // Send's seat too, not a Stop beside a disabled Send; what a click, Enter
+  // or a typed draft does is unchanged.
+  const primaryStops = running && (subagent === null || continuable) && !sending && (empty || blocked !== undefined)
   const primaryRetries = !running && subagent === null && empty && retryableFailure !== undefined
     && !pendingHumanInput && historyOpen && !submissionPending && !disabled && input.queue.length === 0
     && input.phase === 'plain' && retry !== undefined
@@ -861,18 +904,19 @@ export const InputBar = memo(function InputBar({
               />
             )}
             <div className={css.send}>
-            {interruptible && !cancelDenied && (
+            {interruptible && !primaryStops && !cancelDenied && (
               <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stopAction === undefined} portal>
                 <button
                   type="button"
                   className={css.primary}
                   aria-label={t('input.stop')}
+                  data-stop=""
                   disabled={stopAction === undefined}
                   onMouseDown={keepFocus}
                   onClick={stopAction}
                 >
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden data-stop-glyph="">
+                    <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
                   </svg>
                 </button>
               </Tooltip>
@@ -922,12 +966,17 @@ export const InputBar = memo(function InputBar({
         {variant === 'composer' ? <span className={css.meterSpacer} aria-hidden /> : null}
         {variant === 'composer' ? (
           <button
+            ref={meterMoreRef}
             type="button"
             className={css.meterMore}
             aria-expanded={metaExpanded}
             aria-label={metaExpanded ? t('runRow.lessDetails') : t('runRow.moreDetails')}
             data-meter-more=""
-            onClick={() => { setMetaExpanded(open => !open) }}
+            onClick={() => {
+              // A tap does not focus a button in WebKit, so any fold from the toggle counts, not only a focused one.
+              refocusAfterFold.current = metaExpanded
+              setMetaExpanded(open => !open)
+            }}
           >
             ⋯
           </button>

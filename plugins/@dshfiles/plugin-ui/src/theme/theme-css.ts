@@ -13,6 +13,7 @@
  * surface turns warm at once), then the aliases with a clear job are pinned to the 11 palette steps. Regenerate with
  * `node plugins/@dshfiles/plugin-ui/scripts/emit-theme-css.ts`; a ui-styles test fails when the file drifts.
  */
+import { DiffLook } from './diff-look.ts'
 import { PaletteMath, NEUTRAL_STEP_NAMES, WARM_STONE, type Oklch, type Palette, type PaletteInput, type Scheme } from './palette.ts'
 
 export const LIGHT_SELECTOR = 'html body'
@@ -98,15 +99,12 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-alias-border-l2-darkmode-thin', 4, 4],
   ['--dsw-alias-border-l3', 5, 5],
   ['--dsw-alias-border-l4', 6, 6],
-  ['--dsw-alias-brand-primary', 10, 10],
+  // The primary fill and its hover (council round 3 A3, round 4 A2): `--dshx-primary-fill` / `--dshx-primary-hover`.
+  ['--dsw-alias-brand-primary', 'var(--dshx-primary-fill)', 'var(--dshx-primary-fill)'],
   ['--dsw-alias-brand-primary-invert', 0, 0],
   ['--dsw-alias-brand-text', 10, 10],
   ['--dsw-alias-brand-primary-new-colorprimary-new-color', 'var(--dshx-tone-accent)', 'var(--dshx-tone-accent)'],
-  [
-    '--dsw-alias-button-primary-hover',
-    'color-mix(in oklch, var(--dshx-tone-10) 86%, var(--dshx-tone-0))',
-    'color-mix(in oklch, var(--dshx-tone-10) 86%, var(--dshx-tone-0))',
-  ],
+  ['--dsw-alias-button-primary-hover', 'var(--dshx-primary-hover)', 'var(--dshx-primary-hover)'],
   ['--dsw-alias-interactive-bg-hover', mixText(6), mixText(7)],
   ['--dsw-alias-interactive-bg-active', mixText(10), mixText(12)],
   ['--dsw-alias-interactive-bg-hover-accent', mixText(14), mixText(20)],
@@ -132,19 +130,62 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-alias-state-error-primary', 'var(--dshx-tone-danger)', 'var(--dshx-tone-danger)'],
   ['--dsw-alias-code-diff-added', 'var(--dshx-tone-success-bg)', 'var(--dshx-tone-success-bg)'],
   ['--dsw-alias-code-diff-deleted', 'var(--dshx-tone-danger-bg)', 'var(--dshx-tone-danger-bg)'],
-  ['--dsw-specific-sidebar-fill', 1, 1],
+  // The nav column's own tone (council round 6 A4): the panel step in light, lifted in dark.
+  ['--dsw-specific-sidebar-fill', 'var(--dshx-tone-nav)', 'var(--dshx-tone-nav)'],
   ['--dsw-specific-sidebar-nav-item-active', 3, 3],
   ['--dsw-specific-sidebar-nav-item-active-accent', 'var(--dshx-tone-accent-bg)', 'var(--dshx-tone-accent-bg)'],
   ['--dsw-specific-bubble', 2, 2],
   ['--dsw-specific-bubble-highlight', 3, 3],
   ['--dsw-specific-input-major', 0, 2],
+  // Native menus are opaque, on the kit popover fill. The Host material is a 70% fill over a 40px blur, and wherever
+  // that blur has no backdrop to sample (the composer's @, / and + lists) the transcript reads through the rows.
+  ['--dsw-menu-surface-fill', 0, 2],
+  ['--dsw-menu-backdrop-filter', 'none', 'none'],
 ]
 
-/** Syntax hues for Shiki's `css-variables` theme (keyword red, constant blue, parameter orange, function violet, string teal). */
-const SYNTAX_HUES = { keyword: 20, constant: 245, parameter: 55, function: 300, string: 210 } as const
+/**
+ * Syntax hues for Shiki's `css-variables` theme, one pair shared by the transcript's code blocks and the diff view
+ * (round five A4): keyword violet, function blue, string teal, constant copper, parameter magenta. Each keeps 25° or
+ * more from the status hues (25, 80, 150), so a keyword never reads as a deletion or a string as an addition.
+ */
+const SYNTAX_HUES = { keyword: 300, function: 250, string: 195, constant: 55, parameter: 340 } as const
 
-function syntaxColor(hue: number, scheme: Scheme): Oklch {
-  return scheme === 'dark' ? { l: 0.79, c: 0.11, h: hue } : { l: 0.5, c: 0.14, h: hue }
+type SyntaxRole = keyof typeof SYNTAX_HUES
+
+/**
+ * A syntax colour fitted to every surface code sits on: the page, the code block (panel), raised, and the diff's
+ * context, added, removed and emphasised lines. It starts at light L 0.5 / dark L 0.79 and moves away from the
+ * surfaces until it holds 4.6:1 on all of them, so a lighter hue (teal) steps further than a darker one (violet).
+ */
+function syntaxColor(hue: number, scheme: Scheme, p: Palette = PaletteMath.palette({ ...WARM_STONE, scheme })): Oklch {
+  const dark = scheme === 'dark'
+  const diff = DiffLook.surfaces(p)
+  const under = [p.neutral[0], p.neutral[1], p.neutral[2], ...Object.values(diff)].filter((color): color is Oklch => color !== undefined)
+  let color: Oklch = dark ? { l: 0.79, c: 0.11, h: hue } : { l: 0.5, c: 0.14, h: hue }
+  for (let i = 0; i < 30 && Math.min(...under.map(back => PaletteMath.contrastRatio(color, back))) < 4.6; i += 1)
+    color = { ...color, l: Number((color.l + (dark ? 0.01 : -0.01)).toFixed(4)) }
+  return color
+}
+
+/**
+ * The comment colour: the faint text step, moved toward the ink only as far as it needs to hold 4.6:1 on the code
+ * block and the diff's context, added and removed lines (light faint sits at 4.50:1 on the deletion band).
+ */
+function commentColor(p: Palette): Oklch {
+  const dark = p.scheme === 'dark'
+  const diff = DiffLook.surfaces(p)
+  const under = [p.neutral[0], p.neutral[1], p.neutral[2], diff.body, diff.addition, diff.deletion, diff.separator].filter((color): color is Oklch => color !== undefined)
+  let color: Oklch = p.neutral[8] ?? { l: dark ? 0.66 : 0.52, c: 0, h: 0 }
+  for (let i = 0; i < 20 && Math.min(...under.map(back => PaletteMath.contrastRatio(color, back))) < 4.6; i += 1)
+    color = { ...color, l: Number((color.l + (dark ? 0.005 : -0.005)).toFixed(4)) }
+  return color
+}
+
+/** The fitted colour of every syntax role for one palette. */
+function syntaxColors(p: Palette): Readonly<Record<SyntaxRole, Oklch>> {
+  const entries = Object.entries(SYNTAX_HUES).map(([role, hue]) => [role, syntaxColor(hue, p.scheme, p)] as const)
+  // SAFETY: built from every key of SYNTAX_HUES.
+  return Object.fromEntries(entries) as Record<SyntaxRole, Oklch>
 }
 
 function retint(hex: string, hue: number, chroma: number): Oklch {
@@ -162,6 +203,22 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-tone-accent-bg', PaletteMath.toCss(p.accent.bg))
   push('--dshx-tone-accent-border', PaletteMath.toCss(p.accent.border))
   push('--dshx-tone-accent-on-solid', PaletteMath.toCss(p.accent.onSolid))
+  push('--dshx-selected-wash', PaletteMath.toCss(p.selectedWash))
+  push('--dshx-selected-edge', PaletteMath.toCss(p.selectedEdge))
+  push('--dshx-wash-needs-you', PaletteMath.toCss(p.needsYouWash))
+  push('--dshx-wash-needs-you-band', PaletteMath.toCss(p.needsYouBandWash))
+  push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
+  push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
+  push('--dshx-trigger-fill', PaletteMath.toCss(p.triggerFill))
+  push('--dshx-segment-thumb', PaletteMath.toCss(p.segmentThumb))
+  push('--dshx-segment-edge', PaletteMath.toCss(p.segmentEdge))
+  push('--dshx-segment-track', PaletteMath.toCss(p.segmentTrack))
+  push('--dshx-segment-track-floating', PaletteMath.toCss(p.segmentTrackFloating))
+  push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
+  push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
+  push('--dshx-ready-mark', PaletteMath.toCss(p.readyMark))
+  push('--dshx-primary-fill', PaletteMath.toCss(p.primaryFill))
+  push('--dshx-primary-hover', PaletteMath.toCss(p.primaryHover))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {
     push(`--dshx-tone-${key}`, PaletteMath.toCss(p[key].fg))
     push(`--dshx-tone-${key}-bg`, PaletteMath.toCss(p[key].bg))
@@ -179,15 +236,15 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
     push(name, typeof ref === 'number' ? tone(ref) : ref)
   }
   // Shiki `css-variables` theme: every token colour is `var(--shiki-token-*)` with no fallback.
-  const syntax = (hue: number) => PaletteMath.toCss(syntaxColor(hue, p.scheme))
-  push('--shiki-token-comment', tone(8))
+  const syntax = syntaxColors(p)
+  push('--shiki-token-comment', PaletteMath.toCss(commentColor(p)))
   push('--shiki-token-punctuation', tone(9))
-  push('--shiki-token-constant', syntax(SYNTAX_HUES.constant))
-  push('--shiki-token-keyword', syntax(SYNTAX_HUES.keyword))
-  push('--shiki-token-parameter', syntax(SYNTAX_HUES.parameter))
-  push('--shiki-token-function', syntax(SYNTAX_HUES.function))
-  push('--shiki-token-string', syntax(SYNTAX_HUES.string))
-  push('--shiki-token-string-expression', syntax(SYNTAX_HUES.string))
+  push('--shiki-token-constant', PaletteMath.toCss(syntax.constant))
+  push('--shiki-token-keyword', PaletteMath.toCss(syntax.keyword))
+  push('--shiki-token-parameter', PaletteMath.toCss(syntax.parameter))
+  push('--shiki-token-function', PaletteMath.toCss(syntax.function))
+  push('--shiki-token-string', PaletteMath.toCss(syntax.string))
+  push('--shiki-token-string-expression', PaletteMath.toCss(syntax.string))
   push('--shiki-token-link', 'var(--dshx-tone-accent)')
   push('--shiki-token-inserted', 'var(--dshx-tone-success)')
   push('--shiki-token-deleted', 'var(--dshx-tone-danger)')
@@ -228,7 +285,10 @@ function overriddenHostVariables(): readonly string[] {
 
 /** The generated theme stylesheet: Host variable blocks and syntax colours from a palette input. */
 export class ThemeCss {
+  static readonly SYNTAX_HUES = SYNTAX_HUES
   static readonly syntaxColor = syntaxColor
+  static readonly syntaxColors = syntaxColors
+  static readonly commentColor = commentColor
   static readonly blockDeclarations = blockDeclarations
   static readonly themeCss = themeCss
   static readonly overriddenHostVariables = overriddenHostVariables

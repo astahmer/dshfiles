@@ -20,12 +20,47 @@ const FRAME_SELECTOR = '[data-dshfiles-tool-meta-frame]'
 export const RESERVED_ROW_ATTRIBUTE = 'data-dshfiles-tool-meta-row'
 /** The width of the timing label, published on its frame for the reserved row's padding. */
 export const RESERVE_PROPERTY = '--dshfiles-tool-meta-reserve'
+/** Set on the timing label while its card has a top row that makes room for it; without it the label stays hidden. */
+export const ANCHORED_ATTRIBUTE = 'data-dshfiles-tool-meta-anchored'
+/**
+ * A card that prints its own duration marks any element inside it with this attribute (test-runs does), and gets no
+ * timing label: two durations side by side read as one garbled number.
+ */
+export const OWN_TIMING_SELECTOR = '[data-tool-card-timing="own"]'
 /**
  * The card's top row, in the shapes the native cards render: a disclosure header (its row and any trailing accessory),
  * an expandable header element, or a plain disclosure row. The header precedes the body in document order, so the
  * first match is the card's own unless the card has no header and the match belongs to a nested call's frame.
  */
 const HEADER_ROW_SELECTOR = '[data-disclosure-header], [data-expandable], [data-disclosure-row]'
+/**
+ * Set on the timing label while its card's top row is a native disclosure header, the shared 24 px process row: the
+ * label then takes that row's height, so its time sits on the row's centre line instead of 2 px under it (council round
+ * 22, item 9). Other headers keep the label's 28 px.
+ */
+export const DISCLOSURE_ANCHOR_ATTRIBUTE = 'data-dshfiles-tool-meta-disclosure'
+/** Set on a frame whose card is one collapsed row; the frame then fits that row instead of the message column. */
+export const FIT_ATTRIBUTE = 'data-dshfiles-tool-meta-fit'
+
+/**
+ * Whether the frame holds one collapsed row and nothing else (DESIGN.md, layout: a work row is as wide as its content):
+ * its card reaches its top row through single children, nothing in it is expanded, and no section or in-flow line
+ * follows the card. A card with a body (a diff, a plan, a page, a job) keeps the message column, and so does a card that
+ * prints its own duration (a test report) or holds a size container, which takes no width from its content and would
+ * collapse in a fitted frame. Reads no layout.
+ */
+export const isLoneRow = (frame: HTMLElement): boolean => {
+  const [card, ...rest] = frame.children
+  if (card === undefined || rest.some(child => !child.hasAttribute('data-dshfiles-tool-meta-label'))) return false
+  const keepsColumn = `[aria-expanded="true"], ${OWN_TIMING_SELECTOR}, [class*="@container"]`
+  if (card.matches(keepsColumn) || card.querySelector(keepsColumn) !== null) return false
+  let element: Element | null = card
+  while (element !== null && !element.matches(HEADER_ROW_SELECTOR)) {
+    if (element.children.length !== 1) return false
+    element = element.firstElementChild
+  }
+  return element !== null
+}
 
 /** One observer for every timing label on the page; each label registers the callback that re-reserves its row. */
 const labelSizes = (() => {
@@ -48,6 +83,8 @@ const labelSizes = (() => {
 })()
 
 const headerRowOf = (frame: HTMLElement, label: HTMLElement): HTMLElement | undefined => {
+  const ownTiming = frame.querySelector(OWN_TIMING_SELECTOR)
+  if (ownTiming !== null && ownTiming.closest(FRAME_SELECTOR) === frame) return undefined
   const found = frame.querySelector<HTMLElement>(HEADER_ROW_SELECTOR)
   if (found === null || found.closest(FRAME_SELECTOR) !== frame) return undefined
   // Only the native card, never a section rendered after the label.
@@ -60,8 +97,10 @@ const headerRowOf = (frame: HTMLElement, label: HTMLElement): HTMLElement | unde
  * Keeps the timing label from covering the card's own top row. The label is an overlay (the native card owns its
  * layout), so the frame publishes the label's width and marks the card's top row, which a padding rule then narrows:
  * the row's summary truncates and its trailing controls move left of the label instead of sliding under it. A hidden
- * label (narrow pane, timing off) reserves nothing. Re-runs when the label resizes and when the card's DOM changes
- * (a running row settling into its card, a disclosure opening).
+ * label (narrow pane, timing off) reserves nothing. A card with no such row (one that draws its own header, as the
+ * HTML page card does) cannot make room, so its label stays hidden instead of sitting on the header's controls.
+ * Re-runs when the label resizes and when the card's DOM changes (a running row settling into its card, a disclosure
+ * opening).
  */
 const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | null }, labelRef: { readonly current: HTMLElement | null }): void => {
   useLayoutEffect(() => {
@@ -73,7 +112,11 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
     let queued: number | undefined
     // Marking reads no layout, so a card that streams (many mutations) never forces one; only a resize measures.
     const mark = (): void => {
-      const row = width > 0 ? headerRowOf(frame, label) : undefined
+      frame.toggleAttribute(FIT_ATTRIBUTE, isLoneRow(frame))
+      const anchor = headerRowOf(frame, label)
+      label.toggleAttribute(ANCHORED_ATTRIBUTE, anchor !== undefined)
+      label.toggleAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE, anchor?.matches('[data-disclosure-header]') === true)
+      const row = width > 0 ? anchor : undefined
       if (row === marked && row?.hasAttribute(RESERVED_ROW_ATTRIBUTE) !== false) return
       marked?.removeAttribute(RESERVED_ROW_ATTRIBUTE)
       row?.setAttribute(RESERVED_ROW_ATTRIBUTE, '')
@@ -99,6 +142,9 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
       mutations.disconnect()
       if (queued !== undefined) cancelAnimationFrame(queued)
       marked?.removeAttribute(RESERVED_ROW_ATTRIBUTE)
+      label.removeAttribute(ANCHORED_ATTRIBUTE)
+      label.removeAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE)
+      frame.removeAttribute(FIT_ATTRIBUTE)
     }
   }, [frameRef, labelRef])
 }
@@ -110,10 +156,14 @@ const ToolCallFrame = (props: { readonly card: ReactNode; readonly meta: ReactNo
   return (
     // The frame is a size container: in a narrow pane (a phone, a split) the timing would sit over the card's own
     // status chip, so it gives way below the narrow tier (visual refresh P2). Its marked top row is padded by the
-    // label's width, so the row's content ends before the label.
+    // label's width plus 8px, so the row's content ends 8px before the label. A lone collapsed row fits its content
+    // (capped at chat's prose measure) so the label lands right after it, in its reserved room, at every pane width; a
+    // size container cannot take its width from its content, so that frame stops being one, and the label's narrow
+    // tier (which asks for this frame by name) no longer applies. The `aria-expanded` guard applies in the same frame a
+    // row opens, before the attribute is recomputed.
     <div
       ref={frameRef}
-      className="dshx:@container dshx:relative dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.25rem)]!"
+      className="dshx:@container/tool-frame dshx:relative dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.5rem)]! dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:w-fit dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:max-w-[min(100%,var(--dsh-chat-prose-measure,100%))] dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:[container-type:normal]"
       data-dshfiles-tool-meta-frame=""
     >
       {props.card}
@@ -123,7 +173,7 @@ const ToolCallFrame = (props: { readonly card: ReactNode; readonly meta: ReactNo
         <span
           ref={labelRef}
           data-dshfiles-tool-meta-label=""
-          className="dshx-root dshx:pointer-events-none dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:@max-pane-narrow:hidden"
+          className="dshx-root dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:data-[dshfiles-tool-meta-disclosure]:h-6 dshx:data-[dshfiles-tool-meta-anchored]:visible dshx:@max-pane-narrow/tool-frame:hidden"
         >
           {props.meta}
         </span>
@@ -166,8 +216,8 @@ const wrapToolCallTree = (input: ToolCallFrameParts & { readonly tree: Component
       return framed as RenderToolView
     }, [nativeRenderSlot, sessionId])
     useEffect(() => {
-      if (nativeRenderSlot === undefined) warnOnce('the tool-call renderer no longer receives renderSlot; tool timings are hidden')
-      else if (!dispatched.current) warnOnce('the tool-call renderer rendered without dispatching tool.call.toolview; tool timings are hidden')
+      if (nativeRenderSlot === undefined) warnOnce('the tool-call renderer no longer receives renderSlot. Tool timings are hidden')
+      else if (!dispatched.current) warnOnce('the tool-call renderer rendered without dispatching tool.call.toolview. Tool timings are hidden')
     }, [nativeRenderSlot])
     if (renderSlot === undefined) return createElement(Tree, props)
     return createElement(Tree, { ...props, renderSlot })
@@ -196,7 +246,7 @@ export const installToolCallTreeWrapper = (input: ToolCallFrameParts & { readonl
     const entry = toolCallEntryOf(input.slots)
     if (entry === undefined || wrappers.has(entry.component)) return
     if (entry.component === undefined || entry.component === null) {
-      warnOnce('the conversation.chat.node "tool-call" entry holds no component; tool timings are hidden')
+      warnOnce('the conversation.chat.node "tool-call" entry holds no component. Tool timings are hidden')
       return
     }
     originals.set(entry, entry.component)

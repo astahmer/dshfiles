@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AppearanceModel, DEFAULT_APPEARANCE, PRESET_IDS, RUNTIME_DARK_SELECTOR, RUNTIME_LIGHT_SELECTOR } from '../src/theme/appearance.ts'
 import { DRACULA_THEME } from '../src/theme/dracula.ts'
+import { PaletteMath } from '../src/theme/palette.ts'
 import { BACKDROP_HOST, ThemeDefinitionModel, type ThemeDefinition } from '../src/theme/theme-definition.ts'
 
 const colours = (bg: string, text: string, accent: string) => ({
@@ -68,12 +69,45 @@ describe('theme definitions', () => {
     const css = AppearanceModel.runtimeThemeCss(settings)
     expect(css).toContain(`${RUNTIME_DARK_SELECTOR} {\n  --dshx-tone-0: #2e3440;`)
     expect(css).toContain('--shiki-token-keyword: #81a1c1;')
+    // A pinned theme's panel is its nav column too (council round 6 A4): the generated lift never overrides it.
+    expect(css).toContain(`--dshx-tone-nav: ${NORD.dark!.colours.panel};`)
+    // Its Ready dot is its own success colour (council round 6 A6).
+    expect(css).toContain(`--dshx-ready-mark: ${NORD.dark!.colours.success};`)
     expect(css).toContain(`${RUNTIME_DARK_SELECTOR} ${BACKDROP_HOST}::before {`)
     expect(css).toContain('animation: nord-drift 9s infinite;')
     expect(css).toContain('@keyframes nord-drift')
     // Only dark was given: light keeps the generated palette, with no pins and no backdrop.
     expect(css).not.toContain(`${RUNTIME_LIGHT_SELECTOR} {\n  --dshx-tone-0: #`)
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
+  })
+
+  it('keeps an identity palette and its names, and refuses a malformed one (round eight)', () => {
+    const palette = ['#88C0D0', '#a3be8c', '#d08770', '#b48ead', '#ebcb8b', '#8fbcbb'] as const
+    const names = ['frost', 'green', 'orange', 'purple', 'yellow', ' teal '] as const
+    const parsed = ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, palette, paletteNames: names } })
+    expect(parsed.errors).toEqual([])
+    expect(parsed.definition?.dark?.palette).toEqual(['#88c0d0', '#a3be8c', '#d08770', '#b48ead', '#ebcb8b', '#8fbcbb'])
+    expect(parsed.definition?.dark?.paletteNames).toEqual(['frost', 'green', 'orange', 'purple', 'yellow', 'teal'])
+    const errors = (scheme: { readonly palette?: readonly string[]; readonly paletteNames?: readonly string[] }) =>
+      ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, ...scheme } }).errors
+    expect(errors({ palette: palette.slice(0, 5) })).toEqual(['dark.palette: exactly 6 #rrggbb colours, one per slot'])
+    expect(errors({ palette: [...palette.slice(0, 5), 'teal'] })).toEqual(['dark.palette[5]: a #rrggbb colour is required'])
+    expect(errors({ paletteNames: names })).toEqual(['dark.paletteNames: give palette too (names follow its order)'])
+    expect(errors({ palette, paletteNames: [...names.slice(0, 5), 'x'.repeat(25)] })).toEqual([
+      'dark.paletteNames[5]: a name of 1 to 24 characters is required',
+    ])
+    // A theme without a palette is still valid: one is derived from its colours.
+    expect(ThemeDefinitionModel.parse(NORD).definition?.dark?.palette).toBeUndefined()
+  })
+
+  it('warns about an identity colour that does not read as text on bg, panel or raised', () => {
+    const palette = ['#2e3440', '#a3be8c', '#ebcb8b', '#88c0d0', '#8fbcbb', '#e5e9f0'] as const
+    const warnings = ThemeDefinitionModel.contrastWarnings({ ...NORD, dark: { ...NORD.dark!, palette } })
+    expect(warnings.filter(warning => warning.includes('palette'))).toEqual([
+      'dark: palette[0] on bg is 1.00:1 (needs 4.5:1)',
+      'dark: palette[0] on panel is 1.00:1 (needs 4.5:1)',
+      'dark: palette[0] on raised is 1.00:1 (needs 4.5:1)',
+    ])
   })
 
   it('falls back to the preset when the chosen theme is missing or invalid', () => {
@@ -105,6 +139,22 @@ describe('built-in Dracula', () => {
       'light: danger on raised is 4.14:1 (needs 4.5:1)',
       'light: syntax string on panel is 4.22:1 (needs 4.5:1)',
     ])
+  })
+
+  it('ships the spec’s six accents as its identity palette, every one text-safe on bg, panel and raised (round eight)', () => {
+    const parsed = ThemeDefinitionModel.parse(DRACULA_THEME).definition!
+    expect(parsed.dark?.palette).toEqual(['#8be9fd', '#50fa7b', '#ffb86c', '#bd93f9', '#ff79c6', '#f1fa8c'])
+    // Alucard's yellow darkened at its own hue: the spec's #846e15 reads 4.09:1 on raised.
+    expect(parsed.light?.palette).toEqual(['#036a96', '#14710a', '#a34d14', '#644ac9', '#a3144d', '#7d6706'])
+    for (const scheme of [parsed.dark!, parsed.light!]) {
+      expect(scheme.paletteNames).toEqual(['Cyan', 'Green', 'Orange', 'Purple', 'Pink', 'Yellow'])
+      for (const tone of scheme.palette!)
+        for (const surface of ['bg', 'panel', 'raised'] as const)
+          expect(
+            PaletteMath.contrastRatio(PaletteMath.hexToOklch(tone), PaletteMath.hexToOklch(scheme.colours[surface])),
+            `${tone} on ${surface}`,
+          ).toBeGreaterThanOrEqual(4.5)
+    }
   })
 
   it('paints the night sky only in dark, animating opacity alone', () => {

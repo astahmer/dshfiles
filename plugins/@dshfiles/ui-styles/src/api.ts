@@ -1,5 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
-import { ACCENT_ROLES, MAX_BACKDROP_LAYERS, NEUTRAL_ROLES, ROLE_GUIDE, SYNTAX_ROLES } from '@dshfiles/plugin-ui/theme/definition'
+import { ACCENT_ROLES, MAX_BACKDROP_LAYERS, NEUTRAL_ROLES, PALETTE_GUIDE, ROLE_GUIDE, SYNTAX_ROLES } from '@dshfiles/plugin-ui/theme/definition'
 import { SCENE_IDS } from '@dshfiles/plugin-ui/theme/scenes'
 import * as Schema from 'effect/Schema'
 
@@ -142,7 +142,15 @@ const backdropSchema = Schema.Struct({
   ),
   keyframes: Schema.optional(Schema.String.annotate({ description: 'The @keyframes blocks the layers use; prefix the names with the theme id.' })),
 })
-const schemeThemeSchema = Schema.Struct({ colours: coloursSchema, syntax: Schema.optional(syntaxSchema), backdrop: Schema.optional(backdropSchema) })
+const paletteSchema = Schema.Array(Schema.String).annotate({ description: `Exactly 6 #rrggbb: ${PALETTE_GUIDE.palette}` })
+const paletteNamesSchema = Schema.Array(Schema.String).annotate({ description: `Exactly 6: ${PALETTE_GUIDE.paletteNames}` })
+const schemeThemeSchema = Schema.Struct({
+  colours: coloursSchema,
+  syntax: Schema.optional(syntaxSchema),
+  backdrop: Schema.optional(backdropSchema),
+  palette: Schema.optional(paletteSchema),
+  paletteNames: Schema.optional(paletteNamesSchema),
+})
 
 const themeDefinitionSchema = Schema.Struct({
   id: Schema.String.annotate({ description: 'Lowercase letters, digits and hyphens; not a preset id. Saving an existing id replaces that theme.' }),
@@ -199,7 +207,7 @@ export const themeApi = defineApi({
       input: themeDefineInputSchema,
       output: themeStateSchema,
       description:
-        'Save a theme the user asked for (any named or described theme: Nord, Solarized, "a cyberpunk theme with rain") and, by default, switch to it, live with no restart. Look up the theme’s official palette first when it has one and keep its exact colours; give only the schemes it really has. An optional backdrop animates behind the conversation. Returns contrastWarnings for text under WCAG AA: tell the user. Call only when the user asked for a theme. Reversible: theme_set preset returns to a preset; theme_remove deletes it.',
+        'Save a theme the user asked for (any named or described theme: Nord, Solarized, "a cyberpunk theme with rain") and, by default, switch to it, live with no restart. Look up the theme’s official palette first when it has one and keep its exact colours; give only the schemes it really has. An optional backdrop animates behind the conversation. An optional palette gives the six identity colours users pick for projects, Backlog tags and agents (a choice stores the slot, so the theme recolours it): give the theme’s own accent colours when it has them (Dracula: cyan, green, orange, purple, pink, yellow) with paletteNames; left out, six are derived from its syntax and accent colours. Returns contrastWarnings for text under WCAG AA: tell the user. Call only when the user asked for a theme. Reversible: theme_set preset returns to a preset; theme_remove deletes it.',
       tool: { name: 'theme_define', readOnly: false, render },
     }),
     scene: method({

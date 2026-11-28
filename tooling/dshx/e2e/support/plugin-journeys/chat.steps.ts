@@ -144,9 +144,9 @@ When('the failed turn is retried inline', async ({ page }: { page: Page }) => {
 Then('the request runs again without a continue prompt', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'chat-retried-turn-adds-no-prompt', async () => {
     // The seeded thread has no model of its own, so the rerun request fails again on the default route: that second
-    // failure proves the request ran, and only the newest failed turn keeps the action.
+    // failure proves the request ran. It fails for want of a key, which Retry cannot fix, so no card offers Retry.
     await expect(page.getByText('This turn failed', { exact: true })).toHaveCount(2)
-    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0)
     await expect(page.getByText('Execution requested', { exact: true })).toHaveCount(1)
     await expect(page.getByText('Continue the interrupted task', { exact: false })).toHaveCount(0)
     await expect(page.getByText('Say hello', { exact: true })).toHaveCount(1)
@@ -431,7 +431,9 @@ const openImageLinkFixture = async (page: Page): Promise<void> => {
 
 When('a chat thread with a local image link is opened', async ({ page }: { page: Page }) => {
   await openImageLinkFixture(page)
-  const imageLink = page.getByRole('button', { name: 'red.png', exact: true })
+  // The turn's rows sit directly under "Worked for", so a read row at the end names red.png too: the reply's link,
+  // far up the transcript, is the first.
+  const imageLink = page.getByRole('button', { name: 'red.png', exact: true }).first()
   await imageLink.scrollIntoViewIfNeeded()
   const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
   await expect(backToBottom).toBeVisible()
@@ -440,7 +442,7 @@ When('a chat thread with a local image link is opened', async ({ page }: { page:
 
 When('a read image tool summary path is opened', async ({ page }: { page: Page }) => {
   await openImageLinkFixture(page)
-  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
+  // "Worked for" lists the turn's rows directly: there is no "Read images" header to open first.
   await page.getByRole('button', { name: 'blue.png', exact: true }).click()
 })
 
@@ -451,7 +453,6 @@ When('thread gallery scope is selected and a read image path is opened', async (
   await page.getByRole('button', { name: 'Current turn', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Entire thread', exact: true }).click()
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Read images', exact: true }).last().click()
   await page.getByRole('button', { name: 'blue.png', exact: true }).click()
 })
 
@@ -563,6 +564,111 @@ Then('the transcript marks the effort change once', async ({ page }: { page: Pag
   await recordAssertion(page, 'chat-route-change-marks-effort', async () => {
     await expect(page.getByRole('note', { name: 'Effort default → high', exact: true })).toBeVisible()
     await expect(page.locator('[data-chat-route-change]')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+/** A streamed answer long enough to scroll: nine sections of four sentences. */
+const STREAMED_SECTION = 'The harness streams this paragraph word by word so the transcript grows while you watch it.'
+const STREAMED_ANSWER = Array.from({ length: 9 }, (_, index) => `## Section ${String(index + 1)}\n\n${Array.from({ length: 4 }, () => STREAMED_SECTION).join(' ')}`).join('\n\n')
+/** The answer block the reader is on: its index among the answer's blocks and its top before the turn ended. */
+const readerAnchors = new WeakMap<Page, { readonly index: number; readonly top: number }>()
+const answerBlocks = (page: Page): Locator => page.locator('[data-dsh-markdown] > :is(p, h2)')
+
+When('the fake model streams a long answer in a fresh workspace while the reader scrolls up 400 px', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-chat-turn-end-')
+  const workspace = join(root, 'chat-turn-end')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'chat-turn-end', model: 'commandcode_work/gpt-6-luna' })
+  await sendPrompt(page, `[[stream 12]] [[answer ${STREAMED_ANSWER}]]`)
+  await expect(page.locator('[data-dsh-markdown] h2').filter({ hasText: 'Section 4' })).toBeVisible({ timeout: 60_000 })
+  // A reader's own scroll, over the transcript, while the answer still streams.
+  const answer = await page.locator('[data-dsh-markdown]').last().boundingBox()
+  if (answer === null) throw new Error('The streamed answer is not on screen.')
+  await page.mouse.move(answer.x + answer.width / 2, Math.min(answer.y + answer.height, page.viewportSize()?.height ?? 600) - 150)
+  await page.mouse.wheel(0, -400)
+  await expect(page.locator('[data-chat-following-tail]')).toHaveCount(0)
+  // Let the wheel's scroll settle: the answer's first block holds still between two reads.
+  let previous = Number.NaN
+  await expect
+    .poll(
+      async () => {
+        const top = await answerBlocks(page).first().evaluate(block => block.getBoundingClientRect().top)
+        const settled = top === previous
+        previous = top
+        return settled
+      },
+      { intervals: [150] },
+    )
+    .toBe(true)
+  await expect(page.locator('button[data-turn-process]')).toHaveCount(0)
+  const anchor = await answerBlocks(page).evaluateAll(blocks => {
+    const tops = blocks.map(block => block.getBoundingClientRect().top)
+    const index = tops.findIndex(top => top > 200)
+    return { index, top: tops[index] ?? Number.NaN }
+  })
+  readerAnchors.set(page, anchor)
+})
+
+Then('the paragraph the reader is on stays where it is when the turn ends', async ({ page }: { page: Page }) => {
+  const anchor = readerAnchors.get(page)
+  if (anchor === undefined || anchor.index < 0) throw new Error('No answer block was on screen when the reader scrolled up.')
+  await recordAssertion(page, 'chat-turn-end-holds-reader', async () => {
+    // The "Worked for" row appears above the answer as the turn ends.
+    await expect(page.locator('button[data-turn-process]')).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText('Section 9', { exact: true })).toBeAttached()
+    const block = answerBlocks(page).nth(anchor.index)
+    await expect.poll(async () => Math.abs((await block.evaluate(element => element.getBoundingClientRect().top)) - anchor.top)).toBeLessThanOrEqual(2)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const QUESTION_REPLY = Array.from({ length: 6 }, (_, index) => `Paragraph ${String(index + 1)} of the reply after the answer. The agent goes on with the work you just chose.`).join('\n\n')
+const HISTORY_ANSWER = Array.from({ length: 8 }, (_, index) => `Earlier line ${String(index + 1)} of history.`).join('\n\n')
+
+When('a phone-width thread with history asks a question in a fresh workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-chat-answer-follow-')
+  const workspace = join(root, 'chat-answer-follow')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'chat-answer-follow', model: 'commandcode_work/gpt-6-luna' })
+  await sendPrompt(page, `[[answer ${HISTORY_ANSWER}]]`)
+  await expect(page.getByText('Earlier line 8 of history.', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await page.setViewportSize({ width: 390, height: 664 })
+  const question = {
+    questions: [{ id: 'ship', header: 'Proceed', question: 'Ship the release notes now?', options: [{ label: 'Ship them now', description: 'Publish today.' }, { label: 'Hold them', description: 'Wait for review.' }] }],
+    timeout: -1,
+  }
+  // The fake model answers [[after]] once the tool result is back: the reply to the answer.
+  const composer = page.getByRole('textbox', { name: /commands, @ files or (?:threads|sessions)$/ })
+  await composer.fill(`[[once call ask_user_question ${JSON.stringify(question)}]] [[after ${QUESTION_REPLY}]]`)
+  await composer.press('Enter')
+  await expect(page.getByText('Ship them now', { exact: true })).toBeVisible({ timeout: 60_000 })
+})
+
+When('the question is answered with a tap on its first option', async ({ page }: { page: Page }) => {
+  // A phone tap starts with touchstart, which the transcript reads as the reader taking over its scroll.
+  const tap = async (target: Locator): Promise<void> => {
+    await target.dispatchEvent('touchstart')
+    await target.click()
+  }
+  await tap(page.getByText('Ship them now', { exact: true }))
+  await tap(page.getByRole('button', { name: /^Submit/ }))
+})
+
+Then('the reply to the answer ends on screen with no "Back to bottom"', async ({ page }: { page: Page }) => {
+  const last = page.getByText(/^Paragraph 6 of the reply after the answer\./).last()
+  await expect(last).toBeAttached({ timeout: 60_000 })
+  // Both turns settled: the history turn and the one that asked.
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(2, { timeout: 60_000 })
+  await recordAssertion(page, 'chat-answer-follows-reply', async () => {
+    await expect.poll(async () => {
+      const reply = await last.boundingBox()
+      const composer = await page.locator('[data-composer-seat]').last().boundingBox()
+      return reply !== null && composer !== null && reply.y + reply.height <= composer.y + 1
+    }).toBe(true)
+    await expect(page.getByRole('button', { name: /bottom/i })).toBeHidden()
   })
   await finishJourneyAssertions(page)
 })

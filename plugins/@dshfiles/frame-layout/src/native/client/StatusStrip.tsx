@@ -9,6 +9,8 @@ import { EyeOffIcon } from '@dshfiles/plugin-ui/icons'
 import { Component, createContext, memo, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { phoneStatus, PhoneStatusModel } from '../../phone-status.ts'
+import { useStatusBlank } from '../../status-blank.ts'
 import { openStatusBarSettings } from '../../status-bar.ts'
 import { StatusItems, type StatusItem } from '../../status-strip.ts'
 import { DEFAULT_STATUS_STRIP_PREFERENCES, StatusStripPreferencesModel } from '../../status-strip-preferences.ts'
@@ -77,6 +79,7 @@ const StatusItemView = (props: {
   readonly hidden: readonly StatusItem[]
 }): ReactNode => {
   const { item, settings } = props
+  const blankRef = useStatusBlank()
   const showActions = showHiddenActions(settings, props.hidden)
   const View = item.component
   const content = (
@@ -88,7 +91,7 @@ const StatusItemView = (props: {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
+        <span ref={blankRef} className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
           {item.open === undefined || item.controls === true ? (
             content
           ) : (
@@ -130,7 +133,11 @@ const textOf = (element: Element): string => {
   return parts.join(' ')
 }
 
-/** Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before. */
+/**
+ * Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before.
+ * The strip is a labelled group, not a live region: its items hold counts that follow clocks, so a screen reader would
+ * hear it on every change during a turn. Each item that must be heard owns its own polite node (DESIGN.md Announcements).
+ */
 const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStripSettings }): ReactNode => {
   const items = useRegistry(StatusItems)
   const preferences = props.settings.preferences
@@ -138,6 +145,10 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   const hidden = useMemo(() => StatusStripPreferencesModel.hiddenItems(items, preferences), [items, preferences])
   const [open, setOpen] = useState(false)
   const count = arranged.global.length + arranged.thread.length
+  const ordered = useMemo(() => [...arranged.global, ...arranged.thread], [arranged])
+  // Round five C2: on a phone the pill row shows only while an item needs the user; otherwise status opens from the
+  // top bar's button (PhoneStatus), which reads what this strip measured.
+  const [actionable, setActionable] = useState(false)
   // The phone pill reads what its items say ("1 working · Quota 56%"), never a bare "Status": the items render once
   // more, hidden, and the pill reads their text in strip order.
   const measureRef = useRef<HTMLDivElement | null>(null)
@@ -146,24 +157,30 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
     const measure = measureRef.current
     if (!props.narrow || measure === null) return
     const read = (): void => {
-      setSummary(
-        StatusSummaryModel.summarize(
-          Array.from(measure.children, child => ({ label: child.getAttribute('data-status-label') ?? '', text: textOf(child) })),
-        ),
+      const next = StatusSummaryModel.summarize(
+        Array.from(measure.children, child => ({ label: child.getAttribute('data-status-label') ?? '', text: textOf(child) })),
       )
+      const needsUser = PhoneStatusModel.actionable(measure)
+      setSummary(next)
+      setActionable(needsUser)
+      phoneStatus.publish({ summary: next, actionable: needsUser })
     }
     const observer = new MutationObserver(read)
-    observer.observe(measure, { subtree: true, childList: true, characterData: true })
+    observer.observe(measure, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['data-status-actionable'] })
     read()
     return () => observer.disconnect()
   }, [props.narrow, count])
+  useEffect(() => {
+    phoneStatus.publish({ narrow: props.narrow, items: props.narrow ? ordered : [], useSessions: props.useSessions })
+  }, [props.narrow, ordered, props.useSessions])
+  useEffect(() => phoneStatus.reset, [])
   const renderItem = (item: StatusItem, compact: boolean): ReactNode => (
     <StatusItemView key={item.id} item={item} compact={compact} useSessions={props.useSessions} settings={props.settings} hidden={hidden} />
   )
   if (count === 0 && hidden.length === 0) return null
   if (count === 0) {
     return (
-      <div className={css.statusStrip} data-status-strip={props.narrow ? 'compact' : 'hidden'} role="status" aria-label="Status">
+      <div className={css.statusStrip} data-status-strip={props.narrow ? PhoneStatusModel.stripMode(false) : 'hidden'} role="group" aria-label="Status">
         <div className={css.statusSide}>
           <HiddenItemsControl settings={props.settings} hidden={hidden} />
         </div>
@@ -172,9 +189,9 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   }
   if (props.narrow) {
     return (
-      <div className={css.statusStrip} data-status-strip="compact" role="status">
+      <div className={css.statusStrip} data-status-strip={PhoneStatusModel.stripMode(actionable)} role="group" aria-label="Status">
         <div ref={measureRef} hidden>
-          {[...arranged.global, ...arranged.thread].map(item => (
+          {ordered.map(item => (
             <span key={item.id} data-status-label={item.summaryLabel === false ? '' : item.label}>
               <ItemBoundary id={item.id}>
                 <item.component compact useSessions={props.useSessions} />
@@ -184,7 +201,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
         </div>
         <button
           type="button"
-          className={css.statusChip}
+          className={`${css.statusChip} dshx-hit-44`}
           aria-expanded={open}
           aria-label={summary === '' ? 'Status' : `Status: ${summary}`}
           data-status-summary={summary}
@@ -195,7 +212,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
         </button>
         {open ? (
           <div className={css.statusSheet} role="list" aria-label="Status">
-            {[...arranged.global, ...arranged.thread].map(item => (
+            {ordered.map(item => (
               <div key={item.id} role="listitem" className={css.statusSheetRow}>
                 <span className={css.statusSheetLabel}>{item.label}</span>
                 {renderItem(item, true)}
@@ -207,7 +224,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
     )
   }
   return (
-    <div className={css.statusStrip} data-status-strip="full" role="status" aria-label="Status">
+    <div className={css.statusStrip} data-status-strip="full" role="group" aria-label="Status">
       <div className={css.statusSide}>
         {arranged.global.map(item => renderItem(item, false))}
         {hidden.length === 0 ? null : <HiddenItemsControl settings={props.settings} hidden={hidden} />}
@@ -218,6 +235,31 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
     </div>
   )
 }
+
+/**
+ * The phone status sheet's rows, opened from the top bar's button (round five C2): each visible item with its name, in
+ * strip order. An item that opens a page is a button, as in the strip; hiding items stays in the strip and Settings.
+ */
+export const StatusSheetList = (props: { readonly items: readonly StatusItem[]; readonly useSessions: StatusStripProps['useSessions'] }): ReactNode => (
+  <div className={css.statusSheetList} role="list" aria-label="Status">
+    {props.items.map(item => (
+      <div key={item.id} role="listitem" className={css.statusSheetRow}>
+        <span className={css.statusSheetLabel}>{item.label}</span>
+        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
+          <ItemBoundary id={item.id}>
+            {item.open === undefined || item.controls === true ? (
+              <item.component compact useSessions={props.useSessions} />
+            ) : (
+              <button type="button" className={css.statusItemButton} onClick={item.open}>
+                <item.component compact useSessions={props.useSessions} />
+              </button>
+            )}
+          </ItemBoundary>
+        </span>
+      </div>
+    ))}
+  </div>
+)
 
 const DEFAULT_SETTINGS: StatusStripSettings = { preferences: DEFAULT_STATUS_STRIP_PREFERENCES, error: null }
 

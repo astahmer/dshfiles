@@ -257,18 +257,6 @@ export class UsageOverviewModel {
     return { percent: label === 'reset' && reset !== null ? null : percent, reset }
   }
 
-  /** "1 d 21 h", "2 h 5 min", "9 min", "now", or null without a known reset: the long form tooltips and pages read. */
-  static formatResetSpaced = (resetsAt: number | null, now: number): string | null => {
-    if (resetsAt === null || !Number.isFinite(resetsAt)) return null
-    const remaining = resetsAt - now
-    if (remaining <= 0) return 'now'
-    const minutes = Math.floor(remaining / 60_000)
-    const days = Math.floor(minutes / 1_440)
-    if (days > 0) return `${String(days)} d ${String(Math.floor((minutes % 1_440) / 60))} h`
-    if (minutes >= 60) return `${String(Math.floor(minutes / 60))} h ${String(minutes % 60)} min`
-    return `${String(Math.max(1, minutes))} min`
-  }
-
   /** The local weekday and 24-hour clock of a reset ("Thu 03:00"). */
   static resetClock = (resetsAt: number): string => {
     const date = new Date(resetsAt)
@@ -277,9 +265,9 @@ export class UsageOverviewModel {
     return `${weekday} ${clock}`
   }
 
-  /** "Resets in 1 d 21 h · Thu 03:00", "Resetting now", or null without a known reset. */
+  /** "Resets in 1d 21h · Thu 03:00", "Resetting now", or null without a known reset. */
   static resetLine = (resetsAt: number | null, now: number): string | null => {
-    const spaced = UsageOverviewModel.formatResetSpaced(resetsAt, now)
+    const spaced = UsageOverviewModel.formatResetShort(resetsAt, now)
     if (spaced === null || resetsAt === null) return null
     if (spaced === 'now') return 'Resetting now'
     return `Resets in ${spaced} · ${UsageOverviewModel.resetClock(resetsAt)}`
@@ -443,9 +431,9 @@ export class UsageOverviewModel {
     return groups.flatMap(kind => cards.filter(card => card.kind === kind).sort((left, right) => remaining(left) - remaining(right)))
   }
 
-  /** "Resets in 1 h 11 min", "Resets in 5 d 20 h", or a plain fallback. */
+  /** "Resets in 1h 11m", "Resets in 5d 20h", or a plain fallback: the strip's own duration format, so one reset never reads two ways. */
   static formatResetIn = (resetsAt: number | null, now: number): string => {
-    const spaced = UsageOverviewModel.formatResetSpaced(resetsAt, now)
+    const spaced = UsageOverviewModel.formatResetShort(resetsAt, now)
     if (spaced === null) return 'Reset time unavailable'
     return spaced === 'now' ? 'Resetting now' : `Resets in ${spaced}`
   }

@@ -15,6 +15,8 @@ import { FIXED_VIEW_ID } from '../view-pins.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
 import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
+import { PHONE_SHELL_QUERY } from '@dshfiles/plugin-ui/lib/phone-shell'
+import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 
 /** Full props composed from the strict session body contract. */
 export type ConversationSessionProps = ConversationSessionSlotProps
@@ -163,11 +165,12 @@ function SessionTitleEditor({ title, label, error, onCommit, onCancel }: Session
 }
 
 /**
- * The phone shell (thread-sidebar's stack navigation: `data-shell-phone-nav` on the document under 640px) draws its
+ * The phone shell (thread-sidebar's stack navigation: `data-shell-phone-nav` on the document under the kit's phone
+ * shell rule, @dshfiles/plugin-ui/lib/phone-shell: under 640px wide or a coarse pointer under 500px tall) draws its
  * own 44pt top bar with Back and the title. There the conversation header gives up its row (visual refresh T1.4):
  * the title is already in the bar, and the view switch and header actions move into one `⋯` sheet.
  */
-const PHONE_QUERY = '(max-width: 639.98px)'
+const PHONE_QUERY = PHONE_SHELL_QUERY
 const phoneShell = {
   subscribe: (listener: () => void): (() => void) => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => undefined
@@ -205,6 +208,10 @@ export function ConversationSessionHeader({
   // Traces and Requests as facets (thread-view-facets.tsx), the header's `⋯` opens them and the stage is always Chat.
   // A composition without a right pane keeps this view switch, so those views stay reachable.
   const facetsHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.hosted, ThreadViewsModel.hosted)
+  // dshfiles (unslop H1, DESIGN.md "the thread header is one row with one `⋯`"): where the thread menu lists this
+  // header's More actions (thread-sidebar reads them through ThreadViewsModel.headerMenu), the header draws no second
+  // `⋯`. A composition without that menu keeps the native button, so the actions stay reachable.
+  const headerMenuHosted = useSyncExternalStore(ThreadViewsModel.subscribe, ThreadViewsModel.headerMenuHosted, ThreadViewsModel.headerMenuHosted)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const phone = usePhoneShell()
   const { service: phoneMenu, snapshot: phoneMenuState } = usePhoneThreadMenu()
@@ -212,6 +219,7 @@ export function ConversationSessionHeader({
   usePhoneMenuReader(readerId === null ? null : { id: readerId, sessionId })
   const phoneToolsOpen = readerId !== null && phoneMenuState.openReader === readerId
   const phoneTools = phoneMenuState.tools.filter(tool => tool.readerId === readerId)
+  const sheetTitle = ancestry.at(-1)?.displayTitle
   const phoneMenuRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!phone || !phoneToolsOpen) return
@@ -427,6 +435,7 @@ export function ConversationSessionHeader({
         <button
           type="button"
           className={css.phoneMenuButton}
+          data-phone-thread-menu=""
           aria-label={t('session.menu')}
           aria-haspopup="dialog"
           aria-expanded={menuOpen}
@@ -451,9 +460,15 @@ export function ConversationSessionHeader({
         {/* dshfiles: data-dshx-sheet hands the sheet to the shared drag gesture (@dshfiles/plugin-ui hooks/sheet-drag). */}
         <div className={css.phoneSheet} role="dialog" aria-label={t('session.menu')} data-conversation-phone-sheet="" data-dshx-sheet="" ref={phoneMenuRef} tabIndex={-1}>
           <span className={css.phoneGrabber} aria-hidden />
+          {/* dshfiles (council round 35 P2): the sheet names its thread, as the row menu's sheet does (round 34, B9). */}
+          {sheetTitle === undefined ? null : <p className={css.phoneSheetTitle} data-phone-sheet-title="">{sheetTitle}</p>}
           {views}
+          {/* The header's chips (the subagent count, dev servers), then its utilities as rows: the thread's place ("In the
+              project ›") and every thread verb behind one "More thread actions ›" row, never a bare nested ⋯. */}
           <div className={css.phoneSheetActions}>
             {renderSlot('conversation.session.header.actions', {})}
+          </div>
+          <div className={css.phoneSheetRows} data-phone-sheet-rows="">
             {renderSlot('conversation.session.header.utilities', {})}
           </div>
           {phoneTools.length > 0 && (
@@ -463,10 +478,21 @@ export function ConversationSessionHeader({
                   key={tool.id}
                   type="button"
                   className={css.phoneSheetTool}
+                  // The label and its detail are separate spans: the name keeps a pause between them ("Tools, @dsh").
+                  aria-label={tool.detail === undefined ? undefined : `${tool.label}, ${tool.detail}`}
                   data-phone-thread-tool-proxy=""
                   onClick={() => { phoneMenu?.pick(tool) }}
                 >
-                  {tool.label}
+                  {tool.icon === undefined ? null : (
+                    <span className={css.phoneSheetToolIcon} aria-hidden="true" data-phone-sheet-tool-icon="">{tool.icon}</span>
+                  )}
+                  <span className={css.phoneSheetToolLabel}>{tool.label}</span>
+                  {tool.detail === undefined ? null : (
+                    <span className={css.phoneSheetToolDetail} data-phone-sheet-tool-detail="">{tool.detail}</span>
+                  )}
+                  {tool.opens === true ? (
+                    <ChevronRightIcon aria-hidden="true" className={css.phoneSheetToolChevron} data-phone-sheet-tool-chevron="" />
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -570,7 +596,7 @@ export function ConversationSessionHeader({
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.changes', {})}
               {renderSlot('conversation.session.header.utilities', {})}
-              {renderFactorySlot('contextMenu.button', {
+              {headerMenuHosted ? null : renderFactorySlot('contextMenu.button', {
                 target: { kind: 'sessionHeader', value: { sessionId } },
                 label: t('header.more'), className: css.headerMenuButton, size: 'sm',
               })}

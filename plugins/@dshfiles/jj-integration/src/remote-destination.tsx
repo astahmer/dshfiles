@@ -222,10 +222,11 @@ export const prepareRemoteFolder = async (api: MultiHostClient, destination: Run
     method: 'provision',
     input: { workspaceId: opened.workspaceId, isolate: destination.isolate ?? true, ...(destination.base !== undefined && { base: destination.base }) },
   })
-  if (!provisioned.ok) throw new Error(`${provisioned.message} (${provisioned.code})`)
+  // The code stays with the error for diagnostics; the person reads the Host's sentence.
+  if (!provisioned.ok) throw new Error(provisioned.message, { cause: provisioned.code })
   const workspaceId = Schema.decodeUnknownSync(provisionedSchema)(provisioned.value).workspaceId
   const status = await api.runtimeStatus({ runtimeId: destination.runtimeId })
   const path = status.ok ? status.workspaces.find(workspace => workspace.workspaceId === workspaceId)?.path : undefined
-  if (path === undefined) throw new Error('The host created the thread workspace but did not report its folder.')
+  if (path === undefined) throw new Error('The host created the workspace but did not report its folder. Send again.')
   return path
 }

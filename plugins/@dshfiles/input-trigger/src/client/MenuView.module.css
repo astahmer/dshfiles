@@ -121,15 +121,15 @@
   line-height: 18px;
 }
 
-/* Right-aligned so every description ends at the same edge and the titles
-   read as one left column. */
+/* dshfiles: left-aligned, so every description starts after its title. Right-aligned, a short one sat at the row's
+   edge while a long one, truncated, filled the row from the title: two alignments in one list. */
 .itemDescription {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;
@@ -311,5 +311,55 @@
   .itemIcon svg {
     width: 18px;
     height: 18px;
+  }
+}
+
+/*
+ * Touch (unslop phone 3): the composer's other pickers are 44px sheets, so this list matches them (as the app sheet
+ * on a phone, or anchored above the composer while the keyboard is up; focus never leaves the field, so typing still
+ * filters). Rows are 44px at the comfortable UI size, every caption reads as meta (13px on a phone, never 10-11px),
+ * the Tab key hint goes, and the drill chevron gets a 44px hit area.
+ */
+@media (pointer: coarse) {
+  .item {
+    min-height: 44px;
+    font-size: var(--dshx-density-text-ui, 15px);
+    line-height: 22px;
+  }
+
+  .sectionTitle,
+  .groupTitle,
+  .crumb,
+  .itemDescription,
+  .itemAlias {
+    font-size: var(--dshx-density-text-meta, 13px);
+    line-height: 18px;
+  }
+
+  .item.active .drillHintText,
+  .item.active .drillHint {
+    display: none;
+  }
+
+  .drill {
+    position: relative;
+  }
+
+  .drill::after {
+    content: '';
+    position: absolute;
+    inset: -13px;
+  }
+
+  .skeletonRow {
+    min-height: 44px;
+  }
+}
+
+/* Under the phone shell, while the keyboard keeps the list anchored above the composer (the kit's sheet rule sets
+   its own top-only radius otherwise), the list takes the sheet radius (DESIGN.md: 16px phone sheets). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .menu {
+    border-radius: var(--dsw-radius-panel, 16px);
   }
 }

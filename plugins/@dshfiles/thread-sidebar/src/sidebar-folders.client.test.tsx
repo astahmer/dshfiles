@@ -120,7 +120,9 @@ describe('Sidebar folders on the rail (b:952m)', () => {
       within(rail)
         .getAllByRole('tab')
         .map(tab => tab.textContent),
-    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Review', 'Settings'])
+    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Review', ''])
+    // The bottom cluster is glyphs only (council round 4 B6): Settings is found by its name.
+    expect(within(rail).getAllByRole('tab').at(-1)?.getAttribute('aria-label')).toBe('Settings')
     fireEvent.click(screen.getByRole('tab', { name: 'Review' }))
     const rows = screen.getByRole('navigation', { name: 'Review pages' })
     expect(

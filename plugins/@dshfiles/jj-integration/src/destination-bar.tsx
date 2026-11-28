@@ -267,7 +267,7 @@ const NotARepository = (props: { readonly t: JjIntegrationTranslate; readonly pa
           <TooltipContent className="dshx:max-w-72">{hint}</TooltipContent>
         </Tooltip>
       )}
-      {failure === null ? null : <span className="dshx:text-xs dshx:text-destructive">{props.t('enableJujutsuFailed', { message: failure })}</span>}
+      {failure === null ? null : <span role="alert" className="dshx:text-xs dshx:text-destructive">{props.t('enableJujutsuFailed', { message: failure })}</span>}
     </>
   )
 }
@@ -445,7 +445,15 @@ export const DestinationBar = (props: {
             <Tooltip>
               <TooltipTrigger asChild>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" className={chip} disabled={toggle.busy} aria-label={segmentName} data-run-segment="workspace">
+                  <Button
+                    variant="ghost"
+                    className={chip}
+                    disabled={toggle.busy}
+                    aria-label={segmentName}
+                    data-run-segment="workspace"
+                    // The composer's location chip names the working location only when it differs from this default.
+                    data-location-default={isolated === isolateByDefault ? '' : undefined}
+                  >
                     {isolated ? <GitBranchIcon className="dshx:size-3.5" /> : <FolderIcon className="dshx:size-3.5" />}
                     <span className="dshx:min-w-0 dshx:truncate">{segmentLabel}</span>
                     {/* The two spans are one flex row, so a real space only reaches textContent: rich-composer joins
@@ -564,7 +572,8 @@ export const DestinationBar = (props: {
             </Button>
           </span>
         ) : null}
-        {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
+        {/* An alert, so the composer's location chip opens its panel to show it (council round 16 C1). */}
+        {toggle.error === null ? null : <span role="alert" className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
       </div>
     </TooltipProvider>
   )

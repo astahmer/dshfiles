@@ -348,6 +348,8 @@ export interface ChatViewInjected {
     imageGalleryScope: ObservableSnapshot<ImageGalleryScope>
     /** Where opening a thread with an unseen final answer lands. */
     unreadLanding: ObservableSnapshot<UnreadLanding>
+    /** dshfiles: key of the question or approval this thread waits on; answering it follows the reply (F6). */
+    pendingInteraction: ObservableSnapshot<string | null>
     /** Inline shape of the draft's annotations in the transcript. */
     annotationMarks: ObservableSnapshot<AnnotationMarks>
     /** Whether Annotate asks for the comment at the selection. */

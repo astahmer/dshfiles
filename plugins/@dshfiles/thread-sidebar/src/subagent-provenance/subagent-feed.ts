@@ -4,7 +4,14 @@ import type { SessionEventLikeEntry, SessionEventSource } from '@deepseek-ai/dsh
  * What the transcript's subagent preview shows of a child thread. A subagent is a conversation, not a job: it works,
  * goes idle and can be followed up, so it has its own states and never reuses the job lifecycle words.
  */
-export type SubagentPreviewState = 'starting' | 'failed-to-start' | 'working' | 'finished' | 'interrupted' | 'idle'
+export type SubagentPreviewState = 'starting' | 'failed-to-start' | 'working' | 'finished' | 'failed' | 'interrupted'
+
+/**
+ * How a child's latest closed turn ended (round 21 D4): it completed, it failed (an error or the output-token limit), or
+ * it stopped (the user or its parent stopped it, a gate refused it, a crash cut it off). Every subagent surface words
+ * it the same way: Done, Failed, Stopped.
+ */
+export type SubagentTerminal = 'completed' | 'failed' | 'stopped'
 
 export interface SubagentFeed {
   /** The tool the child is in now. */
@@ -12,8 +19,8 @@ export interface SubagentFeed {
   readonly toolCalls: number
   /** The tail of the child's latest answer, as it streams and once settled. */
   readonly text: string
-  /** Whether the child's latest closed turn completed; undefined until the window shows one. */
-  readonly lastTurnCompleted: boolean | undefined
+  /** How the child's latest closed turn ended; undefined until the window shows one, and while a turn is open. */
+  readonly lastTurnEnd: SubagentTerminal | undefined
 }
 
 const TEXT_TAIL = 2_000
@@ -25,6 +32,7 @@ const tail = (text: string): string => (text.length > TEXT_TAIL ? text.slice(-TE
 interface WirePayload {
   readonly chunk?: unknown
   readonly content?: unknown
+  readonly kind?: unknown
   readonly message?: unknown
   readonly name?: unknown
   readonly reason?: unknown
@@ -46,7 +54,20 @@ const messageText = (message: { readonly content: readonly unknown[] }): string 
   return text === '' ? undefined : text
 }
 
-const EMPTY: SubagentFeed = { tool: undefined, toolCalls: 0, text: '', lastTurnCompleted: undefined }
+const EMPTY: SubagentFeed = { tool: undefined, toolCalls: 0, text: '', lastTurnEnd: undefined }
+
+/** `turn/end` reasons (DSH's `TurnEndReasonMap`) that are a failure rather than a stop. */
+const FAILED_TURN_END_KINDS = new Set<unknown>(['error', 'max-tokens'])
+
+/**
+ * A `turn/end` payload's reason as a terminal state. DSH writes `{ kind: 'completed' | 'error' | 'aborted' | … }`;
+ * reading the reason as a bare string made every real turn end look stopped.
+ */
+const terminalOfTurnEnd = (data: WirePayload): SubagentTerminal => {
+  const kind = isRecord(data.reason) ? data.reason.kind : data.reason
+  if (kind === 'completed') return 'completed'
+  return FAILED_TURN_END_KINDS.has(kind) ? 'failed' : 'stopped'
+}
 
 /** Wire payloads reach the client unnarrowed for this plugin's purposes, so each field is read defensively. */
 const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFeed => {
@@ -68,9 +89,9 @@ const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFe
       return text === undefined ? feed : { ...feed, text: tail(text) }
     }
     case 'turn/start':
-      return { ...feed, tool: undefined, text: '', lastTurnCompleted: undefined }
+      return { ...feed, tool: undefined, text: '', lastTurnEnd: undefined }
     case 'turn/end':
-      return { ...feed, tool: undefined, lastTurnCompleted: data.reason === 'completed' }
+      return { ...feed, tool: undefined, lastTurnEnd: terminalOfTurnEnd(data) }
     default:
       return feed
   }
@@ -79,13 +100,35 @@ const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFe
 export const SubagentFeedModel = {
   empty: EMPTY,
 
-  /** The child session a settled delegation call started. */
-  childIdOfResult(text: string | undefined): string | undefined {
+  /** The name a settled delegation call gives its child: core answers `started subagent agent-1`, the child's handle. */
+  childNameOfResult(text: string | undefined): string | undefined {
     return text?.match(/^started subagent (\S+)$/)?.[1]
+  },
+
+  /**
+   * The child session behind that name, from the parent's catalog. The result names the handle, not the session, so
+   * reading it as a session id found no status and the row said Idle while the child worked. An older result that
+   * named the session itself still resolves.
+   */
+  childOf(catalog: readonly { readonly id: string; readonly name?: string }[] | undefined, name: string | undefined): string | undefined {
+    if (name === undefined) return undefined
+    return catalog?.find(entry => entry.name === name || entry.id === name)?.id ?? name
   },
 
   fold(feed: SubagentFeed, entries: readonly SessionEventLikeEntry[]): SubagentFeed {
     return entries.reduce(foldEntry, feed)
+  },
+
+  /**
+   * A child's terminal state from what every list surface holds without opening the child (round 21 D4): the Host's
+   * failed-turn record (`useFailedTurns`, kept until a later turn ends without failing) and the native `subagentTiming`
+   * projection's `lastTurnCompleted`. A running child has none.
+   */
+  terminalOf(input: { readonly running: boolean; readonly failedTurn: boolean; readonly lastTurnCompleted: boolean | undefined }): SubagentTerminal | undefined {
+    if (input.running) return undefined
+    if (input.failedTurn) return 'failed'
+    if (input.lastTurnCompleted === undefined) return undefined
+    return input.lastTurnCompleted ? 'completed' : 'stopped'
   },
 
   stateOf(input: {
@@ -93,13 +136,14 @@ export const SubagentFeedModel = {
     readonly failed: boolean
     readonly childId: string | undefined
     readonly running: boolean
-    readonly lastTurnCompleted: boolean | undefined
-  }): SubagentPreviewState {
+    readonly terminal: SubagentTerminal | undefined
+  }): SubagentPreviewState | undefined {
     if (input.failed) return 'failed-to-start'
     if (input.childId === undefined) return 'starting'
     if (input.running) return 'working'
-    if (input.lastTurnCompleted === undefined) return 'idle'
-    return input.lastTurnCompleted ? 'finished' : 'interrupted'
+    // Neither a status nor a closed turn is known yet: say nothing rather than "Idle", which a child never is.
+    if (input.terminal === undefined) return undefined
+    return input.terminal === 'completed' ? 'finished' : input.terminal === 'failed' ? 'failed' : 'interrupted'
   },
 }
 

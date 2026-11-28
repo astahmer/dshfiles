@@ -164,7 +164,8 @@ export function ClarifyPrompt({
               <Button
                 size="icon"
                 aria-label="Send"
-                className="dshx:rounded-full dshx:bg-foreground dshx:text-background dshx:hover:bg-foreground/90"
+                // The primary fill (council round 10 A7): L 0.88 in dark, never the near-white ink.
+                className="dshx:rounded-full"
                 onClick={onSubmit}
               >
                 <ArrowUpIcon aria-hidden />

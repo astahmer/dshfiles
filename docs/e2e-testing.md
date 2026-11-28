@@ -106,7 +106,9 @@ cell and a native entry was still registered behind it.
 ## Feature catalogs
 
 Each package declares its user-visible features in `dshx.features.json`
-(schema in `tooling/dshx/packages/dshx/src/project/features.ts`): id, summary,
+(schema in `tooling/dshx/packages/dshx/src/project/features.ts`): id, title,
+summary (one plain sentence for the person using the feature, shown in Getting
+started), optional details (engineering notes for developers, never rendered),
 surfaces, configuration keys, states, failure modes, external dependencies, and
 `verification` entries of kind `gherkin`, `unit-test`, `host-test` or
 `not-applicable`. A scenario links back with `@scenario:<id>` on the Scenario
@@ -128,7 +130,8 @@ onboarding's Getting started. `dshx create` scaffolds a
 catalog with a new plugin (`create-dshx/src/templates.ts`), so a plugin starts
 linked from its manifest's `dshx.features`.
 
-`features:check` fails on a bundle feature with neither a scenario nor a
+`features:check` fails on a summary over 160 characters or with a semicolon or
+a backtick, a bundle feature with neither a scenario nor a
 `not-applicable` reason, a library feature without a unit test, a missing,
 duplicated or misplaced tag, a test name no longer found in its file, an
 orphan tag, a UI plugin (a feature lists a `client` surface) with no

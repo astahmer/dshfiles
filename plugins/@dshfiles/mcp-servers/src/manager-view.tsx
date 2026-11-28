@@ -1,4 +1,4 @@
-import { GlobeIcon, LibraryIcon, RefreshCwIcon, SquareTerminalIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { GlobeIcon, LibraryIcon, PlusIcon, RefreshCwIcon, SquareTerminalIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
   AlertDialog,
@@ -14,7 +14,6 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useApi } from '@dshfiles/dshx/client'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -24,11 +23,12 @@ import { CatalogBrowser, SignInNotice, type CustomServerRequest } from './catalo
 import { mcpServersApi, type ServerDraft, type ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 import { PreferencesForm } from './preferences-form.js'
-import { ServerEditor, ServerEditorDialog } from './server-editor.js'
+import { ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { ServerSelectionModel } from './server-selection.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { McpServerStatusModel } from './server-status.js'
+import { ServerStatusMark } from './server-status-mark.js'
 
 interface EditorState {
   readonly key: number
@@ -41,7 +41,6 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
   const actions = useServerActions()
   const api = useApi(mcpServersApi)
   const [editor, setEditor] = useState<EditorState>({ key: 0, values: McpServerFormModel.blankServerForm(), opened: false })
-  const editorRef = useRef<HTMLDivElement>(null)
   const [pendingRemoval, setPendingRemoval] = useState<readonly ServerView[]>([])
   const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
   const [batchPending, setBatchPending] = useState(false)
@@ -59,10 +58,6 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
       return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
     })
   }, [orderedServerIds])
-
-  useEffect(() => {
-    if (editor.opened) editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [editor.key, editor.opened])
 
   const openEditor = (values: ServerFormValues): void => {
     actions.resetErrors()
@@ -112,9 +107,15 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
   return (
     <Page
       scroll
-      heading={t('pageTitle')}
+      heading={t('title')}
       description={t('subtitle')}
-      // The add-server form's submit is this page's one primary action, so the header carries secondary ones only.
+      // The list is the page; adding a server is a verb, so its form opens from the one primary action.
+      primaryAction={{
+        id: 'add-server',
+        label: t('addServer'),
+        icon: <PlusIcon aria-hidden />,
+        onSelect: () => openEditor(McpServerFormModel.blankServerForm()),
+      }}
       actions={[
         { id: 'browse', label: t('browseCatalog'), icon: <LibraryIcon aria-hidden />, onSelect: () => setBrowsing(true) },
         { id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, pending: snapshot.isFetching, onSelect: () => void snapshot.refetch() },
@@ -127,10 +128,6 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
         </Alert>
       ) : null}
       <SignInNotice actions={actions} t={t} />
-
-      <div className="dshx:scroll-mt-4" ref={editorRef}>
-        <ServerEditor defaultValues={editor.values} key={editor.key} onCancel={editor.opened ? resetEditor : undefined} onSave={save} t={t} />
-      </div>
 
       <PageSection heading={t('configuredServers')} meta={snapshot.data ? `${enabledCount} ${t('enabledCount')}` : '…'}>
         {servers.length === 0 ? null : (
@@ -220,6 +217,19 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
         snapshot={snapshot.data}
         t={t}
       />
+      {editor.opened ? (
+        <ServerEditorDialog
+          description={editor.values.id === '' ? t('customSubtitle') : t('editSubtitle')}
+          hint={undefined}
+          key={editor.key}
+          onClose={resetEditor}
+          onSave={save}
+          open
+          t={t}
+          title={editor.values.id === '' ? t('add') : `${t('edit')} · ${editor.values.name}`}
+          values={editor.values}
+        />
+      ) : null}
       {custom === null ? null : (
         <ServerEditorDialog
           hint={custom.hint}
@@ -282,13 +292,6 @@ interface ServerItemProps {
   readonly onSignOut: () => void
 }
 
-/** Server states on the shared vocabulary; the lifecycle line keeps the exact client state as text. */
-const serverStatus = (server: ServerView): WorkStatus => {
-  if (server.clientLifecycle === 'start-failed') return 'failed'
-  if (server.enabled && (server.oauth === 'needs-sign-in' || server.configuration !== 'ready')) return 'needs-you'
-  if (server.clientLifecycle === 'starting') return 'working'
-  return 'idle'
-}
 
 const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
   const processText = McpServerStatusModel.localProcessText({ server, t })
@@ -297,8 +300,6 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
   return (
     <EntityRow
       role="listitem"
-      status={serverStatus(server)}
-      statusDecorative
       selected={props.selected}
       leading={
         <input
@@ -322,7 +323,12 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
           className="dshx:size-3.5 dshx:shrink-0 dshx:accent-[var(--color-info)]"
         />
       }
-      heading={<span className="dshx:font-medium">{server.name}</span>}
+      heading={
+        <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <ServerStatusMark mark={McpServerStatusModel.lifecycleMark(server)} />
+          <span className="dshx:font-medium">{server.name}</span>
+        </span>
+      }
       meta={
         <>
           {server.enabled ? null : <Badge variant="muted">{t('disabled')}</Badge>}

@@ -1,6 +1,6 @@
 # AI Accounts
 
-![Reference-faithful Models and inline settings](docs/screenshots/reference-dashboard-models.png)
+![The Models tab: the models table, with the account defaults one link away on Settings](docs/screenshots/reference-dashboard-models.png)
 
 [Settings](docs/screenshots/reference-dashboard-settings.png) · [Usage](docs/screenshots/reference-dashboard-usage.png) · [Design-to-implementation checklist](docs/reference-dashboard.md)
 
@@ -137,7 +137,7 @@ New Codex and Claude profiles use private homes under the active accounts store,
 
 Agent tools share the setup/save/order APIs. Starting or cancelling sign-in requires a user request; cancellation has an explicit opt-in. Device codes and approval URLs are returned only to the browser, never raw agent/plugin responses. There is no intercepted Claude.ai OAuth or fabricated token-validity control.
 
-**Sign out** is a separate, explicitly confirmed operation that preserves the account profile and preferences. Supported scopes are an exact private Codex home, an exact Claude Code directory, an account-owned Copilot grant, or a sole-account private DSH key reference. Unsupported shared/global CLI logins and externally owned references show a disabled action with the reason instead of deleting outside credentials. Codex logout uses the official CLI and an unsigned private tombstone to prevent shared-home reseeding. A canonical-home owner excludes materialization and the complete token-refresh read/modify/persist sequence during logout; metadata/login changes share an account operation guard. Filesystem ownership, permissions and link guards are checked before mutation. Automated verification uses fake executables only; no real provider sign-out is claimed.
+**Sign out** (in the account actions menu, ⋯) is a separate, explicitly confirmed operation that preserves the account profile and preferences. Supported scopes are an exact private Codex home, an exact Claude Code directory, an account-owned Copilot grant, or a sole-account private DSH key reference. Unsupported shared/global CLI logins and externally owned references show the reason in the confirmation, with Sign out disabled, instead of deleting outside credentials. Codex logout uses the official CLI and an unsigned private tombstone to prevent shared-home reseeding. A canonical-home owner excludes materialization and the complete token-refresh read/modify/persist sequence during logout; metadata/login changes share an account operation guard. Filesystem ownership, permissions and link guards are checked before mutation. Automated verification uses fake executables only; no real provider sign-out is claimed.
 
 Automated verification uses fake CLI/device responses and a loopback provider. It does not approve real OpenAI/GitHub consent. Installed official CLI compatibility and real provider approval remain separate, human-dependent checks. The third-party Claude.ai OAuth boundary follows [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance.md); this plugin keeps the unmodified official CLI path separate.
 
@@ -565,7 +565,7 @@ unreset, and the reserve lasts, requests on that account go out as
 `gpt-reserve` (Settings › AI Accounts › Codex Luna Reserve, on by default);
 the picker and transcript keep the model you chose.
 
-Failure recovery (Settings › AI Accounts › Failure recovery) decides what a
+Failure recovery (Settings › AI Accounts › Failure recovery, behind **Edit**) decides what a
 failed request on an account route does, per kind: connection failure
 (resets, timeouts, 5xx, Envoy replay-buffer overflow, an overloaded provider such as
 Codex's "Our servers are currently overloaded"), rate limit, usage
@@ -604,7 +604,7 @@ same-provider fail-over step above: a failure whose kind fails over (connection,
 rate limit, exhausted by default) moves the work to the next enabled, healthy
 rung after the current one, never one the interrupted work already tried. Sticky
 distribution never walks the chain, except for a stalled stream: with **Fall
-back on stalled streams** (Settings › AI Accounts › Failure recovery,
+back on stalled streams** (Settings › AI Accounts › Failure recovery › Edit,
 `stalledStreamFallback`, off by default, needs transport fail-over on) a request
 that sends no data until its idle timeout (`pi-ai stream idle timeout after …ms`)
 moves to the thread's stored chain after its transport retries, under any

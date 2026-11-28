@@ -10,8 +10,8 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
-import { PaletteRules } from './palette.js'
+import { Command, createApiClient, createRegisteredApiClient, defineClient, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { PaletteRules, type ThreadCandidate } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
@@ -24,6 +24,8 @@ import { ContributedCommandsModel } from './contributed-commands.js'
 import {
   CommandPalette,
   PaletteActions,
+  PaletteProjectColors,
+  PaletteThreadStatuses,
   type CommandPaletteState,
   type PaletteAction,
   type PaletteActionContext,
@@ -36,6 +38,12 @@ import { ThreadPalette } from './thread-palette.js'
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
 
 /** The web new-thread chord (plan Q2 T2.5): Cmd+T and Cmd+N belong to the browser tab. */
+const noStatusSnapshot = (): null => null
+const noStatusSubscribe =
+  (_listener: () => void): (() => void) =>
+  () =>
+    undefined
+
 const NEW_THREAD_CHORD = 'Mod+Shift+O'
 /** Sent by the composer (rich-composer's InputBar) when a send should be followed by a fresh new-thread draft. */
 const START_NEW_THREAD_EVENT = 'dshfiles:start-new-thread'
@@ -196,6 +204,24 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     [archivedSessionIds, projectTitleOf, sessions, sessionsById, workspaceBySession, workspacePathById],
   )
   const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
+  // The thread list resolves project colours (a picked colour, else its own palette); the palette borrows the latest source.
+  const projectColorSource = useRegistry(PaletteProjectColors).at(-1)
+  const projectColorOf = useMemo(() => {
+    if (projectColorSource === undefined) return undefined
+    const repositoryById = new Map<string, string | undefined>(threadEntries.map(entry => [entry.thread.id, entry.repository]))
+    return (thread: ThreadCandidate) => projectColorSource.colorOf({ path: repositoryById.get(thread.id), title: thread.project })
+  }, [projectColorSource, threadEntries])
+  // The thread list's status per thread (glyph and word); without a provider rows keep their own running fact.
+  const threadStatusSource = useRegistry(PaletteThreadStatuses).at(-1)
+  const threadStatuses = useSyncExternalStore(
+    threadStatusSource?.subscribe ?? noStatusSubscribe,
+    threadStatusSource?.getSnapshot ?? noStatusSnapshot,
+    threadStatusSource?.getSnapshot ?? noStatusSnapshot,
+  )
+  const threadStatusOf = useMemo(
+    () => (threadStatuses === null ? undefined : (thread: ThreadCandidate) => threadStatuses.get(thread.id)),
+    [threadStatuses],
+  )
   const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
   const currentRepository = threadsScope === 'project' ? repositoryOf(askWorkspaceId) : undefined
   const projectThreads = useMemo(
@@ -223,6 +249,8 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       mode={mode}
       threads={threads}
       {...(projectThreads === undefined ? {} : { projectThreads })}
+      {...(projectColorOf === undefined ? {} : { projectColorOf })}
+      {...(threadStatusOf === undefined ? {} : { threadStatusOf })}
       context={context}
       additionalActions={workspaceActions}
       recentLimit={recentLimit}
@@ -284,6 +312,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         askPending: props.translate('commandPaletteAskPending'),
         askSend: props.translate('commandPaletteAskSend'),
         askExit: props.translate('commandPaletteAskExit'),
+        cancel: props.translate('commandPaletteCancel'),
         askFailed: props.translate('commandPaletteAskFailed'),
         contentSearching: props.translate('commandPaletteContentSearching'),
         contentUnavailable: props.translate('commandPaletteContentUnavailable'),
@@ -359,9 +388,9 @@ export default defineClient({
         return client.findThreads === undefined ? undefined : client.findThreads(input, { signal })
       },
       native: async (query, signal) => {
-        if (typeof ctx.sessions.search !== 'function') throw new Error('Thread content search is unavailable.')
+        if (typeof ctx.sessions.search !== 'function') throw new Error('This DSH cannot search thread content. Update DSH to turn it on.')
         const result = await ctx.sessions.search(query, signal)
-        if (!result.ok) throw new Error('Thread content search failed.')
+        if (!result.ok) throw new Error('Thread content search failed. Search again.')
         return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
       },
     })

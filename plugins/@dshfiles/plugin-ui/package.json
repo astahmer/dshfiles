@@ -21,6 +21,10 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/code-indent": {
+      "types": "./src/lib/code-indent.ts",
+      "default": "./src/lib/code-indent.ts"
+    },
     "./lib/stack-frames": {
       "types": "./src/lib/stack-frames.ts",
       "default": "./src/lib/stack-frames.ts"
@@ -36,6 +40,26 @@
     "./lib/format-duration": {
       "types": "./src/lib/format-duration.ts",
       "default": "./src/lib/format-duration.ts"
+    },
+    "./lib/format-clock-time": {
+      "types": "./src/lib/format-clock-time.ts",
+      "default": "./src/lib/format-clock-time.ts"
+    },
+    "./lib/phone-shell": {
+      "types": "./src/lib/phone-shell.ts",
+      "default": "./src/lib/phone-shell.ts"
+    },
+    "./lib/error-copy": {
+      "types": "./src/lib/error-copy.ts",
+      "default": "./src/lib/error-copy.ts"
+    },
+    "./lib/work-count": {
+      "types": "./src/lib/work-count.ts",
+      "default": "./src/lib/work-count.ts"
+    },
+    "./lib/host-connection": {
+      "types": "./src/lib/host-connection.ts",
+      "default": "./src/lib/host-connection.ts"
     },
     "./motion": {
       "types": "./src/motion/index.ts",
@@ -74,6 +98,10 @@
       "types": "./src/theme/gallery.ts",
       "default": "./src/theme/gallery.ts"
     },
+    "./theme/identity": {
+      "types": "./src/theme/identity-palette.ts",
+      "default": "./src/theme/identity-palette.ts"
+    },
     "./theme/readability": {
       "types": "./src/theme/readability.ts",
       "default": "./src/theme/readability.ts"
@@ -106,6 +134,10 @@
       "types": "./src/diff.tsx",
       "default": "./src/diff.tsx"
     },
+    "./diff-parse": {
+      "types": "./src/diff-parse.ts",
+      "default": "./src/diff-parse.ts"
+    },
     "./virtual": {
       "types": "./src/virtual.ts",
       "default": "./src/virtual.ts"
@@ -113,6 +145,10 @@
     "./testing/host-primitives": {
       "types": "./testing/host-primitives.tsx",
       "default": "./testing/host-primitives.tsx"
+    },
+    "./testing/boot-imports": {
+      "types": "./testing/boot-imports.ts",
+      "default": "./testing/boot-imports.ts"
     },
     "./package.json": "./package.json"
   },

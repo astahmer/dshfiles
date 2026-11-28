@@ -14,6 +14,16 @@ interface SessionRow {
 
 const ICONS = { explain: BookOpenIcon, 'rough-edge': BugIcon, test: FlaskConicalIcon } as const
 
+/**
+ * Each starter's glyph in its own identity tone (round five C4, council round 3; council round 16 C1: no tile behind
+ * it). Identity 5 (green) is never used: it sits beside the success hue.
+ */
+const TILES = {
+  explain: 'dshx:text-identity-7',
+  'rough-edge': 'dshx:text-identity-3',
+  test: 'dshx:text-identity-2',
+} as const satisfies Record<StarterTask['id'], string>
+
 /** Three first tasks for one project, or for "this project" when none is named; each one only reads or proposes first. */
 const list = (input: { readonly project: string | undefined }): readonly StarterTask[] => {
   const project = input.project ?? 'this project'
@@ -36,13 +46,20 @@ export class StarterTasks {
   static readonly beforeFirstThread = beforeFirstThread
 }
 
-// The hero's flat suggestion cards (thread-sidebar's Resume / Review / Inbox): a hairline, 48pt rows on touch.
-const CARD =
-  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&_svg]:size-4 dshx:[&_svg]:flex-none'
+// Council round 16 C1: the starters are lighter than Resume and Inbox (which keep the filled hero chip): a text-and-icon
+// action with no fill, the label in secondary ink, 32px tall with 8px padding and a 6px gap; the hover steps to the
+// selected surface and the label to ink; 44pt on touch. The rich-composer hero leaves `[data-hero-card^='starter-']`
+// unfilled.
+const CHIP =
+  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border-0 dshx:bg-transparent dshx:px-2 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
+
+const TILE = 'dshx:grid dshx:size-4 dshx:flex-none dshx:place-items-center dshx:[&_svg]:size-3.5'
 
 /**
- * The new-thread hero's first tasks (calm-onboarding C2): one sentence and three cards for the project on screen, only
- * until the first thread has a message. A card puts its prompt in the composer and never sends it.
+ * The new-thread hero's suggested tasks (calm-onboarding C2, round five B8): three light actions for the project on
+ * screen, beside Resume and Inbox. Until the first thread has a message one sentence explains them; after that the
+ * chips stay on their own, so a new thread always offers a start. A chip puts its prompt in the composer and never sends
+ * it.
  */
 export const StarterTaskCards = (props: {
   readonly project: string | null
@@ -50,21 +67,31 @@ export const StarterTaskCards = (props: {
   readonly insert: (text: string) => void
 }): ReactNode => {
   const project = props.project
-  if (project === null || !props.beforeFirstThread) return null
+  if (project === null) return null
   return (
     <>
-      <p className="dshx-root dshx:w-full dshx:text-center dshx:text-sm dshx:text-muted-foreground" data-starter-tasks="">
-        Pick a first task for {project}; it goes into the composer and nothing is sent.
-      </p>
-      {StarterTasks.list({ project }).map(task => {
-        const Icon = ICONS[task.id]
-        return (
-          <button className={CARD} data-hero-card={`starter-${task.id}`} key={task.id} onClick={() => props.insert(task.prompt)} type="button">
-            <Icon aria-hidden="true" />
-            <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{task.label}</span>
-          </button>
-        )
-      })}
+      {props.beforeFirstThread ? (
+        <p className="dshx-root dshx:w-full dshx:text-center dshx:text-sm dshx:text-muted-foreground" data-starter-tasks="">
+          Pick a first task for {project}; it goes into the composer and nothing is sent.
+        </p>
+      ) : null}
+      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line), 14px under it (the
+          hero's spacing, council round 14 C4); the row wraps when the column is narrow. */}
+      <div className="dshx-root dshx:flex dshx:basis-full dshx:flex-wrap dshx:justify-center dshx:gap-2 dshx:order-1" data-starter-row="">
+        {StarterTasks.list({ project })
+          .slice(0, 3)
+          .map(task => {
+            const Icon = ICONS[task.id]
+            return (
+              <button className={CHIP} data-hero-card={`starter-${task.id}`} key={task.id} onClick={() => props.insert(task.prompt)} type="button">
+                <span aria-hidden="true" className={`${TILE} ${TILES[task.id]}`} data-starter-tile="">
+                  <Icon />
+                </span>
+                <span className="dshx:min-w-0 dshx:truncate">{task.label}</span>
+              </button>
+            )
+          })}
+      </div>
     </>
   )
 }

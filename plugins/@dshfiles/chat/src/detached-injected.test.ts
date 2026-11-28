@@ -42,6 +42,7 @@ const annotationQuickComment: ObservableSnapshot<AnnotationQuickComment> = {
 
 const connectionState = { getSnapshot: () => undefined, subscribe: () => () => {} }
 const interactionIds: ObservableSnapshot<readonly string[]> = { getSnapshot: () => [], subscribe: () => () => {} }
+const pendingInteraction: ObservableSnapshot<string | null> = { getSnapshot: () => null, subscribe: () => () => {} }
 const fileDrag = { prepare: () => Promise.reject(new Error('detached')), reportFailure: () => {} }
 
 describe('detached Chat injection', () => {
@@ -54,7 +55,10 @@ describe('detached Chat injection', () => {
   })
 
   it('keeps every view action inert so a gap renders nothing and never throws', async () => {
-    const view = detachedView({ presentation, interactionIds, imageGalleryScope, unreadLanding, annotationMarks, annotationQuickComment }, fileDrag)
+    const view = detachedView(
+      { presentation, interactionIds, imageGalleryScope, unreadLanding, pendingInteraction, annotationMarks, annotationQuickComment },
+      fileDrag,
+    )
     expect(() => {
       view.openExternalLink('https://example.invalid')
       view.loadOlder()

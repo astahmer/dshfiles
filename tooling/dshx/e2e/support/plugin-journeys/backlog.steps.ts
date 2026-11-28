@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
-import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
+import { backlogLabel, backlogRef, withBacklogRefs, openBacklogViewMenu, runBacklogPageAction, openBacklogCapture } from './backlog-refs.js'
 import {
   finishJourneyAssertions,
   openSettingsDialog,
@@ -157,11 +157,11 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   // A loaded machine can raise the provider-setup modal after the boot step stopped waiting; it hides the panel from role queries.
   await StartupDialogs.registerProviderSetupDismissal(page)
   await openGlobalPanel(page, 'Backlog')
-  await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+  await expect(await openBacklogCapture(page)).toBeVisible()
 })
 
 When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+  await runBacklogPageAction(page, 'Settings')
   await expect(page.getByRole('dialog', { name: 'Backlog settings' }).getByRole('heading', { name: 'Jev triage', exact: true })).toBeVisible()
   // Settings open over the backlog instead of replacing it: the feed stays mounted behind the sheet.
   await expect(page.getByRole('feed', { name: 'Backlog feed', includeHidden: true })).toHaveCount(1)
@@ -387,7 +387,7 @@ Then('the link dialog explains how to bind the Linear key', async ({ page }: { p
 })
 
 When('the image references are submitted with the capture', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('Capture screenshots with the issue\n\n@Image 1 @Image 2')
   await capture.press('Enter')
 })
@@ -406,7 +406,7 @@ When('two images are attached to the capture', async ({ page }: { page: Page }) 
 
 When('{string} is captured', async ({ page }: { page: Page }, journeyText: string) => {
   const text = await withBacklogRefs(page, journeyText)
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill(text)
   await capture.press('Enter')
   await expect(capture).toHaveText('')
@@ -590,10 +590,11 @@ Then('the item detail can be resized without being cut off', async ({ page }: { 
     const after = Number(await splitter.getAttribute('aria-valuenow'))
     expect(after).toBeGreaterThan(before)
     const detailBox = await detail.boundingBox()
-    const regionBox = await region.boundingBox()
-    if (detailBox === null || regionBox === null) throw new Error('The item detail or its content region has no layout box.')
-    expect(detailBox.y).toBeCloseTo(regionBox.y, 0)
-    expect(detailBox.y + detailBox.height).toBeCloseTo(regionBox.y + regionBox.height, 0)
+    // The region is a bordered card: the detail fills its inside, between the top and bottom borders.
+    const inside = await region.evaluate(element => ({ top: element.getBoundingClientRect().top + element.clientTop, height: element.clientHeight }))
+    if (detailBox === null) throw new Error('The item detail has no layout box.')
+    expect(detailBox.y).toBeCloseTo(inside.top, 0)
+    expect(detailBox.y + detailBox.height).toBeCloseTo(inside.top + inside.height, 0)
   })
 })
 
@@ -601,7 +602,8 @@ When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: numb
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
     .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
-    .getByText(`${await backlogLabel(page, id)}`, { exact: true })
+    // The feed shows the id on hover; the row's time is its mention handle and opens it like the id did.
+    .locator('[data-backlog-mention-handle]')
     .click()
   await expect(peek(page)).toContainText(`${await backlogLabel(page, id)}`)
 })
@@ -658,13 +660,20 @@ Then('its activity records the move {string} by the user', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
+/** The Feed's status filter is the first group of the toolbar's Filter menu (council round 2, D2). */
+const pickFeedStatus = async (page: Page, label: string): Promise<void> => {
+  await page.getByRole('button', { name: 'Filter', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: new RegExp(`^${label} \\d+$`) }).click()
+  await page.keyboard.press('Escape')
+}
+
 When('the feed is filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
   await showFeed(page)
-  await statusChip(page, label).click()
+  await pickFeedStatus(page, label)
 })
 
 When('the feed is also filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
-  await statusChip(page, label).click()
+  await pickFeedStatus(page, label)
 })
 
 When('the feed is shown', async ({ page }: { page: Page }) => {
@@ -778,7 +787,7 @@ Then('backlog item b:{int} exposes all context actions in the {string} view', as
 })
 
 When('ArrowUp is pressed from the empty backlog composer', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('')
   await capture.press('ArrowUp')
 })
@@ -920,7 +929,7 @@ When('the thread is started from the dialog without a first message', async ({ p
 
 Then('the backlog panel stays open while the thread is created', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-start-thread-stays', async () => {
-    await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+    await expect(await openBacklogCapture(page)).toBeVisible()
     await expect(page.getByRole('alert')).toContainText(await withBacklogRefs(page, 'Thread started for b:1'), { timeout: 30_000 })
   })
 })
@@ -940,7 +949,7 @@ Then('the thread composer is open for it', async ({ page }: { page: Page }) => {
 
 When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Backlog')
-  await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+  await expect(await openBacklogCapture(page)).toBeVisible()
 })
 
 Then('the item links the thread it started as {string}', async ({ page }: { page: Page }, title: string) => {
@@ -954,7 +963,7 @@ Then('the item links the thread it started as {string}', async ({ page }: { page
 })
 
 When('an item with linked title and description is captured', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   const title = 'Open [guide](https://example.com/guide) https://example.com'
   const description = 'Read [description](https://example.org/description) https://example.org'
   await capture.fill(`${title}\n${description}`)
@@ -1172,7 +1181,7 @@ const expectSelectionActionsOnOneLine = async (page: Page, tier: 'compact' | 'na
 }
 
 When('{int} numbered items are captured', async ({ page }: { page: Page }, count: number) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   for (let index = 1; index <= count; index += 1) {
     await capture.fill(`Numbered item ${String(index)}`)
     await capture.press('Enter')
@@ -1303,9 +1312,11 @@ When('a thread on the fake model is started', async ({ page }: { page: Page }) =
 
 When('the reference of backlog item {string} is dragged into the thread composer', async ({ page }: { page: Page }, reference: string) => {
   const label = await withBacklogRefs(page, reference)
+  // A list row prints its `b:` id; a feed row keeps it in a tooltip on its time, which is the same handle.
   const handle = page
     .locator('[data-backlog-mention-handle]')
     .filter({ hasText: new RegExp(`^${label}$`, 'u'), visible: true })
+    .or(page.getByRole('article', { name: `Item ${label}`, exact: true }).locator('[data-backlog-mention-handle]').filter({ visible: true }))
     .first()
   await handle.dragTo(threadComposer(page))
 })
@@ -1376,18 +1387,25 @@ Then('the inline backlog preview gallery opens above its card and navigates both
 })
 
 When('the backlog preview is opened in the Backlog panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Open in Backlog', exact: true }).click()
+  const open = page.getByRole('button', { name: 'Open in Backlog', exact: true })
+  // A scroll closes the card by design; ask again from the last preview link the detail shows until it holds still.
+  const lastLink = peek(page).getByRole('button', { name: /^Preview backlog item /u }).last()
+  await expect(async () => {
+    if (!(await open.isVisible())) await lastLink.click()
+    await open.click({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
   await expect(peek(page)).toBeVisible()
 })
 
 Then('the backlog detail shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-opened-in-panel', async () => {
-    await expect(peek(page).getByText(text, { exact: true })).toBeVisible()
+    // The detail is headed by the item's title (and repeats it as the editable title below).
+    await expect(peek(page).locator('[data-peek-title]')).toHaveText(text)
   })
 })
 
 When('the backlog backfill is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backfill triage', exact: true }).click()
+  await runBacklogPageAction(page, 'Backfill triage')
 })
 
 Then('the backfill dialog explains that it runs Jev and the configured triage model', async ({ page }: { page: Page }) => {
@@ -1487,14 +1505,11 @@ Then('the edited reply has only its replacement attachment', async ({ page }: { 
 
 When('the user reply is deleted after confirmation', async ({ page }: { page: Page }) => {
   const activity = peek(page).getByRole('list', { name: 'Conversation' })
-  let confirmationMessage: string | undefined
-  page.once('dialog', dialog => {
-    confirmationMessage = dialog.message()
-    void dialog.accept()
-  })
   await activity.getByText('Edited reply', { exact: true }).hover()
   await activity.getByRole('button', { name: 'Delete reply', exact: true }).click()
-  expect(confirmationMessage).toBe('Delete this reply? This cannot be undone.')
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete this reply?', exact: true })
+  await expect(confirmation).toContainText('“Edited reply”')
+  await confirmation.getByRole('button', { name: 'Delete reply', exact: true }).click()
 })
 
 Then('the reply and its attachment are removed from the activity', async ({ page }: { page: Page }) => {
@@ -1508,21 +1523,23 @@ Then('the reply and its attachment are removed from the activity', async ({ page
 
 Then('the capture composer offers a project picker', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-project-scope-picker', async () => {
-    await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'Project of the new item', exact: true })).toBeVisible()
+    await openBacklogViewMenu(page)
+    await expect(page.getByRole('combobox', { name: 'Filter by project', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })
 
 When('the Backlog Inbox is opened', async ({ page }: { page: Page }) => {
-  const inbox = page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Inbox' })
+  const inbox = page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Triage' })
   await inbox.click()
   await expect(inbox).toHaveAttribute('aria-current', 'page')
 })
 
 Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page }, title: string, filter: string) => {
   await recordAssertion(page, 'backlog-attention-inbox', async () => {
-    const inbox = page.getByRole('region', { name: 'Inbox', exact: true })
+    const inbox = page.getByRole('region', { name: 'Triage', exact: true })
     const filterTab = inbox.getByRole('radio', { name: new RegExp(`^${filter}`) })
     await filterTab.click()
     await expect(filterTab).toHaveAttribute('aria-checked', 'true')
@@ -1629,7 +1646,7 @@ When('Backlog automatic triage is configured to use the local fake model', async
 })
 
 When('an item with a deterministic fake triage proposal is captured', async ({ page }: { page: Page }) => {
-  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const capture = await openBacklogCapture(page)
   await capture.fill('[[answer {"confidence":0.99,"title":"Automatic triage proposal"}]]')
   await capture.press('Enter')
   await expect(capture).toHaveText('')
@@ -1892,7 +1909,7 @@ When('the reply is added to the backlog', async ({ page }: { page: Page }) => {
 
 Then('the capture quotes the reply {string} and links the thread', async ({ page }: { page: Page }, reply: string) => {
   await recordAssertion(page, 'backlog-quote-reply', async () => {
-    const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+    const capture = await openBacklogCapture(page)
     await expect(capture).toBeVisible()
     // The capture editor may draw the Markdown quote as a block, so read the words rather than the `>` marker.
     await expect(capture).toContainText(reply)

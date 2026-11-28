@@ -48,6 +48,8 @@
     transition: opacity 80ms ease;
   }
 
+  /* dshfiles (unslop r5 C1, council round 3): the latest reply reveals its actions on hover or focus like every other
+     one; pinned at rest they read as an orphan copy and ⋯ row under the answer. */
   [data-actions-reveal='hover']:hover .actions,
   [data-actions-reveal='hover']:focus-within .actions,
   :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(

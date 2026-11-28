@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Empty, EmptyHeader, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
-import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
@@ -42,7 +42,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
-import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ArrowDownIcon,
@@ -54,6 +53,7 @@ import {
   EllipsisVerticalIcon,
   Maximize2Icon,
   FolderGit2Icon,
+  ListFilterIcon,
   MonitorIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -111,6 +111,8 @@ import { InlineWorkspaceProvisioner } from './inline-workspace-provisioner.js'
 import { InlineWorkspaceRemoval } from './inline-workspace-removal.js'
 import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
 import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
+import { HistoryPage } from './history-page.js'
+import { RevisionTime } from './revision-time.js'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, usePanelScopeState } from './panel-scope.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
@@ -119,6 +121,7 @@ import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './grap
 import { ReviewSelectionModel } from './review-selection.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 import { WorkspaceLabels } from './workspace-labels.js'
+import { LandLabels } from './land-labels.js'
 import { useJujutsuApi } from './use-jujutsu-api.js'
 import { TOUCH_HIT_AREA } from './touch-hit-area.js'
 
@@ -142,6 +145,8 @@ interface JujutsuPanelProps {
   readonly scope: string
   /** The repository to open when this scope remembers none (a thread's own project). */
   readonly defaultPath?: string | null
+  /** A page's fallback when it remembers no repository: the project of the thread last on screen. Never overrides a remembered or last-opened repository. */
+  readonly currentProjectPath?: string | null
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
@@ -154,6 +159,8 @@ interface JujutsuPanelProps {
   readonly reviewRevisions?: ((input: { readonly workspacePath: string; readonly revisions: readonly string[] }) => boolean) | undefined
   /** The title of the thread working in a folder, so a thread workspace is named by its thread (b:212a). */
   readonly threadTitleOf?: ((path: string) => string | undefined) | undefined
+  /** The title of the thread working in a jj workspace of that name, for History's workspace chips. */
+  readonly threadTitleOfWorkspace?: ((name: string) => string | undefined) | undefined
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -232,6 +239,9 @@ const formatAge = (value: string): string => {
   const age = relativeTime(time, Date.now())
   return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
+
+/** When a revision last changed, relative to the clock as the detail line renders, like formatAge. */
+const revisionChangedNow = (revision: Revision, editedAt: string | undefined) => RevisionTime.lastChanged(revision, editedAt, Date.now())
 
 const dayLabel = (value: string): string => {
   const time = Date.parse(value)
@@ -393,7 +403,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       return input.successNotice
     },
     onSuccess: successNotice => setReviewNotice(successNotice),
-    onError: () => setReviewNotice('Review progress could not be saved to the Host.'),
+    onError: () => setReviewNotice('Review progress was not saved. Mark the file again to retry.'),
   })
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
@@ -609,6 +619,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (selectedPath.length === 0) return
     sendRegistration({ type: 'register', path: selectedPath })
   }, [path, sendRegistration])
+  // A2 #36 (unslop): a page that remembers no repository (its own pick, then the last one opened anywhere) opens the
+  // current project, else the first registered one, so its empty prompt shows only when there is no project at all.
+  // The per-thread side panel keeps its own rule: it follows its thread.
+  const pageDefaultPath = HistoryPage.defaultProjectPath({ currentProjectPath: props.currentProjectPath ?? null, projects: props.projects })
+  useEffect(() => {
+    if (sidePanel || path.trim().length > 0 || pageDefaultPath === undefined) return
+    setPath(pageDefaultPath)
+  }, [sidePanel, path, pageDefaultPath, setPath])
 
   useEffect(() => {
     if (state === undefined) return
@@ -1053,7 +1071,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const inlineDiff =
     fullDiff === null ? null : (
       <InlineRevisionDiff
-        error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff.')}
+        error={fullDiffQuery.error === null ? null : errorMessage(fullDiffQuery.error, 'Could not load the revision diff. Close it and open it again.')}
         focusPath={fullDiff.focusPath}
         layout={diffLayout}
         onCancel={closeFullDiff}
@@ -1094,7 +1112,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     if (reviewQuery.data === undefined) {
       const next = applyLocalReviewChanges({ store: localReviewStore, changes, repositoryRoot, commitId })
       const fallbackSaved = changes.some(change => change.reviewed) ? 'Review progress saved in this browser.' : 'Review mark cleared.'
-      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is unavailable. Review progress could not be persisted.')
+      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is blocked, so review progress was not saved. Allow site storage in this browser.')
       return
     }
 
@@ -1333,6 +1351,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const describeText = describeDrafts[revision.commitId] ?? editableDescription(revision.description)
     const describeChanged = RevisionGraphModel.describeDraftChanged(describeText, revision.description)
     const editing = editingDescription === revision.commitId && !revision.immutable
+    const changed = revisionChangedNow(revision, editTimes.get(revision.commitId))
     return (
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-2 dshx:pr-3 dshx:text-xs">
         {revision.description.trim().length > 0 && !editing && (
@@ -1341,9 +1360,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
           <span>{revision.author || 'Unknown author'}</span>
           <span aria-hidden>·</span>
-          <time dateTime={editTimes.get(revision.commitId) ?? revision.authorTime}>
-            {revisionDates(revision, editTimes.get(revision.commitId)).replaceAll('\n', ' · ')}
-          </time>
+          {/* A2 #37 (unslop): one relative time; the three absolute timestamps are the tooltip's. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <time data-revision-time="" dateTime={changed.dateTime} tabIndex={0}>
+                {changed.text}
+              </time>
+            </TooltipTrigger>
+            <TooltipContent className="dshx:whitespace-pre-line" side="bottom">
+              {revisionDates(revision, editTimes.get(revision.commitId))}
+            </TooltipContent>
+          </Tooltip>
           <span aria-hidden>·</span>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1409,7 +1436,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           </Button>
           {!revision.workingCopy && !revision.immutable && (
             <Button disabled={busy} onClick={() => askForConfirmation({ kind: 'edit', commitId: revision.commitId })} size="xs" type="button" variant="outline">
-              Edit This Change
+              Edit this change
             </Button>
           )}
           {!revision.immutable && parent !== undefined && !parent.immutable && (
@@ -1537,6 +1564,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     )
   }
 
+  const activeFilterCount = Number(mineOnly) + Number(hideImmutable) + Number(fromDate !== '' || toDate !== '')
   const graphView =
     state === undefined ? null : (
       <>
@@ -1560,33 +1588,36 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <TooltipContent side="bottom">Compare selected revision, or current workspace revision, with a landmark</TooltipContent>
               </Tooltip>
             </div>
-            <Toggle
-              className={cn(
-                'dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground',
-                TOUCH_HIT_AREA,
-              )}
-              onPressedChange={pressed => setPreference('mineOnly', pressed)}
-              pressed={mineOnly}
-              size="sm"
-            >
-              <UserIcon className="dshx:size-3.5" />
-              Mine
-            </Toggle>
-            <Label className={cn('dshx:gap-1.5 dshx:px-1.5 dshx:font-mono dshx:text-xs dshx:font-normal dshx:text-muted-foreground', TOUCH_HIT_AREA)}>
-              <Checkbox checked={hideImmutable} onCheckedChange={checked => setPreference('hideImmutable', checked === true)} />
-              Hide immutable
-            </Label>
-            <Button
-              aria-label="Filter by date"
-              aria-pressed={showDates}
-              className={cn('dshx:text-muted-foreground', TOUCH_HIT_AREA, (showDates || fromDate || toDate) && 'dshx:bg-accent dshx:text-foreground')}
-              onClick={() => setShowDates(current => !current)}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            >
-              <CalendarIcon />
-            </Button>
+            {/* A2 #36 (unslop): the secondary filters share one Filter menu instead of three more toolbar controls. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label={activeFilterCount === 0 ? 'Filter' : `Filter (${String(activeFilterCount)} on)`}
+                  className={cn('dshx:text-muted-foreground', TOUCH_HIT_AREA, activeFilterCount > 0 && 'dshx:bg-accent dshx:text-foreground')}
+                  data-history-filter=""
+                  size="xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <ListFilterIcon />
+                  Filter
+                  {activeFilterCount === 0 ? null : <span className="dshx:tabular-nums dshx:text-muted-foreground">{activeFilterCount}</span>}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
+                <DropdownMenuCheckboxItem checked={mineOnly} onCheckedChange={checked => setPreference('mineOnly', checked === true)}>
+                  <UserIcon className="dshx:size-3.5" />
+                  Mine
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={hideImmutable} onCheckedChange={checked => setPreference('hideImmutable', checked === true)}>
+                  Hide immutable
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={showDates || fromDate !== '' || toDate !== ''} onCheckedChange={checked => setShowDates(checked === true)}>
+                  <CalendarIcon className="dshx:size-3.5" />
+                  Filter by date
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               aria-label="Show search"
               aria-pressed={showSearch}
@@ -1721,7 +1752,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
             {reviewOpenFailed && (
               <span className="dshx:basis-full dshx:text-destructive" role="alert">
-                The review could not open. Select at most 30 revisions, and add @dshfiles/diffs-review to the profile if it is missing.
+                The review could not open. Select at most 30 revisions, and enable the diffs-review plugin in Plugins if it is off.
               </span>
             )}
           </div>
@@ -1868,6 +1899,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       rowHeight={rowHeight}
                       revision={item.revision}
                       defaultWorkspaceCommitId={defaultWorkspaceCommitId}
+                      workspaceTitleOf={props.threadTitleOfWorkspace}
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
@@ -1926,16 +1958,42 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         </Button>
       </EmptyHeader>
     </Empty>
-  ) : repositoryStatus.showEmptyPrompt ? (
-    <EmptyState action={{ label: 'Choose repository…', icon: <FolderGit2Icon />, onSelect: () => setPickerOpen(true) }}>
-      Choose a repository to open its revision graph.
-    </EmptyState>
   ) : null
+  /** A2 #36 (unslop): each page says what choosing a project shows there; the select above is the one way to choose. */
+  const emptyPrompt = (target: View): JSX.Element | null =>
+    repositoryStatus.showEmptyPrompt ? <EmptyState data-repository-empty={target}>{HistoryPage.emptyTexts[target]}</EmptyState> : null
+
+  // A2 #36 (unslop): History and Source control are pages wherever the shell puts them (a main tab, a docked pane), so
+  // they carry the page header there and the project select is header meta beside the title. Only the per-thread side
+  // panel, which follows its thread and switches views with tabs, keeps the compact toolbar.
+  const pageSurface = !sidePanel
+  const repositorySelect = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label="Choose repository"
+          className={cn('dshx:min-w-0 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal', pageSurface ? 'dshx:h-7 dshx:max-w-64' : 'dshx:h-8 dshx:flex-1')}
+          onClick={() => setPickerOpen(true)}
+          type="button"
+          variant="outline"
+        >
+          <FolderGit2Icon className="dshx:text-muted-foreground" />
+          {state !== undefined || path.length > 0 ? (
+            <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
+          ) : (
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Choose project…</span>
+          )}
+          <ChevronDownIcon className={cn('dshx:text-muted-foreground', !pageSurface && 'dshx:ml-auto')} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{state?.root ?? (path || 'Choose a project')}</TooltipContent>
+    </Tooltip>
+  )
 
   const tabsContent = (
     <>
       <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="graph">
-        {emptyState ?? graphView}
+        {emptyState ?? emptyPrompt('graph') ?? graphView}
       </TabsContent>
       {fullDiff !== null && (
         <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:overflow-auto dshx:p-3" value="diff">
@@ -1944,6 +2002,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       )}
       <TabsContent className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col" value="source">
         {emptyState ??
+          emptyPrompt('source') ??
           (state !== undefined && repoId !== null && (
             <SourceControlView
               ancestorCount={preferences.ancestorCount}
@@ -1970,293 +2029,290 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:overflow-hidden dshx:bg-background dshx:text-foreground"
     >
       <TooltipProvider delayDuration={500}>
-        <Tabs
-          className="dshx:min-h-0 dshx:flex-1 dshx:gap-0"
-          onValueChange={value => {
-            if (value === 'diff') {
-              setDiffTabOpen(true)
-              return
-            }
-            setDiffTabOpen(false)
-            if (props.view === undefined) setView(value === 'source' ? 'source' : 'graph')
-          }}
-          value={diffTabOpen ? 'diff' : view}
-        >
-          <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
-            {showViewTabs && (
-              <TabsList aria-label="Repository views" className="dshx:self-start">
-                {props.view !== 'source' && (
-                  <TabsTrigger className="dshx:flex-none" value="graph">
-                    Revision graph
-                  </TabsTrigger>
-                )}
-                {fullDiff !== null && (
-                  <TabsTrigger className="dshx:flex-none" value="diff">
-                    Diff
-                  </TabsTrigger>
-                )}
-                {props.view !== 'graph' && (
-                  <TabsTrigger className="dshx:flex-none" value="source">
-                    Source control
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            )}
-            <div className="dshx:flex dshx:items-center dshx:gap-1.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Choose repository"
-                    className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-2 dshx:px-2 dshx:font-normal"
-                    onClick={() => setPickerOpen(true)}
-                    type="button"
-                    variant="outline"
-                  >
-                    <FolderGit2Icon className="dshx:text-muted-foreground" />
-                    {state !== undefined || path.length > 0 ? (
-                      <>
-                        <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{repositoryName(state?.root ?? path)}</span>
-                      </>
-                    ) : (
-                      <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">Choose repository…</span>
+        {(() => {
+          const tabs = (
+            <Tabs
+              className="dshx:min-h-0 dshx:flex-1 dshx:gap-0"
+              onValueChange={value => {
+                if (value === 'diff') {
+                  setDiffTabOpen(true)
+                  return
+                }
+                setDiffTabOpen(false)
+                if (props.view === undefined) setView(value === 'source' ? 'source' : 'graph')
+              }}
+              value={diffTabOpen ? 'diff' : view}
+            >
+              <header className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-2 dshx:pb-2.5">
+                {showViewTabs && (
+                  <TabsList aria-label="Repository views" className="dshx:self-start">
+                    {props.view !== 'source' && (
+                      <TabsTrigger className="dshx:flex-none" value="graph">
+                        {HistoryPage.titles.graph}
+                      </TabsTrigger>
                     )}
-                    <ChevronDownIcon className="dshx:ml-auto dshx:text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{state?.root ?? (path || 'Choose repository')}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className={TOUCH_HIT_AREA}
-                    disabled={repoId === null || selectedRemote === '' || busy}
-                    onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Fetch
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className={TOUCH_HIT_AREA}
-                    disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
-                    onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Push
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className={TOUCH_HIT_AREA}
-                    disabled={repoId === null || busy}
-                    onClick={() => askForConfirmation({ kind: 'operation-undo' })}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Undo
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Undo the last jujutsu operation (jj op undo)</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-busy={busy}
-                    aria-label="Refresh"
-                    className={TOUCH_HIT_AREA}
-                    disabled={busy || repoId === null}
-                    onClick={refreshRepository}
-                    size="icon-sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {busy ? <Spinner /> : <RefreshCwIcon />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Refresh</TooltipContent>
-              </Tooltip>
-              {loadingRepository && (
-                <span aria-live="polite" className="dshx:sr-only" role="status">
-                  Loading repository…
-                </span>
-              )}
-              <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
-                {props.surface === 'main' && props.view !== 'source' ? (
+                    {fullDiff !== null && (
+                      <TabsTrigger className="dshx:flex-none" value="diff">
+                        Diff
+                      </TabsTrigger>
+                    )}
+                    {props.view !== 'graph' && (
+                      <TabsTrigger className="dshx:flex-none" value="source">
+                        {HistoryPage.titles.source}
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
+                )}
+                <div className={cn('dshx:flex dshx:items-center dshx:gap-1.5', pageSurface && 'dshx:justify-end')}>
+                  {pageSurface ? null : repositorySelect}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        aria-label="Open this repository in a new tab"
                         className={TOUCH_HIT_AREA}
-                        disabled={shownRoot === null}
-                        onClick={openInNewTab}
-                        size="icon-sm"
+                        disabled={repoId === null || selectedRemote === '' || busy}
+                        onClick={() => askForConfirmation({ kind: 'fetch', remote: selectedRemote })}
+                        size="sm"
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                       >
-                        <CopyPlusIcon />
+                        Fetch
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">Open this repository in a new tab</TooltipContent>
+                    <TooltipContent side="bottom">{selectedRemote === '' ? 'No remote available' : `Fetch from ${selectedRemote}`}</TooltipContent>
                   </Tooltip>
-                ) : null}
-                <PreferencesMenu />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button aria-label="Repository actions" className={TOUCH_HIT_AREA} size="icon-sm" type="button" variant="outline">
-                      <EllipsisVerticalIcon />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="dshx-root dshx:w-64">
-                    <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Remote</DropdownMenuLabel>
-                    {remoteNames.length === 0 ? (
-                      <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No remotes configured.</p>
-                    ) : (
-                      <DropdownMenuRadioGroup onValueChange={setRemote} value={selectedRemote}>
-                        {remoteNames.map(name => (
-                          <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
-                            {name}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Bookmark to push</DropdownMenuLabel>
-                    {localBookmarkNames.length === 0 ? (
-                      <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No local bookmarks.</p>
-                    ) : (
-                      <DropdownMenuRadioGroup onValueChange={setBookmark} value={selectedBookmark}>
-                        {localBookmarkNames.map(name => (
-                          <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
-                            {name}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    )}
-                    {state !== undefined && (
-                      <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className={TOUCH_HIT_AREA}
+                        disabled={repoId === null || selectedRemote === '' || selectedBookmark === '' || busy}
+                        onClick={() => askForConfirmation({ kind: 'push', remote: selectedRemote, bookmark: selectedBookmark })}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        Push
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className={TOUCH_HIT_AREA}
+                        disabled={repoId === null || busy}
+                        onClick={() => askForConfirmation({ kind: 'operation-undo' })}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        Undo
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Undo the last jujutsu operation (jj op undo)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-busy={busy}
+                        aria-label="Refresh"
+                        className={TOUCH_HIT_AREA}
+                        disabled={busy || repoId === null}
+                        onClick={refreshRepository}
+                        size="icon-sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {busy ? <Spinner /> : <RefreshCwIcon />}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Refresh</TooltipContent>
+                  </Tooltip>
+                  {loadingRepository && (
+                    <span aria-live="polite" className="dshx:sr-only" role="status">
+                      Loading repository…
+                    </span>
+                  )}
+                  <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-1">
+                    {props.surface === 'main' && props.view !== 'source' ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            aria-label="Open this repository in a new tab"
+                            className={TOUCH_HIT_AREA}
+                            disabled={shownRoot === null}
+                            onClick={openInNewTab}
+                            size="icon-sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <CopyPlusIcon />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Open this repository in a new tab</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                    <PreferencesMenu />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button aria-label="Repository actions" className={TOUCH_HIT_AREA} size="icon-sm" type="button" variant="outline">
+                          <EllipsisVerticalIcon />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="dshx-root dshx:w-64">
+                        <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Remote</DropdownMenuLabel>
+                        {remoteNames.length === 0 ? (
+                          <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No remotes configured.</p>
+                        ) : (
+                          <DropdownMenuRadioGroup onValueChange={setRemote} value={selectedRemote}>
+                            {remoteNames.map(name => (
+                              <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                                {name}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="dshx:text-xs"
-                          disabled={emptyAncestors.length === 0 || busy}
-                          onSelect={() => askForConfirmation({ kind: 'abandon', commitIds: emptyAncestors.map(revision => revision.commitId) })}
+                        <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Bookmark to push</DropdownMenuLabel>
+                        {localBookmarkNames.length === 0 ? (
+                          <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground">No local bookmarks.</p>
+                        ) : (
+                          <DropdownMenuRadioGroup onValueChange={setBookmark} value={selectedBookmark}>
+                            {localBookmarkNames.map(name => (
+                              <DropdownMenuRadioItem className="dshx:font-mono dshx:text-xs" key={name} value={name}>
+                                {name}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        )}
+                        {state !== undefined && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="dshx:text-xs"
+                              disabled={emptyAncestors.length === 0 || busy}
+                              onSelect={() => askForConfirmation({ kind: 'abandon', commitIds: emptyAncestors.map(revision => revision.commitId) })}
+                            >
+                              Clear empty ancestors ({emptyAncestors.length})
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="dshx:text-xs" disabled={busy} onSelect={() => setCleanupOpen(true)}>
+                              Clean up JJ workspaces…
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>Last recorded JJ push command: {lastPushLabel}</span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">{state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}</TooltipContent>
+                              </Tooltip>
+                              {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
+                            </div>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  {busy && !loadingRepository && (
+                    <span className="dshx:sr-only" role="status">
+                      Working…
+                    </span>
+                  )}
+                </div>
+              </header>
+
+              <WorkspaceCleanupTrail onFinished={refreshRepository} onReview={() => setCleanupOpen(true)} path={state?.root} />
+
+              {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
+              {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}
+              {(provisionerHidden || bookmarkHidden) && (
+                <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:p-2">
+                  {provisionerHidden && inlineProvisioner}
+                  {bookmarkHidden && inlineBookmark}
+                </div>
+              )}
+
+              {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
+                <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
+                  {errorMessages.map(message => {
+                    const repositoryError = stateQuery.error !== null || registrationError !== null
+                    return (
+                      <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
+                        <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+                          <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+                          {actionSnapshot.context.error === message && (
+                            <Button aria-label="Dismiss alert" onClick={() => sendAction({ type: 'dismissError' })} size="icon-xs" type="button" variant="ghost">
+                              <XIcon />
+                            </Button>
+                          )}
+                          {repositoryError && (
+                            <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
+                              Choose another repository
+                            </Button>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )
+                  })}
+                  {provisionedPath !== null && (
+                    <Alert className="dshx:px-3 dshx:py-2" variant="success">
+                      <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-foreground">Created: {provisionedPath}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">{provisionedPath}</TooltipContent>
+                        </Tooltip>
+                        <Button
+                          disabled={launchMutation.isPending}
+                          onClick={() => launchMutation.mutate(provisionedPath)}
+                          size="xs"
+                          type="button"
+                          variant="outline"
                         >
-                          Clear empty ancestors ({emptyAncestors.length})
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="dshx:text-xs" disabled={busy} onSelect={() => setCleanupOpen(true)}>
-                          Clean up JJ workspaces…
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span>Last recorded JJ push command: {lastPushLabel}</span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">{state.lastPushDescription ?? 'Reads JJ operation argv metadata only.'}</TooltipContent>
-                          </Tooltip>
-                          {state.evolutionHistoryTruncated && <span>Evolution scan limited; some evolved markers may be missing.</span>}
-                        </div>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {busy && !loadingRepository && (
-                <span className="dshx:sr-only" role="status">
-                  Working…
-                </span>
-              )}
-            </div>
-          </header>
-
-          <WorkspaceCleanupTrail onFinished={refreshRepository} onReview={() => setCleanupOpen(true)} path={state?.root} />
-
-          {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
-          {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}
-          {(provisionerHidden || bookmarkHidden) && (
-            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b dshx:p-2">
-              {provisionerHidden && inlineProvisioner}
-              {bookmarkHidden && inlineBookmark}
-            </div>
-          )}
-
-          {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
-            <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
-              {errorMessages.map(message => {
-                const repositoryError = stateQuery.error !== null || registrationError !== null
-                return (
-                  <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
-                    <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                      <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
-                      {actionSnapshot.context.error === message && (
-                        <Button aria-label="Dismiss alert" onClick={() => sendAction({ type: 'dismissError' })} size="icon-xs" type="button" variant="ghost">
-                          <XIcon />
+                          {launchMutation.isPending ? 'Opening…' : 'Open a thread here'}
                         </Button>
-                      )}
-                      {repositoryError && (
-                        <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
-                          Choose another repository
-                        </Button>
-                      )}
-                    </AlertDescription>
-                  </Alert>
-                )
-              })}
-              {provisionedPath !== null && (
-                <Alert className="dshx:px-3 dshx:py-2" variant="success">
-                  <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-foreground">Created: {provisionedPath}</span>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">{provisionedPath}</TooltipContent>
-                    </Tooltip>
-                    <Button
-                      disabled={launchMutation.isPending}
-                      onClick={() => launchMutation.mutate(provisionedPath)}
-                      size="xs"
-                      type="button"
-                      variant="outline"
-                    >
-                      {launchMutation.isPending ? 'Opening…' : 'Open a thread here'}
-                    </Button>
-                  </AlertDescription>
-                </Alert>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {copyNotice !== null && (
+                    <Alert className="dshx:px-3 dshx:py-2" role={copyNotice.copied ? 'status' : 'alert'} variant={copyNotice.copied ? 'default' : 'destructive'}>
+                      <AlertDescription className="dshx:text-xs">
+                        {copyNotice.copied ? `${copyNotice.label} copied.` : `Could not copy ${copyNotice.label.toLocaleLowerCase()}.`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {confirmResult !== null && confirmResult.output.length > 0 && (
+                    <Alert className="dshx:px-3 dshx:py-2">
+                      <AlertDescription>
+                        <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-2xs dshx:whitespace-pre-wrap dshx:text-foreground">
+                          {confirmResult.output}
+                        </pre>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               )}
-              {copyNotice !== null && (
-                <Alert className="dshx:px-3 dshx:py-2" role={copyNotice.copied ? 'status' : 'alert'} variant={copyNotice.copied ? 'default' : 'destructive'}>
-                  <AlertDescription className="dshx:text-xs">
-                    {copyNotice.copied ? `${copyNotice.label} copied.` : `Could not copy ${copyNotice.label.toLocaleLowerCase()}.`}
-                  </AlertDescription>
-                </Alert>
-              )}
-              {confirmResult !== null && confirmResult.output.length > 0 && (
-                <Alert className="dshx:px-3 dshx:py-2">
-                  <AlertDescription>
-                    <pre className="dshx:max-h-40 dshx:w-full dshx:overflow-auto dshx:font-mono dshx:text-2xs dshx:whitespace-pre-wrap dshx:text-foreground">
-                      {confirmResult.output}
-                    </pre>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
 
-          {tabsContent}
-        </Tabs>
+              {tabsContent}
+            </Tabs>
+          )
+          if (!pageSurface) return tabs
+          const pageView: View = props.view ?? view
+          return (
+            <Page
+              bodyClassName="dshx:gap-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border"
+              data-jujutsu-page={pageView}
+              description={HistoryPage.descriptions[pageView]}
+              fill
+              heading={HistoryPage.titles[pageView]}
+              meta={repositorySelect}
+            >
+              {tabs}
+            </Page>
+          )
+        })()}
 
         {pickerOpen && (
           <ProjectFolderPicker
@@ -2311,7 +2367,7 @@ const PreferencesMenu = (): JSX.Element => {
           className="dshx:text-xs"
           onCheckedChange={checked => setPreference('chatReferenceLinks', checked)}
         >
-          Open Jujutsu refs from chat
+          Open Jujutsu refs from threads
         </DropdownMenuCheckboxItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="dshx:text-xs">
@@ -2529,6 +2585,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
 interface RevisionRowProps {
   readonly revision: Revision
   readonly defaultWorkspaceCommitId: string | null
+  readonly workspaceTitleOf?: ((name: string) => string | undefined) | undefined
   readonly expanded: boolean
   readonly dimmed: boolean
   readonly connectionDimmed: boolean
@@ -2567,10 +2624,13 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const workspaceLabel = (workspace: string): JSX.Element => (
     <span
       className={cn(
-        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:font-medium dshx:text-background',
-        revision.workingCopy ? 'dshx:bg-info' : 'dshx:bg-teal',
+        // A2 #37 (unslop): an outline chip. Indigo marks focus, selection and Needs you, never a label; the working
+        // copy reads by its ink border and text, the other workspaces by a muted one.
+        'dshx:inline-flex dshx:h-4 dshx:max-w-40 dshx:flex-none dshx:cursor-grab dshx:items-center dshx:gap-1 dshx:rounded-full dshx:border dshx:bg-background dshx:px-1.5 dshx:text-2xs dshx:font-medium',
+        revision.workingCopy ? 'dshx:border-foreground/60 dshx:text-foreground' : 'dshx:border-border dshx:text-muted-foreground',
         props.draggedLabel?.kind === 'workspace' && props.draggedLabel.name === workspace && 'dshx:opacity-40',
       )}
+      data-workspace-marker={revision.workingCopy ? 'working-copy' : 'workspace'}
       draggable
       onContextMenu={event => event.stopPropagation()}
       onDragStart={event => {
@@ -2581,7 +2641,8 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       }}
     >
       <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
-      <span className="dshx:truncate">{workspace}</span>
+      {/* A thread workspace reads as its thread (b:212a); the tooltip keeps the workspace name. */}
+      <span className="dshx:truncate">{props.workspaceTitleOf?.(workspace) ?? workspace}</span>
     </span>
   )
   const workspaceHint = (workspace: string): string =>
@@ -2805,8 +2866,10 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                     )}
                     dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
                   >
-                    {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
-                    {props.revisionDate === 'both' && props.editedAt !== undefined && (
+                    {LandLabels.isRootCommit(revision.commitId)
+                      ? null
+                      : formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
+                    {props.revisionDate === 'both' && props.editedAt !== undefined && !LandLabels.isRootCommit(revision.commitId) && (
                       <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>
                     )}
                   </time>

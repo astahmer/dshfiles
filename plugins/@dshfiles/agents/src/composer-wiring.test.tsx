@@ -1,7 +1,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createComposerAgentPorts } from './composer-wiring.js'
+import { createAgentMentionToneSource, createComposerAgentPorts } from './composer-wiring.js'
 import type { ComposerAgentPorts } from './composer-agent-preparer.js'
 
 /** Like the page's Remote: a Service, so `ctx.remote.agentPresets` resolves the `remote.agentPresets` service. */
@@ -52,5 +52,14 @@ describe('composer agent ports', () => {
     const ports = await portsInClientEntry(select)
     await expect(ports.applyPreset('session-1', 'standard')).resolves.toBeNull()
     expect(select).toHaveBeenCalledExactlyOnceWith('session-1', 'standard')
+  })
+})
+
+describe('agent mention colours', () => {
+  it("answers rich-composer's mention tones with each agent's chosen slot, and null when the list did not load", async () => {
+    const source = createAgentMentionToneSource(async () => [{ handle: 'luna', tone: 3 }, { handle: 'plain' }])
+    expect(source.id).toBe('@dshfiles/agents.tones')
+    await expect(source.load()).resolves.toEqual(new Map([['luna', 3]]))
+    await expect(createAgentMentionToneSource(async () => null).load()).resolves.toBeNull()
   })
 })

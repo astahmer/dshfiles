@@ -109,7 +109,7 @@ export const PhoneSheet = (props: {
         data-dshx-sheet=""
         data-dshx-sheet-expand="full"
         hidden={!shown}
-        className="dshx-root dshx:fixed dshx:inset-x-0 dshx:z-[43] dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-t-xl dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:text-foreground dshx:shadow-[0_-8px_24px_rgb(0_0_0/0.18)]"
+        className="dshx-root dshx:fixed dshx:inset-x-0 dshx:z-[43] dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-t-2xl dshx:border-t dshx:border-border dshx:bg-background dshx:pr-[env(safe-area-inset-right,0px)] dshx:pl-[env(safe-area-inset-left,0px)] dshx:text-foreground dshx:shadow-[0_-8px_24px_rgb(0_0_0/0.18)]"
         style={{
           // React writes no display for undefined, so a shown sheet keeps its stylesheet display.
           display: shown ? undefined : 'none',

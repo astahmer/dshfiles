@@ -15,7 +15,7 @@ import { runCli } from '../src/cli/run.js'
 import { ScratchDriveRuntime } from '../src/scratch/drive.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
-import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
+import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime, THREAD_HIERARCHY_NAVIGATION_NAME } from '../src/scratch/seed.js'
 import { DEFAULT_WARN_MINUTES, ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 import { ScratchBootModel } from '../src/scratch/up.js'
 
@@ -66,6 +66,14 @@ const startProcess = async (args: readonly string[]): Promise<number> => {
 }
 
 describe('dshx dev scratch commands', () => {
+  it('waits for the sent seed thread under the header landmark rich-composer names', async () => {
+    // The rebase-ready-thread seed failed for every caller once the landmark became "Thread hierarchy".
+    const locales = await readFile(fileURLToPath(new URL('../../../../../plugins/@dshfiles/rich-composer/src/native/locales.ts', import.meta.url)), 'utf8')
+    const enBlock = locales.slice(locales.indexOf('export const en = {'))
+    const english = enBlock.slice(enBlock.indexOf("'session.hierarchy':"))
+    expect(/^'session\.hierarchy': '([^']+)'/u.exec(english)?.[1]).toBe(THREAD_HIERARCHY_NAVIGATION_NAME)
+  })
+
   it('lists the scratch actions and the plugin dev session when dev has no action', async () => {
     for (const flag of ['--help', '-h']) {
       const help = await run(['dev', flag])
@@ -120,7 +128,7 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
   })
 
-  it('posts synthetic OTLP data to the endpoint carried by the receiver badge', async () => {
+  it('posts synthetic OTLP data to the endpoint carried by the store summary', async () => {
     const browser = await chromium.launch({ headless: true })
     const page = await browser.newPage()
     const postedUrls: string[] = []
@@ -131,7 +139,7 @@ describe('dshx dev scratch commands', () => {
     try {
       await page.setContent(`
         <nav aria-label="Global panels"><button type="button">Traces</button></nav>
-        <div data-testid="traces-receiver-state" data-state="listening" data-endpoint="http://127.0.0.1:4318">listening</div>
+        <div data-testid="traces-store-summary" data-receiver-state="listening" data-endpoint="http://127.0.0.1:4318">3 traces</div>
         <button role="tab">Chat</button>
       `)
       const cwd = process.cwd()
@@ -403,6 +411,20 @@ describe('dshx dev scratch commands', () => {
       const page = await browser.newPage()
       await page.setContent(
         `<section data-setup-wizard="account"><button onclick="this.parentElement.remove()">Skip</button></section><aside role="complementary" aria-label="Provider accounts">Accounts</aside>`,
+      )
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.locator('[data-setup-wizard]').count()).toBe(0)
+    } finally {
+      await browser.close()
+    }
+  })
+
+  it("dismisses the setup wizard by Don't show again, its button since the onboarding tour", async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(
+        `<section data-setup-wizard="account"><button onclick="this.parentElement.remove()">Don't show again</button><button>Next</button></section><aside role="complementary" aria-label="Provider accounts">Accounts</aside>`,
       )
       await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
       expect(await page.locator('[data-setup-wizard]').count()).toBe(0)

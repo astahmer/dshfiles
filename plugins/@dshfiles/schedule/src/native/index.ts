@@ -65,6 +65,8 @@ import { en as managerEn, ja as managerJa, es as managerEs, fr as managerFr, de 
 
 const MANAGER_NS = 'schedule.manager'
 const PANEL_ID = 'schedules' as MainPanelId
+// dshfiles: the owned project-automations page, which starts a new thread from a schedule or a webhook.
+const AUTOMATIONS_PANEL_ID = 'project-automations' as MainPanelId
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -78,7 +80,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Required services for catalogs, ambient Session marks, the right Sidebar, Remote queries, linked-Session navigation, and access. */
 export const inject = [
   'slots', 'locale', 'remote', 'remote.schedule', 'conversation', 'uiConversation', 'uiWorkspace', 'sessions',
-  'workspaces', 'sidebarRightTabs', 'sidebarRight', 'remoteAccess',
+  'workspaces', 'sidebarRightTabs', 'sidebarRight', 'remoteAccess', 'layout',
 ]
 
 async function settle<T>(call: () => Promise<RemoteResult<T>>): Promise<RemoteResult<T> | undefined> {
@@ -231,6 +233,9 @@ export function apply(ctx: ClientContext): void {
       store: createEditorStore(),
       inject: (): TaskManagerInjected => ({
         ...detail,
+        openAutomations: () => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === AUTOMATIONS_PANEL_ID)
+          ? () => { ctx.layout.selectPanel(AUTOMATIONS_PANEL_ID) }
+          : undefined,
         onNewTask: () => { ctx.uiWorkspace.startSession(undefined, { prompt: t('host.createPrompt'), whenDraftExists: 'append' }) },
         onClearEnded: async () => {
           const outcome = await clearEnded()

@@ -2,6 +2,8 @@ import { Command, Composer, createApiClient, defineClient } from '@dshfiles/dshx
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { ConversationScope } from '@dshfiles/workbench/conversation-header'
 import { PhoneMenuScope } from './phone-menu-scope.tsx'
+import { AgentChipTone } from './agent-chip-tone.ts'
+import { AgentMentionTones } from './agent-mention-tones.ts'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { AgentPresetVisibility } from './agent-preset-visibility.ts'
@@ -21,6 +23,9 @@ import { ComposerSendPipeline } from './composer-send-pipeline.ts'
 import { ComposerMoreMenu } from './composer-more-menu.tsx'
 import { ModeChip } from './mode-chip.tsx'
 import { ModeChipCatalog, type ModeChipHost } from './mode-chip-model.ts'
+import { RpcFailure } from './rpc-failure.ts'
+import { threadHeaderMenuOf } from './thread-header-menu.ts'
+import { ThreadViewsModel } from './thread-views.ts'
 
 type ComposerControls = SettingsValue<typeof composerControlsSettings.schema>
 
@@ -37,6 +42,20 @@ export default defineClient({
     const preparers = metadata?.plugin?.list(ComposerSendPreparers)
     if (preparers !== undefined) ctx.effect(() => ComposerSendPipeline.bind(() => preparers.get()), 'rich-composer: new-thread send preparers')
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
+    // Agent mentions in a draft wear the colour the agent chose: one shared read from the first source an agent
+    // registry adds (agent-mention-tones.ts), the hashed slot without one.
+    const toneSources = metadata?.plugin?.list(AgentMentionTones)
+    if (toneSources !== undefined)
+      ctx.effect(() => AgentChipTone.install(async () => (await toneSources.get()[0]?.load()) ?? null), 'rich-composer: agent mention colours')
+    // The header's More actions as plain rows, for the thread menu that lists them (thread-views.ts): one `⋯` per header.
+    ctx.effect(
+      () =>
+        ThreadViewsModel.provideHeaderMenu(sessionId => {
+          const menus = ctx.get('contextMenus')
+          return menus === undefined ? undefined : threadHeaderMenuOf(menus.resolve({ kind: 'sessionHeader', value: { sessionId: SessionId(sessionId) } }))
+        }),
+      'rich-composer: thread header menu',
+    )
     // The composer's own keymap runs these chords (it knows the draft, the uploads and the IME); these rows only list
     // them in the ? sheet, so their run declines and the key goes on to the editor.
     for (const command of [
@@ -104,8 +123,8 @@ export default defineClient({
         onCatalogChanged: listener => remote.$on('permission-presets/catalog-changed', listener),
         run: async (sessionId, line) => {
           const result = await remote.commands.execute(SessionId(sessionId), line, [])
-          if (!result.ok) return `${result.error.message} (${result.error.code})`
-          return result.value === undefined ? `this Host has no ${line.split(' ')[0] ?? line} command` : null
+          if (!result.ok) return RpcFailure.sentence({ subject: 'Plan mode and file access', error: result.error })
+          return result.value === undefined ? `this DSH has no ${line.split(' ')[0] ?? line} command` : null
         },
       }
       const catalog = new ModeChipCatalog(host)

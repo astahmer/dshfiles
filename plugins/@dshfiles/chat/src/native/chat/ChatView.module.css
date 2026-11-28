@@ -27,9 +27,10 @@
      makes the transcript jitter while the tail is pinned. */
   overflow-x: clip;
   overflow-y: auto;
-  /* Sides = composer clearance + 16px: on narrow viewports the transcript
-     stays exactly 32px narrower than the input card (the shared width rule). */
-  padding: 16px calc(var(--dsh-composer-side-clearance) + 16px);
+  /* dshfiles (unslop r5 C3): sides = the composer clearance, so on a narrow pane the transcript, the dock and the input
+     card share one column edge (upstream kept the transcript 16px inside the card on each side). The end padding is
+     24px (round five C2, council round 4): a finished turn's last line sits 24px above the dock's live rows. */
+  padding: 16px var(--dsh-composer-side-clearance) 24px;
   /* Inline-size query container: wide markdown tables size their breakout
      against this box's content width (100cqw in AssistantMarkdown's
      md-table-wide rule) — the CSS stand-in for deepsuite chat's JS-measured
@@ -66,7 +67,12 @@
 /* Message column: shared chat width (ConversationRoot --dsh-chat-content-width),
    centered on the same axis as the input box (which caps at chat + 16px); the
    scroller itself stays full-bleed. */
+/* dshfiles (unslop R4): --dsh-chat-prose-measure is the width a one-line work row ("Worked for", a collapsed tool row,
+   the turn summary) fits its content up to: 44em of the prose size, in pixels so a 13px work row caps at the same
+   edge; blocks with a body keep the column. Council round 11 C5 set prose itself narrower (36em, AssistantMarkdown);
+   work rows keep this wider cap, so a long collapsed command still reads to the column's side. */
 .column {
+  --dsh-chat-prose-measure: calc(44 * max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px)));
   position: relative;
   max-width: var(--dsh-chat-content-width);
   width: 100%;
@@ -103,8 +109,53 @@
   --dsh-chat-flow-gap: 28px;
 }
 
+/* dshfiles (unslop r5 C3, council round 5): where a prompt's actions show only on hover, they overlay the space under
+   its bubble (MessageItem.module.css) and "Worked for" sits 24px under the bubble; it was 50px, the hidden row's 34px
+   plus the 16px gap. */
+@media (hover: hover) {
+  .flowItem[data-chat-flow-kind="user"] + .flowItem[data-chat-flow-kind="turn-process"] {
+    --dsh-chat-flow-gap: 24px;
+  }
+}
+
+/* dshfiles (council round 23, item 9): a turn a notice opened (a subagent's failed run) sits as far under the reply
+   before it as its own "Worked for" sits under the notice: 24px of ink each side. Below, 22px plus the notice's 2px
+   padding; above on a touch screen, 22px under the reply's visible actions row. */
+.flowItem[data-chat-flow-kind="turn-trigger"] + .flowItem[data-chat-flow-kind="turn-process"],
+.flowItem[data-chat-flow-kind="turn-tail"] + .flowItem[data-chat-flow-kind="turn-trigger"] {
+  --dsh-chat-flow-gap: 22px;
+}
+
+/* On a pointer device the reply's actions show only on hover, so an actions-only tail reserved a 32px blank row over
+   the notice (77px of ink above it, 18px below). It takes no height there: its actions row shrinks to its buttons at
+   the row's end and hangs over the gap, where the notice's short first line leaves room, above the notice so hovering
+   it still reveals them; the notice sits 24px of ink under the reply (3px under its last line, the tail's 12px, 7px,
+   the notice's 2px). */
+@media (hover: hover) {
+  .flowItem[data-chat-flow-kind="turn-tail"]:has(+ .flowItem[data-chat-flow-kind="turn-trigger"]):has([data-actions-reveal="hover"]):not(:has([data-actions-reveal] > [data-slot] > *)) {
+    height: 0;
+  }
+
+  .flowItem[data-chat-flow-kind="turn-tail"]:has(+ .flowItem[data-chat-flow-kind="turn-trigger"]) [data-actions-reveal="hover"]:not(:has(> [data-slot] > *)) {
+    position: relative;
+    z-index: 1;
+    width: fit-content;
+    margin-left: auto;
+  }
+
+  .flowItem[data-chat-flow-kind="turn-tail"]:has([data-actions-reveal="hover"]):not(:has([data-actions-reveal] > [data-slot] > *)) + .flowItem[data-chat-flow-kind="turn-trigger"] {
+    --dsh-chat-flow-gap: 7px;
+  }
+}
+
 /* dshfiles (visual refresh T2.2): consecutive tool rows read as one list of 24px lines, 2px apart. */
 .flowItem[data-chat-flow-kind="tool-call"] + .flowItem[data-chat-flow-kind="tool-call"] {
+  --dsh-chat-flow-gap: 2px;
+}
+
+/* dshfiles (council round 22, item 9): the failed call a run took in from after its process group is the run's last
+   row; it keeps the run's 2px pitch instead of the 4px gap after a group. */
+.flowItem[data-run-fold-member="absorbed"] {
   --dsh-chat-flow-gap: 2px;
 }
 
@@ -114,19 +165,19 @@
   min-width: 0;
 }
 
-/* Where an unread thread opened: above its final answer, drawn like the Since you left divider (a muted label between
-   hairlines). With the recap card in the row, that card's divider is the only one. */
+/* Where an unread thread opened: above its final answer, when output of its Turn came before it (use-chat-viewport.ts
+   opensTurn; an answer that opens its Turn needs no marker). dshfiles (unslop r5 C3, council round 5): an 11px label in
+   the accent, on the text's start edge, with no rules: the centred divider read as a section break inside one Turn. With
+   the recap card in the row, that card's divider is the only one. */
 .flowItem[data-chat-unread-label]::before {
   content: attr(data-chat-unread-label);
   display: block;
-  margin-bottom: 8px;
-  color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xxs-12);
+  margin-bottom: 4px;
+  color: var(--dshx-tone-info, var(--dsw-alias-brand-primary));
+  font-size: 11px;
   font-weight: 600;
-  text-align: center;
-  background:
-    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) left center / calc(50% - 3em) 1px no-repeat,
-    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) right center / calc(50% - 3em) 1px no-repeat;
+  line-height: 16px;
+  letter-spacing: 0.02em;
 }
 
 .flowItem[data-chat-unread-label]:has(> [data-since-you-left])::before {
@@ -368,6 +419,8 @@
 /* Floating controls sit outside the clipped transcript. A standalone Chat
    anchors them to its frame; the shared host supplies the sticky scrollport. */
 .toBottomSlot {
+  /* dshfiles (unslop r5 C2, council round 3): a 36px circle everywhere; a touch screen gets a 44px hit area (below). */
+  --dsh-to-bottom-size: 36px;
   position: absolute;
   right: 0;
   bottom: 16px;
@@ -380,9 +433,11 @@
   height: 0;
   display: flex;
   justify-content: flex-end;
+  /* dshfiles (unslop T19): the control sits in the gutter right of the text column, 12px clear of it, so it never
+     covers the last line of a user bubble or a row's timing. A pane too narrow for a gutter keeps the edge inset. */
   padding-right: max(
-    calc(var(--dsh-composer-side-clearance) + 16px),
-    calc((100% - var(--dsh-chat-content-width)) / 2)
+    var(--dsh-composer-side-clearance),
+    calc((100% - var(--dsh-chat-content-width)) / 2 - var(--dsh-to-bottom-size) - 12px)
   );
   pointer-events: none;
 }
@@ -392,17 +447,20 @@
   /* Clears the sticky composer stack (docks + input card + stats): the live
      height rides --dsh-composer-height (ConversationRoot's seat observer) so
      the control follows a growing textarea; the fallback covers the first
-     paint before the observer fires. */
-  bottom: calc(var(--dsh-composer-height, 152px) + 16px);
+     paint before the observer fires. dshfiles (unslop r5 C2, council round 3): 12px above the dock. */
+  bottom: calc(var(--dsh-composer-height, 152px) + 12px);
 }
 
+/* dshfiles (unslop r5 C2, council round 3): the control floats over the transcript, 16px from the pane's edge where no
+   gutter holds it, with nothing behind it: the band and hairline of round 2 read as a second dock edge. */
 .toBottom {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-top: -34px;
+  width: var(--dsh-to-bottom-size);
+  height: var(--dsh-to-bottom-size);
+  margin-top: calc(-1 * var(--dsh-to-bottom-size));
   padding: 0;
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
@@ -420,6 +478,45 @@
     background: var(--dsw-alias-button-floating-hover);
   }
 }
+
+/* dshfiles (unslop r5 C1, council round 4): a phone has no gutter, so the control sits in the dock's trailing seat
+   (rich-composer's PhoneDockHead), on the dock, never over prose; there it is an ordinary box in a row. Round five C1
+   (council round 5): a 32px control in that 44px seat, its own control beside Live work. Council round 8 C4: it is the
+   strip's trailing icon button after the seat's hairline, with no floating shadow. Council round 10 C1: a 28px round
+   seat filled like the composer's + circle (InputBar `.add`), so the strip's end reads as one control, not a loose
+   glyph. */
+.toBottomInDock {
+  --dsh-to-bottom-size: 28px;
+  margin-top: 0;
+  border-radius: 999px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-selector);
+  box-shadow: none;
+}
+
+.toBottomInDock:active {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+@media (hover: hover) {
+  .toBottomInDock:hover {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
+  }
+}
+
+/* A touch screen answers a 44px tap centred on the 36px circle. */
+@media (pointer: coarse) {
+  .toBottom::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+  }
+
+  .toBottomInDock::after {
+    inset: -8px;
+  }
+}
+
 
 /* Host open-path refusal: same dialog family as the workspace folder error. */
 .modalAction {
@@ -473,11 +570,32 @@
   gap: 8px;
 }
 
+/* Council round 9 (lane B's phone gutter, B4): on a phone the composer and the transcript's fills start 12px in, and
+   bare text (prose, lists, "Worked for", the turn summary) 12px further, at 24px, like every phone page. Fills pull
+   back out to the 12px edge (AssistantMarkdown's code cards, MessageItem's prompt bubble). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  /* Council round 10 C1: the composer seat's fade above the dock grew from 16px to one 28px line; the end padding gave
+     those 12px back. Council round 17 C4: the fade is 8px, so the end padding is 32px and at the tail the last line
+     still ends 40px above the Live work card. */
+  :global(html[data-shell-phone-nav]) .scroll {
+    padding-inline: calc(var(--dsh-composer-side-clearance) + 12px);
+    padding-bottom: 32px;
+  }
+}
+
 /* Phone: an off-screen row skips style, layout and paint; the flow item is already the
    settled mount/measure unit, so containment changes no wrapper and keeps the column gap. */
 @media (max-width: 639.98px) {
   .flowItem {
     content-visibility: auto;
     contain-intrinsic-size: auto 96px;
+  }
+
+  /* dshfiles: containment clips paint to the item's padding box, and the phone fills (AssistantMarkdown's code cards,
+     MessageItem's prompt bubble) bleed 12px out of the text column. The item reaches the fill edge; its padding keeps
+     the content box where it was. */
+  :global(html[data-shell-phone-nav]) .flowItem {
+    margin-inline: -12px;
+    padding-inline: 12px;
   }
 }

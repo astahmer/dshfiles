@@ -4,7 +4,11 @@ import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { errorMessage, PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useId } from 'react'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
+import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useId, useState, type ReactNode } from 'react'
 import type { ShellTranslate } from './native/locales.js'
 import { rowIdOf, settingsShellApi, type PluginChange, type PluginEntry } from './shell-api.js'
 
@@ -30,7 +34,7 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
   const dotTone = entry.pendingRestart !== null ? 'warning' : entry.enabled ? 'success' : 'muted'
   return (
     <div
-      className="dshx:@container dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:px-3.5 dshx:py-2.5"
+      className="dshx:@container dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:px-3 dshx:py-2"
       data-plugin-entry={entry.entryId}
     >
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-x-3 dshx:gap-y-1.5">
@@ -82,7 +86,39 @@ const EntryCard = (props: { readonly entry: PluginEntry; readonly t: ShellTransl
   )
 }
 
-const EntryForNamespace = (props: { readonly namespace: string; readonly t: ShellTranslate }): JSX.Element | null => {
+/**
+ * The fold around a page's plugin entry. The entry is plumbing (a Loader row id, the bundle behind it and a switch the
+ * Plugins page also offers), so it stays one click away instead of heading every settings page; it starts open only
+ * when it has something to say. The control is named for its page: a task entry holds several.
+ */
+export const PluginEntryDisclosure = (props: {
+  readonly page: string
+  readonly open: boolean
+  readonly t: ShellTranslate
+  readonly children: ReactNode
+}): JSX.Element => {
+  const [open, setOpen] = useState(props.open)
+  return (
+    <Collapsible className="dshx:mt-2 dshx:flex dshx:flex-col" onOpenChange={setOpen} open={open}>
+      <CollapsibleTrigger asChild>
+        <Button
+          aria-label={props.t('entryCard.detailsOf', { page: props.page })}
+          className="dshx:-ml-2 dshx:self-start dshx:text-muted-foreground"
+          data-plugin-details=""
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <ChevronRightIcon className={cn('dshx:transition-transform', open && 'dshx:rotate-90')} />
+          {props.t('entryCard.details')}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>{props.children}</CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+const EntryForNamespace = (props: { readonly namespace: string; readonly page: string; readonly t: ShellTranslate }): JSX.Element | null => {
   const api = useApi(settingsShellApi)
   const plugins = useQuery({
     queryKey: PLUGINS_QUERY_KEY,
@@ -91,7 +127,12 @@ const EntryForNamespace = (props: { readonly namespace: string; readonly t: Shel
   })
   // A Host without a plugin manager, or one older than these fields, answers an error: the page shows no entry.
   const entry = plugins.data?.entries.find(candidate => rowIdOf(candidate.entryId) === props.namespace)
-  return entry === undefined ? null : <EntryCard entry={entry} t={props.t} />
+  if (entry === undefined) return null
+  return (
+    <PluginEntryDisclosure open={entry.pendingRestart !== null} page={props.page} t={props.t}>
+      <EntryCard entry={entry} t={props.t} />
+    </PluginEntryDisclosure>
+  )
 }
 
 /**
@@ -99,8 +140,8 @@ const EntryForNamespace = (props: { readonly namespace: string; readonly t: Shel
  * a change waiting for a restart, and whether `pnpm profile:sync` would undo a change. A dshx plugin's settings
  * namespace is its row id, the last segment of the entry id, so the page finds its entry by it; a namespace no entry carries shows nothing.
  */
-export const PluginEntryCard = (props: { readonly namespace: string; readonly t: ShellTranslate }): JSX.Element => (
+export const PluginEntryCard = (props: { readonly namespace: string; readonly page: string; readonly t: ShellTranslate }): JSX.Element => (
   <PluginQueryProvider>
-    <EntryForNamespace namespace={props.namespace} t={props.t} />
+    <EntryForNamespace namespace={props.namespace} page={props.page} t={props.t} />
   </PluginQueryProvider>
 )

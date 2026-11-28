@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, EllipsisIcon, MessagesSquareIcon, PinIcon, PinOffIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ChevronDownIcon, MessagesSquareIcon, PinIcon, PinOffIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
@@ -18,7 +19,8 @@ import { ItemGlyphs } from './item-glyphs.js'
 /** Space the list keeps below its last row so the bar (38px tall, 16px off the bottom) never hides it. */
 export const bulkSelectionBarClearance = 64
 
-const actionClass = 'dshx:inline-flex dshx:h-7 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent'
+const actionClass =
+  'dshx:inline-flex dshx:h-7 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50'
 const iconClass = 'dshx:size-3.5'
 const chevronClass = 'dshx:size-3 dshx:opacity-60'
 const menuItemClass = 'dshx:gap-2 dshx:text-sm'
@@ -94,7 +96,7 @@ export const BulkSelectionBar = (props: {
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger aria-label="More actions" className={cn(actionClass, shownWhenNarrow)}>
-          <EllipsisIcon aria-hidden className={iconClass} />
+          <OverflowGlyph />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="dshx-root">
           <DropdownMenuSub>

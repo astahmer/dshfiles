@@ -3,8 +3,9 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover Agents and peers",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
+      "title": "Find running agents",
+      "summary": "Agents can find the other running agents, with the ones in the same project listed first.",
+      "details": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
       "surfaces": ["tool", "host", "client"],
       "surface": "destinationSection",
       "destination": "agents",
@@ -50,8 +51,9 @@
     },
     {
       "id": "passive-messaging",
-      "title": "Durable direct peer mail with a bounded request wake",
-      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
+      "title": "Store and browse agent messages",
+      "summary": "Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.",
+      "details": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
       "surfaces": ["tool", "host", "storage", "client"],
       "surface": "destinationSection",
       "destination": "agents",
@@ -88,7 +90,7 @@
       "externalDependencies": [],
       "onboarding": {
         "firstAction": "Open Agents \u203a Messages and send a direct message to a live Agent.",
-        "doneWhen": "Your message shows in that Agent\u2019s conversation.",
+        "doneWhen": "Your message shows in that Agent\u2019s thread.",
         "open": {
           "panel": "agent-communication"
         }
@@ -198,7 +200,8 @@
     {
       "id": "human-browser",
       "title": "Send direct messages from the Messages panel",
-      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
+      "summary": "Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.",
+      "details": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
       "reach": ["click tab \"Agents\"", "click button \"Messages\"", "expect combobox \"Message a thread\u2026\""],
       "reachNarrow": [
         "click button \"More\"",
@@ -241,7 +244,8 @@
     {
       "id": "durable-inbox",
       "title": "Read and acknowledge direct messages",
-      "summary": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
+      "summary": "Agents read and acknowledge their own direct messages, which survive a restart.",
+      "details": "Messages survive service reopen, explicit inbox reads do not acknowledge, and only the recipient can acknowledge its record.",
       "surfaces": ["tool", "host", "storage"],
       "surface": "agentToolOnly",
       "destination": "none",

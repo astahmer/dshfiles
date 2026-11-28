@@ -40,6 +40,21 @@ const pressEscape = (): void => {
 }
 
 describe('confirm', () => {
+  it('gives every dialog the 12 px dialog radius', async () => {
+    const confirm = ask(() => queue.service.confirm({ title: 'Delete Old draft?' }))
+    expect(screen.getByRole('alertdialog').className).toContain('dshx:rounded-xl')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await confirm
+    const prompt = ask(() => queue.service.prompt({ title: 'Rename' }))
+    expect(screen.getByRole('dialog').className).toContain('dshx:rounded-xl')
+    pressEscape()
+    await prompt
+    const select = ask(() => queue.service.select({ title: 'Pick a model', options: [{ value: 'a', title: 'A' }] }))
+    expect(screen.getByRole('dialog').className).toContain('dshx:rounded-xl')
+    pressEscape()
+    await select
+  })
+
   it('resolves true from the confirm button', async () => {
     const answer = ask(() => queue.service.confirm({ title: 'Delete it?', confirm: 'Delete' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))

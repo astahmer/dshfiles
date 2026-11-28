@@ -28,8 +28,8 @@ const progressStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'd
 const statusBar = {
   inbox: 'dshx:bg-muted-foreground/40',
   todo: 'dshx:bg-muted-foreground/70',
-  doing: 'dshx:bg-warning',
-  done: 'dshx:bg-success',
+  doing: 'dshx:bg-foreground/45',
+  done: 'dshx:bg-foreground',
   dropped: 'dshx:bg-muted',
 } satisfies Record<BacklogStatus, string>
 
@@ -455,7 +455,7 @@ export const ProjectsView = (props: {
       ) : (
         <div className="dshx:mx-auto dshx:flex dshx:max-w-6xl dshx:flex-col dshx:gap-4 dshx:px-6 dshx:py-5">
           <div>
-            <h2 className="dshx:text-lg dshx:font-semibold dshx:tracking-tight">Projects</h2>
+            <h2 className="dshx:text-sm dshx:font-semibold">Projects</h2>
             <p className="dshx:text-xs dshx:text-muted-foreground">
               Grouped from the repositories items were captured in.{' '}
               {matchingProjects === null ? `${String(projects.length)} in total.` : `${String(shown.length)} of ${String(projects.length)} match the search.`}
@@ -469,27 +469,25 @@ export const ProjectsView = (props: {
                   key={project.key}
                   type="button"
                   onClick={() => props.setSelectedProject(project.key)}
-                  className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-left dshx:transition-[border-color,box-shadow,transform] dshx:duration-150 dshx:hover:-translate-y-px dshx:hover:border-input dshx:hover:shadow-md"
+                  className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-4 dshx:text-left dshx:outline-none dshx:transition-colors dshx:duration-150 dshx:hover:border-input dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
                 >
                   <div className="dshx:flex dshx:items-start dshx:gap-3">
-                    <span className="dshx:inline-flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:bg-muted">
-                      <FolderGit2Icon className="dshx:size-4 dshx:text-muted-foreground" />
-                    </span>
+                    <FolderGit2Icon aria-hidden className="dshx:mt-0.5 dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                     <div className="dshx:min-w-0 dshx:flex-1">
                       <p className="dshx:text-sm dshx:font-semibold">
                         <ProjectTitle projectKey={project.key} />
                       </p>
                       {project.key === NO_PROJECT ? (
-                        <p className="dshx:truncate dshx:font-mono! dshx:text-2xs dshx:text-muted-foreground">Captured outside a repository</p>
+                        <p className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">Captured outside a repository</p>
                       ) : null}
                     </div>
                     <span
                       className={cn(
-                        'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs',
-                        recent ? 'dshx:bg-success/12 dshx:text-success' : 'dshx:bg-muted dshx:text-muted-foreground',
+                        // Active is this page's own word, not a work status: a muted chip, an ink dot.
+                        'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground',
                       )}
                     >
-                      <StatusDot size="sm" className={recent ? 'dshx:bg-success' : 'dshx:bg-muted-foreground'} />
+                      <StatusDot size="sm" className={recent ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/50'} />
                       {recent ? 'Active' : 'Quiet'}
                     </span>
                   </div>

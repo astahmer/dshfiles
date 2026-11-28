@@ -1,6 +1,6 @@
 # DSH activity timeline
 
-![Unified agent activity feed](docs/screenshots/activity-feed.png)
+![Activity feed](docs/screenshots/activity-feed.png)
 
 One chronological activity feed across agents, sessions, communication, and jj
 workspaces — a shared activity room rather than another thread list. Observation
@@ -16,17 +16,51 @@ Open the reusable **Activity Timeline: Activity** view from navigation or the Wo
 
 The plugin also owns the attention inbox of [the ADE plan](../../../docs/ade-ux/README.md#48-the-attention-model)
 (Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
-badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
+badge, the Needs you count (the kit's `AttentionBadge`, seated past the glyph's trailing edge so it never covers it; council round 4). The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
 plus **Snoozed**, **Done** and **Muted** when they hold items. Each row leads with the thread or item it is about,
 then the sentence that says what it is about and its detail, then one direct action and its verbs inline: answer
 choices, **Review thread** for a finished turn, **Open thread**, **Open backlog item** for a subject another page owns,
 Land, Done, Snooze (1 h, 4 h, tomorrow, until it changes) and Mute source. Row actions are 44 px on touch input. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
 usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
 transition can be undone. Browser
-alerts for new Needs you items (questions and failures) are opt-in, per browser, below the list: the notification is
+alerts for new Needs you items (questions and failures) are opt-in, per browser, in the page menu: the notification is
 titled with the thread, its body is the question or the failure, and a click opens that item's thread (or the Inbox
 when nothing else can show it). An item that can Land asks before it lands, showing what will land, and offers
 **Review**, which opens the thread's Changes view.
+
+A question a subagent asked its parent thread also shows in that thread, above its composer, with the same options
+(`src/thread-question-dock.tsx`): **Answer** on a thread row opens the thread, and this is the answerable card it lands
+on. It reads the Needs you list the badge reads, so answering in either place clears both.
+
+Each item is one card (desktop and phone, the page on the kit's 920 px list lane): a head band flush with its top holds the status
+glyph, the title, the type and the age, on the kit's attention wash for Needs you (the calmer band wash) and Failed; the neutral body below
+holds the question or detail and the actions. The recommended answer says **Recommended** in words, **Write your
+own…** beside the answers opens the thread to reply in free text, and a failed turn's card names its thread once.
+Council round 4: titles use the kit heading step (15/20 at 600), the `⋯` menu sits in the head band's corner at every
+width, an approval says its title once (its "Approve: …" line goes when it only restates the title) with the command
+in 12/16 secondary mono, and a Failed item with nothing to say is one compact row: title and recovery verb. The
+page title carries one count chip per status present, ◆2 ✕1 (the kit Page's `statusCounts`), and the header ends at the
+list's trailing edge, so Start triage and the page menu line up with the cards. Council round 8: every card has one
+structure. The head reads glyph · title · project · kind · time with muted "·" separators, plus its `⋯` menu; the
+body opens with the evidence (council round 16 C3: what a card quotes sits in the kit's evidence well, desktop and
+phone: an approval's "Runs: `command`" in the neutral well, a failed turn's provider line as "Error: …" in the danger
+well, and no well for a failure without one; a question's "Asks: …") and the verbs
+follow it as full-width buttons on a phone (a question's answers are its verbs). On a desktop (council round 11) a
+card's verb sits in its head's trailing slot, 12 px before the `⋯`, approval and failed alike; answers stay under the
+question. Council round 16 C2: a question card's head **Open thread** is a quiet ghost in secondary ink with ↗, so its
+answers are the strongest controls; a phone's body Review is drawn 44 pt tall, 8 pt under the evidence. A
+bodyless failure keeps its verb in the head. On a phone the head of a card with a body is one 44 pt line: the title
+truncates, the project's mark and the kind stay ("BA · Approval"), and the age shows only where it fits; the body
+takes the card's 16 pt inset and a long answer wraps inside its 44 pt row. **Start triage** (a worded 44 pt "Triage" text
+button beside the `⋯`, council round 11; the view switcher's row keeps only the segments and the Needs you tally), the
+page menu and the frame's status button (frame-layout's `PhoneStatus`) sit in the top
+bar beside the "Inbox" title (`src/inbox-phone-bar.tsx`, drawn from the frame's root overlay) instead of a row of
+their own.
+
+An item that asks a question never offers the prompt library's quick replies, and a row prints a question as plain
+words: the first paragraph of its Markdown, at most two lines (`src/inbox-preview.ts`). **Start triage** shows one item
+at a time with a single action row (the bar): the item's answers or verb, Open, Done, Snooze, Skip and Exit. This
+device's alert settings open from the page menu (**More actions › Alerts on this device**).
 
 ### The attention contract
 
@@ -55,7 +89,7 @@ are Ready, or Failed for an error or the token limit; opening the thread resolve
 
 ## Push for blocking items
 
-**Push blocking items to this device** (Inbox, under the in-tab alerts) sends each new Needs you or Failed item to a
+**Push blocking items to this device** (Inbox › More actions › Alerts on this device, under the in-tab alerts) sends each new Needs you or Failed item to a
 device even when no DSH tab is open; Ready items never push. Turning it on registers a service worker the Host serves
 from its own origin (`/dshfiles-web-push/sw.js`, scoped to its own folder so it controls no page), subscribes the
 browser with the Host's VAPID key and records the device. The Host keeps the keys and subscriptions in the
@@ -119,7 +153,7 @@ events and named milestones (`session.error`, `session.input`,
 of `workspace.sync_refused` events (jj-integration's safe "checkout kept as is"
 refusals): those with the same checkout and the same reason within thirty
 minutes fold into one attention row (`N× <summary>`), placed at the newest one.
-Selecting it shows the count, and **Detailed** expands each event. Folding is
+Selecting it shows the count, and **Every event** expands each event. Folding is
 read-only: nothing is retried or rebased. Every group carries the ids of its
 members, and the `detailed` filter expands every retained event.
 
@@ -130,7 +164,7 @@ attention-only, detailed), a chronological feed (oldest top, newest bottom),
 auto-scroll only when already near the bottom, a new-events indicator, jump to
 latest, "load older" cursor pagination, and a detail drawer with metadata,
 references, provenance, and correlated events. When an event names a Session,
-"Open Session" navigates through the public Client workspace API only if that
+"Open thread" navigates through the public Client workspace API only if that
 Session is in the current Host list. Missing or archived Sessions show an
 unavailable message without being revived or changed. Verification detail is a
 historical summary; open Project Checks for live source freshness and the full

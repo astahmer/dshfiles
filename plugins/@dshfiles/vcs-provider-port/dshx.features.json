@@ -5,7 +5,8 @@
     {
       "id": "vcs-provider-resolution",
       "title": "One port for version-control providers",
-      "summary": "Providers serve the same dshx API id under their own owner; a caller asks every served provider which claims a path and uses the highest priority one to isolate a thread or snapshot and restore files.",
+      "summary": "Jujutsu and git support plug in the same way, and the best one for a folder is used.",
+      "details": "Providers serve the same dshx API id under their own owner; a caller asks every served provider which claims a path and uses the highest priority one to isolate a thread or snapshot and restore files.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -47,7 +48,8 @@
     {
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
-      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
+      "summary": "DSH tells whether a folder uses Jujutsu or git from the folder itself.",
+      "details": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: library",
@@ -79,8 +81,9 @@
     },
     {
       "id": "workspace-attribution",
-      "title": "Which project a Session belongs to",
-      "summary": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspace lists falls back to its recorded cwd. thread-sidebar groups by it and agents picks a project's default agent with it.",
+      "title": "Which project a thread belongs to",
+      "summary": "Tells other plugins which project a thread belongs to, counting a thread workspace for the project it was cut from.",
+      "details": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspace lists falls back to its recorded cwd. thread-sidebar groups by it and agents picks a project's default agent with it.",
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: library",

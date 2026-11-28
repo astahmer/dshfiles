@@ -20,9 +20,11 @@ import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
 import { ReminderWake, ReminderWakeSources } from './reminder-wake-host.js'
 import { ClientModules } from './client-modules-promise.js'
+import { FailedTurns } from './failed-turns.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { LiveTurns } from './live-turns.js'
+import { PendingApprovals } from './pending-approvals.js'
 import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadMentionCandidateApi } from './mention-candidate-api.js'
@@ -53,6 +55,9 @@ import { SessionLineage } from './session-lineage.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { threadSidebarSettings } from './settings.js'
 import { SettledGateModel, type SettledSessionHeader } from './settled-gate.js'
+import { threadSidebarSettledApi } from './settled-api.js'
+import { SettledStore } from './settled-store.js'
+import { SettledThreadsModel } from './settled-threads.js'
 import { ThreadSubscriptionActions } from './subscription-actions.js'
 import { subscriptionChangeEvents, subscriptionNoticeHostLayer, subscriptionNoticer } from './subscription-notices-host.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
@@ -153,6 +158,7 @@ const restartWithUpdates = autoRestart.pipe(
 
 const services = Layer.mergeAll(
   ThreadAttention.layer,
+  FailedTurns.layer,
   NotificationHistory.layer,
   subscriptionNoticeHostLayer,
   ThreadSubscriptionActions.layer,
@@ -162,6 +168,7 @@ const services = Layer.mergeAll(
   threads,
   MachineName.layer,
   LiveTurns.layer,
+  PendingApprovals.layer,
   UserNotifications.layer,
 ).pipe(Layer.provideMerge(runtimeState))
 
@@ -289,6 +296,7 @@ export default DshxPlugin.make({
       markUnreadMany: input => ThreadAttention.use(attention => attention.markUnreadMany(input.sessionIds)),
       migrate: input => ThreadAttention.use(attention => attention.migrate(input.entries)),
       writeDelta: input => ThreadAttention.use(attention => attention.writeDelta(input)),
+      failedTurns: () => FailedTurns.use(failed => Effect.map(failed.list, sessions => ({ sessions: [...sessions] }))),
       writeCapabilities: (): Effect.Effect<{ readonly deltaVersion: 1 }> => Effect.succeed({ deltaVersion: 1 }),
     }),
     Api.bind(threadSidebarSessionArchiveApi, {
@@ -369,6 +377,16 @@ export default DshxPlugin.make({
     Api.bind(threadSidebarAutoSettleApi, {
       status: () => AutoSettle.use(autoSettle => autoSettle.status),
       requestSettle: input => AutoSettle.use(autoSettle => autoSettle.requestSettle(input)),
+    }),
+    Api.bind(threadSidebarSettledApi, {
+      read: () => SettledStore.use(store => store.snapshot),
+      change: input =>
+        SettledStore.use(store =>
+          Effect.andThen(
+            store.update(status => ({ status: SettledThreadsModel.applyChange(status, input), result: undefined })),
+            store.snapshot,
+          ),
+        ),
     }),
   ],
 })

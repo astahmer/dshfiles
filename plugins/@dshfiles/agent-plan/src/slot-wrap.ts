@@ -17,8 +17,7 @@ const wrappers = new WeakSet<object>()
  * disposer that puts every original back.
  *
  * Used for the seats where the native occupant takes injected props a shadowing entry could not supply:
- * `tool.call.toolview` `todo_write`, `conversation.input.plan`, `conversation.input.activity`, and the
- * `conversation.chat.node` `turn-error` / `model-retry` renderers.
+ * `tool.call.toolview` `todo_write`, `conversation.input.plan` and `conversation.input.activity`.
  */
 export const wrapSlotEntries = <Props extends object>(input: {
   readonly slots: SlotLedger
