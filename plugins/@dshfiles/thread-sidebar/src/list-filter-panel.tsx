@@ -715,10 +715,11 @@ const StatusChips = (props: {
         </ToggleGroup>
         {forced ? (
           // A status in force never hides (council round 29, item 3). While one is on, a plain label stands where the
-          // disclosure was, at its label's x and height, in the secondary ink with no hover fill or pointer (council round
-          // 34, A6, Astra's wording): it read as a disabled "Fewer statuses" with a hint line under it.
-          // Three held statuses run past one line at 320px: it wraps rather than cutting the names it exists to say.
-          <p className="dshx:flex dshx:min-h-7 dshx:min-w-0 dshx:cursor-default dshx:items-center dshx:py-1 dshx:pl-6 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:min-h-11" data-thread-status-forced="">
+          // disclosure was, at its height, in the secondary ink with no hover fill or pointer (council round 34, A6, Astra's
+          // wording): it read as a disabled "Fewer statuses" with a hint line under it. It starts at the section's left
+          // edge, with the heading and the chips (council round 35 P4): with no chevron, the disclosure's indent read as a
+          // stray offset. Three held statuses run past one line at 320px: it wraps rather than cutting the names.
+          <p className="dshx:flex dshx:min-h-7 dshx:min-w-0 dshx:cursor-default dshx:items-center dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:min-h-11" data-thread-status-forced="">
             {forcedLabel}
           </p>
         ) : (

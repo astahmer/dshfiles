@@ -1574,8 +1574,14 @@ describe('a forced More statuses is one plain label (council round 34, A6)', () 
     expect(forced.hasAttribute('tabindex')).toBe(false)
     expect(forced.className).toContain('dshx:cursor-default')
     expect(forced.className).not.toMatch(/hover:/u)
-    // At the disclosure's label x (24px into the section, where "More statuses" starts) in the secondary ink.
-    for (const token of ['dshx:pl-6', 'dshx:text-xs', 'dshx:text-muted-foreground']) expect(forced.className).toContain(token)
+    // At the section's left edge, where the Status heading and the chips start (council round 35 P4: the disclosure's
+    // chevron indent, 24px, read as a stray offset once nothing sat in it), in the secondary ink.
+    expect(forced.className).not.toMatch(/(?:^|\s)dshx:(?:pl|px|ml|mx)-/u)
+    for (const token of ['dshx:text-xs', 'dshx:text-muted-foreground']) expect(forced.className).toContain(token)
+    // Its row shares the section's left edge: the Status heading's row has no inset either.
+    const heading = element(document.querySelector('[data-thread-status-heading]'))
+    expect(heading.className).not.toMatch(/(?:^|\s)dshx:(?:pl|px|ml|mx)-/u)
+    expect(forced.parentElement).toBe(heading.parentElement?.querySelector('[data-thread-status-filters]'))
     expect(screen.queryByText(/Turn (?:it|them) off to fold/u)).toBeNull()
     expect(document.querySelector('[data-thread-status-fold-hint]')).toBeNull()
     expect(screen.queryByRole('button', { name: /statuses/u })).toBeNull()
