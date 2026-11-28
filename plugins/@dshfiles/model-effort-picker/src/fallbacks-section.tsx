@@ -121,6 +121,10 @@ export const FallbackList = (props: {
 
       {props.expanded ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1" id={listId}>
+          {/* Round 5 U11: on touch the help icon is hidden, so the chain says what it is. */}
+          <p className="dshx:hidden dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:block" data-model-fallbacks-help>
+            Priority distribution tries these routes in order if the request fails.
+          </p>
           {props.serving === null ? null : (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Undo2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />

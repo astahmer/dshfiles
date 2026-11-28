@@ -86,4 +86,13 @@ describe('fallbacks collapse to one line (council picker N5)', () => {
     expect(text(html)).toContain('Reset to default chain')
     expect(text(html)).not.toContain('Use default')
   })
+
+  it('explains the chain in one sentence on touch, where the help icon is hidden (round 5 U11)', () => {
+    const html = render({ expanded: true })
+    expect(/<p[^>]*data-model-fallbacks-help[^>]*>([^<]*)</u.exec(html)?.[1]?.trim()).toBe(
+      'Priority distribution tries these routes in order if the request fails.',
+    )
+    expect(/<p[^>]*data-model-fallbacks-help[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:hidden[^"]*dshx:pointer-coarse:block/u)
+    expect(render({ expanded: false })).not.toContain('data-model-fallbacks-help')
+  })
 })
