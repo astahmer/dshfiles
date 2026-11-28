@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, ListChecksIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountAccents } from './account-color.js'
+import { accountAccents, accountColor } from './account-color.js'
 import { ListEmptyState } from './empty-state.js'
 import { FanOutBar } from './fan-out-bar.js'
 import { FallbacksSection } from './fallbacks-section.js'
@@ -306,11 +306,31 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none dshx:in-data-model-icon:hidden">
                 {/* The family mark is identity beside the name; it never shrinks, the name truncates first. */}
                 {triggerBrand === undefined ? null : <BrandMark brand={triggerBrand} className="dshx:size-3.5" name={triggerLabel} />}
-                {shortLabel?.providerTag === undefined ? null : (
+                {shortLabel?.providerTag === undefined || current === null ? null : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="dshx:shrink-0 dshx:text-2xs dshx:font-semibold dshx:text-foreground" data-model-picker-provider>
-                        {shortLabel.providerTag}
+                      <span
+                        className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1"
+                        data-model-picker-provider
+                        data-off-default={shortLabel.offDefault === true || undefined}
+                      >
+                        {/* Round 3 R8: the default account reads muted at 500; another account in ink at 600 after its dot. */}
+                        {shortLabel.offDefault === true ? (
+                          <i
+                            aria-hidden="true"
+                            className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full"
+                            data-model-picker-account-dot
+                            style={{ backgroundColor: accountAccentMap.get(current.provider) ?? accountColor({ instanceId: current.provider }) }}
+                          />
+                        ) : null}
+                        <span
+                          className={cn(
+                            'dshx:text-2xs',
+                            shortLabel.offDefault === true ? 'dshx:font-semibold dshx:text-foreground' : 'dshx:font-medium dshx:text-muted-foreground',
+                          )}
+                        >
+                          {accountBadges.get(current.provider) ?? shortLabel.providerTag}
+                        </span>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>{shortLabel.title}</TooltipContent>

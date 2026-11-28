@@ -121,23 +121,27 @@ describe('model picker selection rules', () => {
     expect(ModelPickerModel.effortName(plain, { provider: 'northstar', model: 'plain-1' })).toBeUndefined()
   })
 
-  it('names the account in the trigger only when the thread is off the default account for its model (b:4qjm)', () => {
+  it('names the account in the trigger when several offer the model, marking any but the default (b:4qjm, round 3 R8)', () => {
     const alex = { id: 'opencode-go-alex', name: 'OpenCode Go Alex', models: [{ id: 'deepseek-v4', name: 'opencode-go-alex/DeepSeek V4' }] }
     const work = { id: 'opencode-go-work', name: 'OpenCode Go Work', models: [{ id: 'deepseek-v4', name: 'opencode-go-work/DeepSeek V4' }] }
     const alexSelection: ModelSelection = { provider: 'opencode-go-alex', model: 'deepseek-v4' }
 
+    // One account offers the model: no tag.
     expect(ModelPickerModel.triggerLabel({ groups: [alex, redwood], current: alexSelection })).toEqual({
       model: 'deepseek-v4',
       title: 'OpenCode Go Alex · deepseek-v4',
     })
-    // Alex is the first account offering the model: the default, so unnamed.
+    // Alex is the first account offering the model: the default, tagged quietly.
     expect(ModelPickerModel.triggerLabel({ groups: [alex, work], current: alexSelection })).toEqual({
       model: 'deepseek-v4',
+      providerTag: 'OGA',
+      offDefault: false,
       title: 'OpenCode Go Alex · deepseek-v4',
     })
     expect(ModelPickerModel.triggerLabel({ groups: [work, alex], current: alexSelection })).toEqual({
       model: 'deepseek-v4',
       providerTag: 'OGA',
+      offDefault: true,
       title: 'OpenCode Go Alex · deepseek-v4',
     })
     expect(ModelPickerModel.triggerLabel({ groups: [], current: alexSelection })).toBeUndefined()

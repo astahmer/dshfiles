@@ -8,11 +8,10 @@ const tagOf = (marker: string): string => {
 }
 
 describe('composer trigger on the phone (council picker N8)', () => {
-  it('draws the off-default account tag in ink at 600, apart from the muted rest of the chip', () => {
-    const tag = tagOf('data-model-picker-provider')
-    expect(tag).toMatch(/dshx:font-semibold/u)
-    expect(tag).toMatch(/dshx:text-foreground/u)
-    expect(tag).not.toMatch(/text-muted-foreground/u)
+  it('draws the default account tag muted at 500 and another account in ink at 600 after its 6 px dot (round 3 R8)', () => {
+    const tag = picker.slice(picker.indexOf('data-model-picker-provider'), picker.indexOf('</Tooltip>', picker.indexOf('data-model-picker-provider')))
+    expect(tag).toContain("shortLabel.offDefault === true ? 'dshx:font-semibold dshx:text-foreground' : 'dshx:font-medium dshx:text-muted-foreground'")
+    expect(tag).toMatch(/shortLabel\.offDefault === true \? \(\s*<i[^>]*dshx:size-1\.5[^>]*data-model-picker-account-dot/u)
   })
 
   it('moves the swap shortcut off the phone bar, where the details account rows do the same job at 44 px', () => {

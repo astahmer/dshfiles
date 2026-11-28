@@ -219,18 +219,19 @@ export class ModelPickerModel {
   }: {
     readonly groups: readonly ModelGroup[]
     readonly current: ModelSelection
-  }): { readonly model: string; readonly providerTag?: string; readonly title: string } | undefined => {
+  }): { readonly model: string; readonly providerTag?: string; readonly offDefault?: boolean; readonly title: string } | undefined => {
     const group = groups.find(candidate => candidate.id === current.provider)
     const model = group?.models.find(candidate => candidate.id === current.model)
     if (group === undefined || model === undefined) return undefined
     const name = ModelPickerModel.displayName({ group, model })
     const title = `${group.name} · ${name}`
-    // b:4qjm: the chip reads just the model; it names the account only when the thread uses another account than the
-    // default one for this model (the first account, in priority order, that offers it). The menu's Account section and
-    // the tooltip always name it.
-    const fallback = ModelPickerModel.defaultAccountFor({ groups, model: current.model })
-    if (fallback === undefined || fallback.id === group.id) return { model: name, title }
-    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), title }
+    // b:4qjm, round 3 R8: a model one account offers reads just the model. When several do, the chip names the account:
+    // quietly on the default one (the first, in priority order, that offers it), and marked as "off default" on any other
+    // (ink at 600 with its dot), so two accounts never read alike. The menu's Account section and the tooltip name it.
+    const offering = groups.filter(candidate => candidate.models.some(entry => entry.id === current.model))
+    if (offering.length < 2) return { model: name, title }
+    const offDefault = offering[0]?.id !== group.id
+    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), offDefault, title }
   }
 
   /** The account a model runs on by default: the first account, in catalog (priority) order, that offers it. */
