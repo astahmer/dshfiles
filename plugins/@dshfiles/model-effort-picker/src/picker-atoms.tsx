@@ -55,6 +55,21 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
   )
 }
 
+/**
+ * Round 6 V12: the width a cut head draws (its kept characters and the ellipsis), so the head can shrink to it and the
+ * tail follows the ellipsis with no leftover space; `measure` gives a string's width in the head's font.
+ */
+export class SnugHead {
+  static width(input: { readonly text: string; readonly room: number; readonly measure: (text: string) => number }): number | undefined {
+    if (input.measure(input.text) <= input.room) return undefined
+    for (let keep = input.text.length - 1; keep > 0; keep -= 1) {
+      const drawn = input.measure(`${input.text.slice(0, keep)}…`)
+      if (drawn <= input.room) return Math.ceil(drawn)
+    }
+    return undefined
+  }
+}
+
 /** Whether an element, or a part of it marked `data-truncates` (a name's head, round 5 U1), is cut short. */
 export const isTruncatedWithin = (element: Element): boolean =>
   isTruncated(element) || [...element.querySelectorAll('[data-truncates]')].some(part => isTruncated(part))
@@ -78,6 +93,13 @@ export const TruncatedTooltip = ({
   readonly shortened?: boolean
 }) => {
   const [open, setOpen] = useState(false)
+  // Round 6 V12: the tooltip stays inside the pane that marks itself `data-tooltip-boundary` (the list), so a long
+  // name's tooltip wraps there instead of covering the details beside it.
+  const [boundary, setBoundary] = useState<Element | null>(null)
+  const show = (target: Element): void => {
+    setBoundary(target.closest('[data-tooltip-boundary]'))
+    setOpen(shortened || isTruncatedWithin(target))
+  }
   return (
     <Tooltip
       onOpenChange={next => {
@@ -87,13 +109,20 @@ export const TruncatedTooltip = ({
     >
       <TooltipTrigger
         asChild
-        onFocus={event => setOpen(shortened || isTruncatedWithin(event.currentTarget))}
-        onPointerEnter={event => setOpen(shortened || isTruncatedWithin(event.currentTarget))}
+        onFocus={event => show(event.currentTarget)}
+        onPointerEnter={event => show(event.currentTarget)}
         onPointerLeave={() => setOpen(false)}
       >
         {children}
       </TooltipTrigger>
-      <TooltipContent align="start" data-model-truncated-tooltip side="bottom">
+      <TooltipContent
+        align="start"
+        className={cn(boundary !== null && 'dshx:max-w-(--radix-tooltip-content-available-width) dshx:break-all')}
+        {...(boundary === null ? {} : { collisionBoundary: boundary })}
+        collisionPadding={4}
+        data-model-truncated-tooltip
+        side="bottom"
+      >
         {content}
       </TooltipContent>
     </Tooltip>

@@ -492,6 +492,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             >
               <section
                 aria-label="Choose a model"
+                data-tooltip-boundary
                 className={cn(
                   // Round 6 V9: 8 px on desktop, so the search ring clears the popover border and the field starts with the rows.
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-2 dshx:@max-pane-compact:pb-1.5',

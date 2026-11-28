@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
-import { BrandMark, QuotaText, TruncatedTooltip } from './picker-atoms.js'
+import { BrandMark, QuotaText, SnugHead, TruncatedTooltip } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = CatalogGroup['models'][number]
@@ -58,6 +58,26 @@ export const ModelRow = (props: {
   const name = ModelPickerModel.displayName({ group: props.group, model: props.model })
   const brand = ModelPickerModel.brandFor({ model: props.model })
   const parts = ModelPickerModel.nameTail(name)
+  // Round 6 V12: a cut head shrinks to what it draws, so the tail follows its ellipsis directly.
+  const snugHead = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const head = snugHead.current
+    const row = head?.parentElement?.parentElement
+    if (head === null || parts.tail === '' || row === null || row === undefined || typeof ResizeObserver === 'undefined') return
+    const context = document.createElement('canvas').getContext('2d')
+    if (context === null) return
+    const fit = (): void => {
+      head.style.maxWidth = ''
+      const style = getComputedStyle(head)
+      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+      const width = SnugHead.width({ text: head.textContent ?? '', room: head.clientWidth, measure: text => context.measureText(text).width })
+      if (width !== undefined) head.style.maxWidth = `${String(width)}px`
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [parts.tail, name])
   const selectMode = props.selectSeveral === true
   const quotaId = props.id === undefined ? undefined : `${props.id}-quota`
 
@@ -146,7 +166,7 @@ export const ModelRow = (props: {
               data-model-picker-name
             >
               {/* Round 5 U1: the head shrinks with one ellipsis; the tail ("-preview") always shows. */}
-              <span className="dshx:min-w-0 dshx:truncate" data-truncates>
+              <span className="dshx:min-w-0 dshx:truncate" data-truncates ref={snugHead}>
                 <MatchedName from={0} name={name} query={props.query} to={parts.head.length} />
               </span>
               {parts.tail === '' ? null : (
