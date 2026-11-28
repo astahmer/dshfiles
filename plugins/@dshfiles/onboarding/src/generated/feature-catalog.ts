@@ -19211,23 +19211,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect list \"Models and accounts\"",
+          "text": "expect listbox \"Models and accounts\"",
           "action": "expect",
-          "by": "list",
+          "by": "listbox",
           "name": "Models and accounts",
           "value": null
         },
         {
-          "text": "hover button \"Reasoning effort: *\"",
-          "action": "hover",
-          "by": "button",
-          "name": "Reasoning effort: *",
+          "text": "expect radiogroup \"Reasoning effort*\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Reasoning effort*",
           "value": null
         },
         {
-          "text": "expect button \"High\"",
+          "text": "expect radio \"High\"",
           "action": "expect",
-          "by": "button",
+          "by": "radio",
           "name": "High",
           "value": null
         }
@@ -19289,17 +19289,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Details for*\"",
-          "action": "click",
-          "by": "button",
-          "name": "Details for*",
-          "value": null
+          "text": "press ArrowRight",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowRight"
         },
         {
           "text": "expect region \"Fallbacks\"",
           "action": "expect",
           "by": "region",
           "name": "Fallbacks",
+          "value": null
+        },
+        {
+          "text": "click button \"Fallbacks*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Fallbacks*",
           "value": null
         },
         {
@@ -19344,24 +19351,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "shiftclick button \"Use gpt-6-luna*\"",
+          "text": "shiftclick option \"Use gpt-6-luna*\"",
           "action": "shiftclick",
-          "by": "button",
+          "by": "option",
           "name": "Use gpt-6-luna*",
           "value": null
         },
         {
-          "text": "shiftclick button \"Use claude-sonnet-5-5*\"",
+          "text": "shiftclick option \"Use claude-sonnet-5-5*\"",
           "action": "shiftclick",
-          "by": "button",
+          "by": "option",
           "name": "Use claude-sonnet-5-5*",
           "value": null
         },
         {
-          "text": "expect text \"2 selected\"",
+          "text": "expect text \"2 selected · up to 6\"",
           "action": "expect",
           "by": "text",
-          "name": "2 selected",
+          "name": "2 selected · up to 6",
           "value": null
         },
         {
