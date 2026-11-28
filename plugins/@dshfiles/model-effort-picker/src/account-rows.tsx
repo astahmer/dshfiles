@@ -66,7 +66,7 @@ export const AccountRows = (props: {
                 className={cn(
                   'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                   // Round 3 R14, round 5 U4: hover is a light wash; the chosen account is its 1 px edge, check and 600 weight, no wash,
-                // so it never reads as the list's keyboard row.
+                  // so it never reads as the list's keyboard row.
                   checked && 'dshx:font-selected dshx:selected-edge',
                 )}
                 data-model-account
@@ -95,7 +95,8 @@ export const AccountRows = (props: {
                     )}
                     data-model-account-quota
                   >
-                    <span aria-hidden="true">{percent === undefined ? '' : `${quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
+                    {/* Round 5 U9: an unknown quota is a muted dash, as in the fallbacks. */}
+                    <span aria-hidden="true">{percent === undefined ? '—' : `${quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
                     <span className="dshx:sr-only" id={`${headingId}-quota-${String(index)}`}>
                       {percent === undefined ? 'quota unknown' : `${String(percent)} % left on ${account.name}`}
                     </span>
@@ -119,12 +120,15 @@ const SingleAccount = (props: { readonly account: Account; readonly accent: Acco
     <div className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:text-xs dshx:pointer-coarse:h-11" data-model-account-single>
       <AccountDot accent={props.accent ?? AccountColor.of({ instanceId: props.account.id })} className="dshx:size-2" />
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.account.name}</span>
+      {/* Round 5 U9: the value in the rows' 48 px right-aligned column and the check slot after it, so it ends under
+          "Weekly quota left". */}
       {percent === undefined ? null : (
-        <span className={cn('dshx:shrink-0 dshx:tabular-nums', quotaTone(percent))}>
+        <span className={cn('dshx:w-12 dshx:shrink-0 dshx:text-right dshx:tabular-nums', quotaTone(percent))} data-model-account-quota>
           <span aria-hidden="true">{`${props.quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
           <span className="dshx:sr-only">{`${String(percent)} % left on ${props.account.name}`}</span>
         </span>
       )}
+      <span aria-hidden="true" className="dshx:w-3.5 dshx:shrink-0" />
     </div>
   )
 }

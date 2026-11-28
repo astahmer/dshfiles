@@ -21,13 +21,12 @@ describe('round 4 smaller fixes (council picker T16)', () => {
     expect(renderToStaticMarkup(<BrandMark brand={undefined} name="zeta" />)).toContain('dshx:dark:bg-(--dshx-tone-5)')
   })
 
-  it('draws no dash for an account with no quota, and one account as a plain line, not a lone radio', () => {
+  it('draws one account as a plain line, not a lone radio', () => {
     const one = renderToStaticMarkup(
       <AccountRows accents={new Map()} accounts={[{ id: 'codex', name: 'Codex 1' }]} onChoose={() => undefined} quotas={new Map()} selected="codex" />,
     )
     expect(one).not.toContain('role="radio')
     expect(one).toContain('data-model-account-single')
-    expect(one).not.toContain('—')
   })
 
   it('writes "No reasoning" on the trigger instead of "Off"', () => {
