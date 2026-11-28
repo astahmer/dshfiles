@@ -153,6 +153,8 @@ export const EffortControl = (props: {
           // 324 px or wider (each at least 44 pt); eight, or a narrower track, wrap four to a row and the last row stretches.
           // Round 5 U10: on touch the segments touch (no gap), so eight fit one row at 44 pt from a 356 px track.
           'dshx:pointer-coarse:flex dshx:pointer-coarse:flex-wrap dshx:pointer-coarse:gap-0',
+          // Round 6 V1: eight levels on desktop sit edge to edge, so their labels keep 10 px between them.
+          segments.length > 7 && 'dshx:gap-0',
         )}
         data-model-effort-options
         onBlur={event => {
@@ -168,7 +170,9 @@ export const EffortControl = (props: {
               aria-checked={checked}
               aria-label={segment.name}
               className={cn(
-                'dshx:h-7 dshx:min-w-0 dshx:rounded-md dshx:px-1 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                'dshx:h-7 dshx:min-w-0 dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                // Eight levels on desktop: 11 px labels with a 2 px inset keep them 10 px apart; touch keeps 13 px.
+                segments.length > 7 ? 'dshx:px-0.5 dshx:text-2xs' : 'dshx:px-1 dshx:text-xs',
                 'dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:flex-1',
                 segments.length > 7
                   ? 'dshx:pointer-coarse:basis-1/4 dshx:@min-[22.25rem]/effort:pointer-coarse:basis-0'

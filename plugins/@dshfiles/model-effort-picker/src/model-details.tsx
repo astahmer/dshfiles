@@ -178,7 +178,8 @@ export const ModelDetails = (props: {
 
       <div
         // Round 5 U10: once the header draws its hairline, the top fade goes, so nothing shows half-faded under the line.
-        className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:data-[scrolled]:[mask-image:linear-gradient(to_bottom,black,black_calc(100%-8px),transparent)]"
+        // Round 6 V1: on touch no scrollbar takes width (as on an iPhone), so a scrolling body is as wide as a still one.
+        className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:data-[scrolled]:[mask-image:linear-gradient(to_bottom,black,black_calc(100%-8px),transparent)] dshx:pointer-coarse:[scrollbar-width:none] dshx:pointer-coarse:[&::-webkit-scrollbar]:hidden"
         data-model-details-body
         data-scrolled={scrolled || undefined}
         onScroll={event => setScrolled(event.currentTarget.scrollTop > 0)}
