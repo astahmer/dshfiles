@@ -61,7 +61,6 @@ export const ModelDetails = (props: {
   const selectedEffort = draft ? (stagedEffort === null ? model?.reasoning?.defaultEffort : stagedEffort.value) : props.current?.reasoningEffort
 
   const name = group === undefined || model === undefined ? undefined : ModelPickerModel.displayName({ group, model })
-  const providerLabel = group === undefined ? undefined : props.providerLabels.get(group.id)
   const accounts = model === undefined ? [] : props.groups.filter(candidate => candidate.models.some(entry => entry.id === model.id))
 
   /** Effort: staged on a draft, applied in place on the thread's model, never a model switch. */
@@ -118,7 +117,8 @@ export const ModelDetails = (props: {
                 {name}
               </h2>
               <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" data-model-details-route>
-                {[providerLabel, group.name].filter(Boolean).join(' · ')}
+                {/* Round 3 R18: the account name already names its service ("Command Code 1"). */}
+                {group.name}
               </span>
               {/* Round 3 R11: the header says whether the thread uses this model. */}
               {draft ? (

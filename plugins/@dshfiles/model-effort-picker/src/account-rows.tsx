@@ -72,18 +72,21 @@ export const AccountRows = (props: {
             >
               <AccountDot accent={props.accents.get(account.id) ?? accountColor({ instanceId: account.id })} className="dshx:size-2" />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{account.name}</span>
-              <span
-                className={cn(
-                  'dshx:w-12 dshx:shrink-0 dshx:text-right dshx:tabular-nums',
-                  percent === undefined ? 'dshx:text-muted-foreground' : quotaTone(percent),
-                )}
-                data-model-account-quota
-              >
-                <span aria-hidden="true">{percent === undefined ? '—' : `${quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
-                <span className="dshx:sr-only" id={`${headingId}-quota-${String(index)}`}>
-                  {percent === undefined ? 'quota unknown' : `${String(percent)} % left on ${account.name}`}
+              {/* Round 3 R18: without any quota (no heading) the column is gone, not a column of dashes. */}
+              {heading === undefined ? null : (
+                <span
+                  className={cn(
+                    'dshx:w-12 dshx:shrink-0 dshx:text-right dshx:tabular-nums',
+                    percent === undefined ? 'dshx:text-muted-foreground' : quotaTone(percent),
+                  )}
+                  data-model-account-quota
+                >
+                  <span aria-hidden="true">{percent === undefined ? '—' : `${quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
+                  <span className="dshx:sr-only" id={`${headingId}-quota-${String(index)}`}>
+                    {percent === undefined ? 'quota unknown' : `${String(percent)} % left on ${account.name}`}
+                  </span>
                 </span>
-              </span>
+              )}
               <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:justify-center">
                 {checked ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground" data-model-account-check /> : null}
               </span>

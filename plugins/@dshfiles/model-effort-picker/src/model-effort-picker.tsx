@@ -57,7 +57,10 @@ const FastModeIndicator = ({
   // Composer redesign (b:v9yh): the chip is plain text; only a live state (Fast mode on) earns a glyph, in ink (C2: amber
   // means low quota).
   if (enabledOverride ?? state.data?.enabled ?? false)
-    return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-foreground" data-model-fast-mode-enabled />
+    return (
+      // Round 3 R18: 4 px from the brand mark on a phone bar, whose mark step removes the chip gap.
+      <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-foreground dshx:in-data-model-mark:mr-1" data-model-fast-mode-enabled />
+    )
   return null
 }
 
@@ -427,38 +430,58 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <h2 className="dshx:text-heading dshx:font-semibold">Choose a model</h2>
                 </header>
                 <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                  <SearchInput
-                    aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
-                    aria-autocomplete="list"
-                    aria-controls={listboxId}
-                    aria-expanded={open}
-                    aria-label="Search models and accounts"
-                    autoComplete="off"
-                    className="dshx:min-w-0 dshx:flex-1"
-                    onChange={event => setQuery(event.currentTarget.value)}
-                    onKeyDown={event => {
-                      const input = event.currentTarget
-                      const action = ModelPickerModel.listKey({
-                        key: event.key,
-                        active: activeIndex,
-                        count: rows.length,
-                        caretAtEnd: input.selectionStart === input.value.length && input.selectionEnd === input.value.length,
-                      })
-                      if (action.kind === 'none') return
-                      event.preventDefault()
-                      if (action.kind === 'move') {
-                        setActiveIndex(action.index)
-                      } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
-                      else {
-                        const row = rows[action.index]
-                        if (row !== undefined) showDetails({ model: row.model.id, provider: row.group.id })
-                      }
-                    }}
-                    role="combobox"
-                    placeholder="Search models…"
-                    ref={searchInputRef}
-                    value={query}
-                  />
+                  {/* Round 3 R18: one focus ring (the field edge does not also turn accent), a clear button inside the field,
+                      and a search that waits while there is nothing to search. */}
+                  <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
+                    <SearchInput
+                      aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
+                      aria-autocomplete="list"
+                      aria-controls={listboxId}
+                      aria-expanded={open}
+                      aria-label="Search models and accounts"
+                      autoComplete="off"
+                      className="dshx:w-full dshx:has-[input:focus-visible]:border-transparent dshx:[&_input]:pr-8 dshx:pointer-coarse:[&_input]:pr-11"
+                      data-model-picker-search
+                      disabled={catalogEmpty}
+                      onChange={event => setQuery(event.currentTarget.value)}
+                      onKeyDown={event => {
+                        const input = event.currentTarget
+                        const action = ModelPickerModel.listKey({
+                          key: event.key,
+                          active: activeIndex,
+                          count: rows.length,
+                          caretAtEnd: input.selectionStart === input.value.length && input.selectionEnd === input.value.length,
+                        })
+                        if (action.kind === 'none') return
+                        event.preventDefault()
+                        if (action.kind === 'move') {
+                          setActiveIndex(action.index)
+                        } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
+                        else {
+                          const row = rows[action.index]
+                          if (row !== undefined) showDetails({ model: row.model.id, provider: row.group.id })
+                        }
+                      }}
+                      role="combobox"
+                      placeholder="Search models…"
+                      ref={searchInputRef}
+                      value={query}
+                    />
+                    {query === '' ? null : (
+                      <button
+                        aria-label="Clear search"
+                        className="dshx:absolute dshx:top-1/2 dshx:right-1 dshx:flex dshx:size-6 dshx:-translate-y-1/2 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:right-0 dshx:pointer-coarse:size-11"
+                        data-model-search-clear
+                        onClick={() => {
+                          setQuery('')
+                          searchInputRef.current?.focus()
+                        }}
+                        type="button"
+                      >
+                        <XIcon aria-hidden="true" className="dshx:size-3.5" />
+                      </button>
+                    )}
+                  </div>
                   {rows.length === 0 ? null : (
                     // Round 3 R12: a visible "Select" / "Done" label at 44 pt on touch, pressed while the mode is on.
                     <Button
@@ -478,7 +501,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   )}
                 </div>
                 <ScrollArea
-                  className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
+                  className="dshx:min-h-0 dshx:flex-1 dshx:data-[empty]:hidden dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
+                  data-empty={emptyState === null ? undefined : ''}
                   data-model-picker-scroll
                 >
                   <div
@@ -514,26 +538,27 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         quota={quotas.get(group.id)}
                       />
                     ))}
-                    {emptyState === null ? null : (
-                      <ListEmptyState
-                        kind={emptyState}
-                        onClearSearch={() => {
-                          setQuery('')
-                          searchInputRef.current?.focus()
-                        }}
-                        onOpenAccounts={
-                          openAccounts === undefined
-                            ? undefined
-                            : () => {
-                                setOpen(false)
-                                openAccounts()
-                              }
-                        }
-                        query={query}
-                      />
-                    )}
                   </div>
                 </ScrollArea>
+                {/* Round 3 R18: the empty states take the list's room, centred, instead of a line at its top. */}
+                {emptyState === null ? null : (
+                  <ListEmptyState
+                    kind={emptyState}
+                    onClearSearch={() => {
+                      setQuery('')
+                      searchInputRef.current?.focus()
+                    }}
+                    onOpenAccounts={
+                      openAccounts === undefined
+                        ? undefined
+                        : () => {
+                            setOpen(false)
+                            openAccounts()
+                          }
+                    }
+                    query={query}
+                  />
+                )}
                 {several ? (
                   <FanOutSelection
                     accountTagOf={fanOutTagOf}

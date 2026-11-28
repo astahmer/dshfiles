@@ -34,7 +34,7 @@ describe('Fast mode is one visible, labelled control (council picker C2)', () =>
     expect(text(html)).toContain('Fast mode · may cost more')
     const control = /<button[^>]*role="switch"[^>]*>/u.exec(html)?.[0] ?? ''
     expect(control).toContain('aria-checked="true"')
-    expect(control).toMatch(/dshx:h-4 dshx:w-7/u)
+    expect(control).toMatch(/dshx:data-\[size=sm\]:h-4! dshx:data-\[size=sm\]:w-7!/u)
     // The visible label names the switch; no tooltip trigger sits on it to overwrite its state.
     expect(control).not.toContain('tooltip-trigger')
     // The switch is named by the visible label text.

@@ -10,7 +10,10 @@ export const ListEmptyState = (props: {
   readonly onClearSearch: () => void
   readonly onOpenAccounts?: (() => void) | undefined
 }) => (
-  <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-8 dshx:text-center" data-model-picker-empty={props.kind}>
+  <div
+    className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-2 dshx:px-3 dshx:py-8 dshx:text-center"
+    data-model-picker-empty={props.kind}
+  >
     {props.kind === 'loading' ? (
       <p className="dshx:text-sm dshx:text-muted-foreground">Loading models…</p>
     ) : props.kind === 'no-match' ? (

@@ -66,6 +66,6 @@ describe('one naming everywhere (council picker N1)', () => {
     const title = /<h2[^>]*data-model-picker-current[^>]*>([^<]*)</u.exec(html)
     expect(title?.[1]).toBe('gemini-3.8-flash')
     expect(title?.[0]).toMatch(/dshx:line-clamp-2 dshx:text-heading[^"]*dshx:font-semibold/u)
-    expect(/<span[^>]*data-model-details-route[^>]*>([^<]*)</u.exec(html)?.[1]).toBe('Command Code · Command Code 2')
+    expect(/<span[^>]*data-model-details-route[^>]*>([^<]*)</u.exec(html)?.[1]).toBe('Command Code 2')
   })
 })
