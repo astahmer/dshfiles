@@ -307,11 +307,16 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     setInspected(null)
     setNarrowDetails(false)
     // On touch, the list's title rather than the search, which would raise the keyboard (round 4 T14).
-    requestAnimationFrame(() =>
-      window.matchMedia('(pointer: coarse)').matches
-        ? focusSheetTitle(listTitleRef.current?.closest('[data-slot="popover-content"]') ?? null)
-        : searchInputRef.current?.focus(),
-    )
+    requestAnimationFrame(() => {
+      if (window.matchMedia('(pointer: coarse)').matches) {
+        focusSheetTitle(listTitleRef.current?.closest('[data-slot="popover-content"]') ?? null)
+        return
+      }
+      const input = searchInputRef.current
+      input?.focus()
+      // Round 5 U15: the caret at the end of the query, so Right opens details again (it moves the caret otherwise).
+      input?.setSelectionRange(input.value.length, input.value.length)
+    })
   }
 
   /** The sheet's title when it shows (the phone list header), else the picker itself: never something behind the sheet. */

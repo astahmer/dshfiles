@@ -38,7 +38,8 @@ describe('Fast mode is one visible, labelled control (council picker C2)', () =>
     // The visible label names the switch; no tooltip trigger sits on it to overwrite its state.
     expect(control).not.toContain('tooltip-trigger')
     // The switch is named by the visible label text.
-    expect(control).toMatch(/aria-labelledby="[^"]+"/u)
+    // Round 5 U15: an explicit name.
+    expect(control).toContain('aria-label="Fast mode"')
     // No <label>: WebKit re-dispatched a tap through a label onto the switch and toggled it twice.
     expect(html).not.toContain('<label')
     // The whole row is the one 44 px target (C6).

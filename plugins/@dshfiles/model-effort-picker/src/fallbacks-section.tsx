@@ -106,17 +106,16 @@ export const FallbackList = (props: {
           </span>
         </button>
         <InfoHint description="Routes tried in order when this model request fails under Priority distribution." label="About fallbacks" />
-        {/* The rest of the row opens it too, for the pointer; the labelled toggle carries the state for assistive tech. */}
-        <button
+        {/* The rest of the row opens it too, for the pointer only (round 5 U15: not a nameless button); the labelled toggle
+            carries the state for assistive tech and the keyboard. */}
+        <span
           aria-hidden="true"
           className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:pr-1.5"
           data-model-fallbacks-chevron
           onClick={toggle}
-          tabIndex={-1}
-          type="button"
         >
           <ChevronRightIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', props.expanded && 'dshx:rotate-90')} />
-        </button>
+        </span>
       </div>
 
       {props.expanded ? (

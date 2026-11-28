@@ -42,7 +42,8 @@ export const FastModeRow = (props: {
           Fast mode <span className="dshx:font-normal dshx:text-muted-foreground">· may cost more</span>
         </span>
         <Switch
-          aria-labelledby={labelId}
+          // Round 5 U15: an explicit name (it was only aria-labelledby), the visible label's first words.
+          aria-label="Fast mode"
           checked={props.enabled}
           // The row is the touch target, so the kit's 44 px hit area (an ::after 10 px past a 24 px switch) is off: it
           // pushed the details body 10 px wider than the sheet (round 3 R1).
