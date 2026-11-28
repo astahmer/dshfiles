@@ -360,7 +360,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-clip! dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg"
+            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-clip! dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg dshx:in-[html[data-shell-phone-nav]]:bg-popover!"
+            // Round 3 R7: on the phone the sheet takes the kit sheet's fill (the popover step), not the raised tone the
+            // composer gives the sheets it opens, which equals the selected wash and the segment track.
             collisionPadding={12}
             // Round 3 R4: the root never scrolls (only the list and the details body do). overflow: hidden still let
             // scrollIntoView scroll it, which sheared the picker by 12–404 px; `clip` cannot scroll, and its !important

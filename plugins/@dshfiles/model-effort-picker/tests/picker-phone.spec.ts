@@ -43,4 +43,9 @@ describe('phone picker is one sheet, list then details in place (council picker 
       'dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]',
     )
   })
+
+  it('draws the phone sheet on the kit sheet fill, apart from the selected wash (round 3 R7)', () => {
+    // A layered !important utility outranks the composer's raised-tone rule for sheets it opens (also !important).
+    expect(tagOf(picker, '<PopoverContent')).toContain('dshx:in-[html[data-shell-phone-nav]]:bg-popover!')
+  })
 })
