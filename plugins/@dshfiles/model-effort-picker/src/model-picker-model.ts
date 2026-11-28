@@ -88,6 +88,21 @@ export class ModelPickerModel {
     return { provider: input.inspected.provider, model: input.inspected.model, ...(effort !== undefined && { reasoningEffort: effort }) }
   }
 
+  /** Council picker C1: a level's segment label (Off, Min, Low, Med, High, XHigh, Max); any other name stays whole. */
+  static effortShortLabel = (effort: { readonly id: string; readonly name: string }): string => {
+    const key = `${effort.id} ${effort.name}`.toLowerCase()
+    const known: readonly (readonly [RegExp, string])[] = [
+      [/^(?:off|none)\b/u, 'Off'],
+      [/^(?:minimal|min)\b/u, 'Min'],
+      [/^low\b/u, 'Low'],
+      [/^(?:medium|med)\b/u, 'Med'],
+      [/^high\b/u, 'High'],
+      [/^(?:xhigh|x-high|extra[ -]high)\b/u, 'XHigh'],
+      [/^(?:max|maximum)\b/u, 'Max'],
+    ]
+    return known.find(([pattern]) => pattern.test(key))?.[1] ?? effort.name
+  }
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups

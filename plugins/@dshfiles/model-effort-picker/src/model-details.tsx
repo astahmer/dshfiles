@@ -2,13 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelPickerModel, type InspectedRoute, type ModelQuota } from './model-picker-model.js'
-import { BrandMark, InfoHint, ProviderLabel, QuotaPercent } from './picker-atoms.js'
+import { EffortControl } from './effort-control.js'
+import { BrandMark, ProviderLabel, QuotaPercent } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 
@@ -55,20 +55,9 @@ export const ModelDetails = (props: {
     setStagedEffort(null)
     setStagedFast(undefined)
   }, [model?.id])
-  const selectedEffort = draft
-    ? stagedEffort === null
-      ? model?.reasoning?.defaultEffort
-      : stagedEffort.value
-    : (props.current?.reasoningEffort ?? model?.reasoning?.defaultEffort)
-  const effortIndex = Math.max(
-    0,
-    efforts.findIndex(effort => effort.id === selectedEffort),
-  )
-  const [sliderIndex, setSliderIndex] = useState(effortIndex)
-
-  useEffect(() => {
-    setSliderIndex(effortIndex)
-  }, [effortIndex, group?.id, model?.id])
+  // Truthful (C1): the thread's own model shows the effort it chose, or the provider default when it chose none; a draft
+  // shows what Use would commit.
+  const selectedEffort = draft ? (stagedEffort === null ? model?.reasoning?.defaultEffort : stagedEffort.value) : props.current?.reasoningEffort
 
   const name = group === undefined || model === undefined ? undefined : ModelPickerModel.displayName({ group, model })
   const providerLabel = group === undefined ? undefined : props.providerLabels.get(group.id)
@@ -194,78 +183,7 @@ export const ModelDetails = (props: {
         )}
 
         {model === undefined || props.inspected === null ? null : (
-          <section aria-label="Reasoning effort" className="dshx:mt-2.5 dshx:flex dshx:flex-col dshx:gap-1">
-            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-              <span className="dshx:flex dshx:items-center dshx:gap-1">
-                <p className="dshx:text-2xs dshx:font-medium">Reasoning effort</p>
-                <InfoHint description="Higher effort lets the model think for longer before it answers." />
-              </span>
-              <button
-                aria-pressed={selectedEffort === undefined}
-                className={cn(
-                  'dshx:flex dshx:items-center dshx:gap-1 dshx:rounded dshx:px-1 dshx:py-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                  selectedEffort === undefined && 'dshx:text-foreground',
-                )}
-                onClick={() => changeEffort(undefined)}
-                type="button"
-              >
-                <RotateCcwIcon aria-hidden="true" className="dshx:size-3" />
-                Default
-              </button>
-            </div>
-            {efforts.length === 0 ? (
-              <p className="dshx:text-2xs dshx:text-muted-foreground">This model has no reasoning levels.</p>
-            ) : (
-              <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
-                <div className="dshx:relative dshx:py-0.5">
-                  <Slider
-                    aria-label="Reasoning effort"
-                    className="dshx:[&_[data-slot=slider-range]]:bg-info dshx:[&_[data-slot=slider-thumb]]:z-[2] dshx:[&_[data-slot=slider-thumb]]:size-4 dshx:[&_[data-slot=slider-thumb]]:border-2 dshx:[&_[data-slot=slider-thumb]]:border-info dshx:[&_[data-slot=slider-thumb]]:bg-white dshx:[&_[data-slot=slider-track]]:h-1 dshx:[&_[data-slot=slider-track]]:bg-muted-foreground/25"
-                    data-model-effort-slider
-                    max={efforts.length - 1}
-                    min={0}
-                    onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
-                    onValueCommit={(values: number[]) => {
-                      const effort = efforts[values[0] ?? 0]
-                      if (effort !== undefined) changeEffort(effort.id)
-                    }}
-                    step={1}
-                    value={[Math.min(sliderIndex, efforts.length - 1)]}
-                  />
-                  {efforts.length > 1 && (
-                    <div aria-hidden="true" className="dshx:pointer-events-none dshx:absolute dshx:inset-x-0 dshx:top-[6px] dshx:h-1">
-                      {efforts.map((effort, index) => (
-                        <span
-                          className="dshx:absolute dshx:h-1.5 dshx:w-px dshx:-translate-x-1/2 dshx:rounded-full dshx:bg-foreground/25"
-                          key={effort.id}
-                          style={{ left: `calc(8px + (100% - 16px) * ${index} / ${efforts.length - 1})` }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="dshx:relative dshx:h-3.5" data-model-effort-options>
-                  {efforts.map((effort, index) => (
-                    <button
-                      aria-pressed={index === effortIndex}
-                      className={cn(
-                        'dshx:absolute dshx:top-0 dshx:min-w-0 dshx:whitespace-nowrap dshx:rounded-sm dshx:px-0.5 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                        index === 0 ? 'dshx:translate-x-0' : index === efforts.length - 1 ? 'dshx:-translate-x-full' : 'dshx:-translate-x-1/2',
-                        index === effortIndex && 'dshx:font-semibold dshx:text-foreground',
-                      )}
-                      data-model-effort-option
-                      key={effort.id}
-                      onClick={() => changeEffort(effort.id)}
-                      style={{ left: `calc(8px + (100% - 16px) * ${index} / ${Math.max(1, efforts.length - 1)})` }}
-                      type="button"
-                    >
-                      {effort.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
+          <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} />
         )}
 
         {draft ? null : props.fallbacks}

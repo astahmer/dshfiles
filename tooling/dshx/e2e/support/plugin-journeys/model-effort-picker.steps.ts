@@ -80,28 +80,19 @@ When('the reasoning-effort slider is adjusted one step', async ({ page }: { page
   const selection = pickerSelectionByPage.get(page)
   if (selection === undefined) throw new Error('The model picker selection was not captured before adjusting reasoning effort.')
 
-  const effort = reasoningEffort(page)
-  const slider = effort.getByRole('slider')
-  await expect(slider).toBeVisible()
-  const currentValueAttribute = await slider.getAttribute('aria-valuenow')
-  const minimumAttribute = await slider.getAttribute('aria-valuemin')
-  const maximumAttribute = await slider.getAttribute('aria-valuemax')
-  if (currentValueAttribute === null || minimumAttribute === null || maximumAttribute === null) {
-    throw new Error('The reasoning slider did not expose its accessible value range.')
-  }
-
-  const currentValue = Number(currentValueAttribute)
-  const minimum = Number(minimumAttribute)
-  const maximum = Number(maximumAttribute)
-  if (![currentValue, minimum, maximum].every(Number.isInteger)) throw new Error('The reasoning slider exposed a non-integer value range.')
-
-  const direction = currentValue > minimum ? 'ArrowLeft' : 'ArrowRight'
-  const targetValue = direction === 'ArrowLeft' ? currentValue - 1 : currentValue + 1
-  if (targetValue < minimum || targetValue > maximum) throw new Error('The reasoning slider has no adjacent value to select.')
-
-  const targetEffort = (await effort.locator('[data-model-effort-option]').nth(targetValue).innerText()).trim()
-  await slider.press(direction)
-  await expect(slider).toHaveAttribute('aria-valuenow', String(targetValue))
+  // Council picker C1: effort is a radio group (one stop, arrow keys move the level).
+  const levels = reasoningEffort(page).getByRole('radio')
+  await expect(levels.first()).toBeVisible()
+  const count = await levels.count()
+  const checked = await levels.evaluateAll(radios => radios.findIndex(radio => radio.getAttribute('aria-checked') === 'true'))
+  const start = checked < 0 ? 0 : checked
+  const direction = start > 0 ? 'ArrowLeft' : 'ArrowRight'
+  const targetValue = direction === 'ArrowLeft' ? start - 1 : start + 1
+  if (targetValue < 0 || targetValue >= count) throw new Error('The reasoning levels have no adjacent value to select.')
+  const targetEffort = (await levels.nth(targetValue).getAttribute('aria-label')) ?? ''
+  await levels.nth(start).focus()
+  await page.keyboard.press(direction)
+  await expect(levels.nth(targetValue)).toHaveAttribute('aria-checked', 'true')
   pickerSelectionByPage.set(page, { model: selection.model, effort: targetEffort })
 })
 
@@ -112,7 +103,7 @@ Then('the picker reflects the adjusted reasoning effort', async ({ page }: { pag
   await recordAssertion(page, 'reasoning-slider-updates-selected-effort', async () => {
     await expect(page.locator('[data-model-picker-text]')).toHaveText(selection.model)
     await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
-    await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(reasoningEffort(page).getByRole('radio', { name: selection.effort, exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })
@@ -230,21 +221,9 @@ When('a supported legacy Codex model is selected without validating a new connec
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
   const effort = reasoningEffort(page)
-  const providerDefault = effort.getByRole('button', { name: 'Default', exact: true })
-  await expect(providerDefault).toBeVisible()
-  const defaultBounds = await providerDefault.boundingBox()
-  const slider = effort.getByRole('slider')
-  const sliderBounds = await slider.boundingBox()
-  if (defaultBounds === null || sliderBounds === null) throw new Error('The reasoning controls have no visible bounds.')
-  expect(defaultBounds.y + defaultBounds.height).toBeLessThan(sliderBounds.y)
-  const trackBounds = await effort.locator('[data-model-effort-slider] [data-slot="slider-track"]').boundingBox()
-  if (trackBounds === null) throw new Error('The effort slider track has no visible bounds.')
-  expect(trackBounds.height).toBeGreaterThanOrEqual(4)
-  expect(sliderBounds.width).toBeGreaterThanOrEqual(16)
-  const rangeColor = await effort
-    .locator('[data-model-effort-slider] [data-slot="slider-range"]')
-    .evaluate(element => getComputedStyle(element).backgroundColor)
-  expect(rangeColor).not.toBe('rgba(0, 0, 0, 0)')
+  // Council picker C1: the provider default is its own option beside the heading, the levels a radio group below it.
+  await expect(effort.getByRole('button', { name: 'Provider default', exact: true })).toBeVisible()
+  await expect(effort.getByRole('radiogroup')).toBeVisible()
   pickerSelectionByPage.set(page, {
     model: (await trigger.innerText()).trim(),
     effort: (await page.locator('[data-model-picker-effort]').innerText()).trim(),
@@ -263,8 +242,8 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     await expect(dialog).toBeVisible()
     await expect(trigger).toHaveText(selection.model)
     await expect(page.locator('[data-model-picker-effort]')).toHaveText(selection.effort)
-    await expect(reasoningEffort(page).getByRole('slider')).toBeVisible()
-    await expect(reasoningEffort(page).getByRole('button', { name: selection.effort, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(reasoningEffort(page).getByRole('radiogroup')).toBeVisible()
+    await expect(reasoningEffort(page).getByRole('radio', { name: selection.effort, exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(fastMode).toBeEnabled()
     await fastMode.click()
     await expect(fastMode).toBeChecked()

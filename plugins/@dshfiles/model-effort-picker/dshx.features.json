@@ -16,8 +16,8 @@
         "seed tool-call-thread",
         "click button \", reasoning *\"",
         "expect list \"Models and accounts\"",
-        "hover button \"Reasoning effort: *\"",
-        "expect button \"High\""
+        "expect radiogroup \"Reasoning effort*\"",
+        "expect radio \"High\""
       ],
       "states": ["closed", "open", "scanning", "searching", "empty-search", "handoff-check", "compacting"],
       "failureModes": [

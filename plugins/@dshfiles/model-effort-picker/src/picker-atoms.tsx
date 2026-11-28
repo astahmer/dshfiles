@@ -141,12 +141,12 @@ export const QuotaText = ({
   )
 }
 
-/** A "?" that explains a control in place, never as inline helper text. */
-export const InfoHint = ({ description, className }: { readonly description: string; readonly className?: string }) => (
+/** A "?" that explains a control in place, never as inline helper text; `label` names it ("About reasoning effort"). */
+export const InfoHint = ({ description, label, className }: { readonly description: string; readonly label?: string; readonly className?: string }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <button
-        aria-label={description}
+        aria-label={label ?? description}
         className={cn(
           'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
           className,
