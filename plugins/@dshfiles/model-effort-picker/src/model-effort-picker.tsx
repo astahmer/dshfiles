@@ -60,8 +60,8 @@ const FastModeIndicator = ({
   // means low quota).
   if (enabledOverride ?? state.data?.enabled ?? false)
     return (
-      // Round 3 R18: 4 px from the brand mark on a phone bar, whose mark step removes the chip gap.
-      <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-foreground dshx:in-data-model-mark:mr-1" data-model-fast-mode-enabled />
+      // Round 5 U7: 4 px after the name on a phone bar, whose mark step removes the chip gap.
+      <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-foreground dshx:in-data-model-mark:ml-1" data-model-fast-mode-enabled />
     )
   return null
 }

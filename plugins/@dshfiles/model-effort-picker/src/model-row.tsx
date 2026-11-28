@@ -136,11 +136,12 @@ export const ModelRow = (props: {
         <BrandMark brand={brand} className="dshx:size-4" name={name} />
         {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
           name takes its room while it still fits. */}
-        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
           <TruncatedTooltip content={props.model.id}>
             <span
               className={cn(
-                'dshx:flex dshx:min-w-0 dshx:flex-[1_1_auto] dshx:overflow-hidden dshx:text-sm dshx:font-[450]',
+                // Round 5 U7: the name takes its own width, so the Fast bolt sits 4 px after it.
+                'dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:overflow-hidden dshx:text-sm dshx:font-[450]',
                 props.active && 'dshx:font-semibold',
               )}
               data-model-picker-name

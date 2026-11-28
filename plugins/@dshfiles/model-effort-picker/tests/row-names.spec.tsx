@@ -36,7 +36,7 @@ describe('names come before labels in the list (council picker round 3, R3)', ()
   })
 
   it('lets the name take the room first, at 13 px', () => {
-    expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(row({}))?.[0]).toMatch(/dshx:min-w-0 dshx:flex-\[1_1_auto\] dshx:overflow-hidden dshx:text-sm/u)
+    expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(row({}))?.[0]).toMatch(/dshx:min-w-0 dshx:flex-\[0_1_auto\] dshx:overflow-hidden dshx:text-sm/u)
   })
 
   it('reserves the check slot on every row and puts the bolt next to the name (round 4 T7 supersedes round 3)', () => {

@@ -23,7 +23,8 @@ describe('round 3 smaller fixes (council picker R18)', () => {
   })
 
   it('keeps 4 px between the Fast bolt and the brand mark on a phone bar', () => {
-    expect(picker).toMatch(/dshx:in-data-model-mark:mr-1" data-model-fast-mode-enabled/u)
+    // Round 5 U7: the bolt follows the name now, so its 4 px sit on its left.
+    expect(picker).toMatch(/dshx:in-data-model-mark:ml-1" data-model-fast-mode-enabled/u)
   })
 
   it('shows no quota column of dashes when no account has a quota', () => {
