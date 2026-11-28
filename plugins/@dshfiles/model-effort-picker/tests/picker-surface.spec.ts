@@ -42,6 +42,8 @@ describe('desktop picker is one bounded surface (council picker S2)', () => {
   })
 
   it('fades rows 8 px where they pass under the search and the footer', () => {
-    expect(classesOf(picker, 'data-model-picker-scroll')).toContain('mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)')
+    expect(classesOf(picker, 'data-model-picker-scroll')).toContain(
+      'mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)',
+    )
   })
 })

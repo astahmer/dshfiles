@@ -51,7 +51,15 @@ export const FastModeRow = (props: {
 }
 
 /** Fast mode for the inspected route: hidden unless AI Accounts says the route supports it. */
-export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange, draft = null, onStatus }: Props & {
+export const FastModeSection = ({
+  sessionId,
+  provider,
+  model,
+  disabled,
+  onEnabledChange,
+  draft = null,
+  onStatus,
+}: Props & {
   /** Reports the route's stored state once it is known, so the list can mark the routes where Fast mode is on. */
   readonly onStatus?: (enabled: boolean) => void
 }) => {

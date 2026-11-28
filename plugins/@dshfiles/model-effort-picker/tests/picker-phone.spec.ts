@@ -37,6 +37,8 @@ describe('phone picker is one sheet, list then details in place (council picker 
     expect(tagOf(picker, 'aria-label="Choose a model"')).toMatch(/dshx:@max-pane-compact:px-2/u)
     expect(tagOf(picker, 'data-model-inspector')).toMatch(/dshx:@max-pane-compact:px-2/u)
     expect(tagOf(picker, 'data-model-inspector')).toMatch(/dshx:@max-pane-compact:border-l-0/u)
-    expect(tagOf(picker, 'data-model-picker-surface')).toContain('dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]')
+    expect(tagOf(picker, 'data-model-picker-surface')).toContain(
+      'dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]',
+    )
   })
 })

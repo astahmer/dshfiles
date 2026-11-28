@@ -42,9 +42,7 @@ export interface InspectedRoute {
 }
 
 /** What the details pane does with a change: stage it on a draft, or apply it to the thread at once. */
-export type DetailsChange =
-  | { readonly kind: 'stage' }
-  | { readonly kind: 'apply'; readonly selection: ModelSelection }
+export type DetailsChange = { readonly kind: 'stage' } | { readonly kind: 'apply'; readonly selection: ModelSelection }
 
 /** A fallback rung named for display: catalog names when the catalog still lists the route, its ids otherwise. */
 interface FallbackLabel {

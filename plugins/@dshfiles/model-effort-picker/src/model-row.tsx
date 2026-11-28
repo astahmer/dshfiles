@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, ProviderLabel, QuotaText } from './picker-atoms.js'
@@ -41,8 +41,8 @@ export const ModelRow = (props: {
     <div
       className={cn(
         'dshx:group/row dshx:flex dshx:h-7 dshx:pointer-coarse:h-11 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60',
-        props.active && 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/60',
-        props.fanOutSelected && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
+        (props.active || props.fanOutSelected) && 'dshx:bg-selected-wash',
+        props.active && 'dshx:selected-edge',
       )}
       data-fan-out-selected={props.fanOutSelected || undefined}
       data-model-picker-row
@@ -84,7 +84,10 @@ export const ModelRow = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-2xs dshx:font-medium" data-model-picker-name>
+              <span
+                className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-2xs dshx:font-medium', props.active && 'dshx:font-selected')}
+                data-model-picker-name
+              >
                 {name}
               </span>
             </TooltipTrigger>
@@ -105,10 +108,11 @@ export const ModelRow = (props: {
       <span className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:justify-end" data-model-picker-quota>
         {props.quota === undefined ? null : <QuotaText label={props.quota.label} onReserve={props.quota.onReserve} percent={props.quota.percent} />}
       </span>
+      <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center">
+        {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground" data-model-current-check /> : null}
+      </span>
       <span className="dshx:flex dshx:w-4 dshx:shrink-0 dshx:items-center dshx:justify-center">
-        {props.fastOn === true ? (
-          <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground" data-model-fast-on role="img" />
-        ) : null}
+        {props.fastOn === true ? <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground" data-model-fast-on role="img" /> : null}
       </span>
       <button
         aria-label={`Details for ${name}`}

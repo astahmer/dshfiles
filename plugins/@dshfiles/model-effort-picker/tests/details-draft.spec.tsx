@@ -17,7 +17,11 @@ const groups = [
       { id: 'gemini-3.8-flash', name: 'gemini-3.8-flash', description: '', reasoning: { efforts, defaultEffort: 'low' } },
     ],
   },
-  { id: 'cc2', name: 'Command Code 2', models: [{ id: 'gemini-3.8-flash', name: 'gemini-3.8-flash', description: '', reasoning: { efforts, defaultEffort: 'low' } }] },
+  {
+    id: 'cc2',
+    name: 'Command Code 2',
+    models: [{ id: 'gemini-3.8-flash', name: 'gemini-3.8-flash', description: '', reasoning: { efforts, defaultEffort: 'low' } }],
+  },
 ]
 const current = { provider: 'cc1', model: 'gpt-6-luna' }
 
@@ -69,7 +73,11 @@ describe('inspecting a model never changes the thread (council picker S1)', () =
     const model = groups[1]?.models[0]
     if (model === undefined) throw new Error('fixture')
     const inspected = { provider: 'cc2', model: 'gemini-3.8-flash' }
-    expect(ModelPickerModel.draftSelection({ inspected, model, stagedEffort: null })).toEqual({ provider: 'cc2', model: 'gemini-3.8-flash', reasoningEffort: 'low' })
+    expect(ModelPickerModel.draftSelection({ inspected, model, stagedEffort: null })).toEqual({
+      provider: 'cc2',
+      model: 'gemini-3.8-flash',
+      reasoningEffort: 'low',
+    })
     expect(ModelPickerModel.draftSelection({ inspected, model, stagedEffort: { value: 'high' } })).toEqual({
       provider: 'cc2',
       model: 'gemini-3.8-flash',

@@ -83,7 +83,11 @@ export const ModelDetails = (props: {
   }
 
   return (
-    <section aria-label="Model details" className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-model-details-draft={draft || undefined}>
+    <section
+      aria-label="Model details"
+      className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1 dshx:flex-col"
+      data-model-details-draft={draft || undefined}
+    >
       <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:@max-pane-compact:min-h-12 dshx:@max-pane-compact:items-center">
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
@@ -153,9 +157,7 @@ export const ModelDetails = (props: {
           </div>
         )}
 
-        {model === undefined || props.inspected === null ? null : (
-          <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} />
-        )}
+        {model === undefined || props.inspected === null ? null : <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} />}
 
         {group !== undefined && model !== undefined && props.fast !== undefined
           ? props.fast({ provider: group.id, model: model.id, draft: draft ? { value: stagedFast, onChange: setStagedFast } : null })

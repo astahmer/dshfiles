@@ -5,12 +5,11 @@ import { useApi, useApiQuery, useResource, useSettings } from '@dshfiles/dshx/cl
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, SearchIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
@@ -36,9 +35,6 @@ type Props = Omit<ModelSelectInjected, 'resolveText'> & {
 type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
 
 const fastModeRouteKey = ({ sessionId, provider, model }: FastModeRoute): string => JSON.stringify([sessionId, provider, model])
-
-/** The picker's own shortcut: focus the search field while it is open. */
-const MOD_KEY = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 
 const FastModeIndicator = ({
   sessionId,
@@ -356,36 +352,27 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
-                <label className="dshx:relative dshx:block dshx:shrink-0">
-                  <SearchIcon
-                    aria-hidden="true"
-                    className="dshx:pointer-events-none dshx:absolute dshx:left-2 dshx:top-1/2 dshx:size-3.5 dshx:-translate-y-1/2 dshx:text-muted-foreground"
-                  />
-                  <Input
-                    aria-label="Search models and accounts"
-                    autoComplete="off"
-                    className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-2xs dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
-                    onChange={event => setQuery(event.currentTarget.value)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter') {
-                        const first = rows[0]
-                        if (first === undefined || busy) return
-                        event.preventDefault()
-                        choose(ModelPickerModel.selectionForModel(first.group, first.model, current))
-                        return
-                      }
-                      if (event.key !== 'ArrowDown') return
+                <SearchInput
+                  aria-label="Search models and accounts"
+                  autoComplete="off"
+                  className="dshx:shrink-0"
+                  onChange={event => setQuery(event.currentTarget.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter') {
+                      const first = rows[0]
+                      if (first === undefined || busy) return
                       event.preventDefault()
-                      modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
-                    }}
-                    placeholder="Search models…"
-                    ref={searchInputRef}
-                    value={query}
-                  />
-                  <Kbd className="dshx:pointer-events-none dshx:absolute dshx:right-1.5 dshx:top-1/2 dshx:h-4 dshx:-translate-y-1/2 dshx:px-1 dshx:text-2xs">
-                    {MOD_KEY} K
-                  </Kbd>
-                </label>
+                      choose(ModelPickerModel.selectionForModel(first.group, first.model, current))
+                      return
+                    }
+                    if (event.key !== 'ArrowDown') return
+                    event.preventDefault()
+                    modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
+                  }}
+                  placeholder="Search models…"
+                  ref={searchInputRef}
+                  value={query}
+                />
                 <ScrollArea
                   className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
                   data-model-picker-scroll
