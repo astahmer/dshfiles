@@ -25,6 +25,6 @@ describe('every touch target is 44 pt (council picker C6)', () => {
 
   it('lets the whole Fast mode row toggle the switch', () => {
     const fast = sources.find(source => source.name === 'fast-mode-section.tsx')?.text ?? ''
-    expect(fast).toMatch(/<label[^>]*dshx:min-h-8[^>]*dshx:pointer-coarse:min-h-11[^>]*>|<label[^>]*dshx:pointer-coarse:min-h-11[^>]*dshx:min-h-8/u)
+    expect(fast).toMatch(/<label\s+className="[^"]*dshx:min-h-8[^"]*dshx:flex-1[^"]*dshx:pointer-coarse:min-h-11/u)
   })
 })

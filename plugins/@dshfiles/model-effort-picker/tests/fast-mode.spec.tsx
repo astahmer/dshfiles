@@ -38,6 +38,8 @@ describe('Fast mode is one visible, labelled control (council picker C2)', () =>
     // The visible label names the switch; no tooltip trigger sits on it to overwrite its state.
     expect(control).not.toContain('tooltip-trigger')
     expect(html).toMatch(/<label[^>]*for="[^"]+"/u)
+    // The switch is not inside its label: WebKit re-dispatched a tap on it through the label and toggled it twice.
+    expect(html).not.toMatch(/<label[^>]*>(?:(?!<\/label>).)*role="switch"/u)
     expect(html).toMatch(/dshx:min-h-8 [^"]*dshx:pointer-coarse:min-h-11/u)
   })
 
