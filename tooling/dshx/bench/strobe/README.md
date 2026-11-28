@@ -1,38 +1,90 @@
-# Scratch DSH strobe benches
+# Scratch DSH web benchmarks
 
-These cases use a scratch DSH URL only. Never point them at `http://127.0.0.1:3080` or another live profile.
+Run only against a disposable `strobe-bench` scratch instance. The driver reads
+its launch URL and fixture IDs from scratch state; it does not take a live URL.
 
-## Start and prepare the fixture
+## Prepare the fixture
 
-From the repository root, after machine load is below 12 on the 10-core Mac:
+From the repository root, with the workspace dependencies installed and
+Playwright Chromium available (`pnpm --dir tooling/dshx exec playwright install chromium`):
 
 ```sh
-node tooling/dshx/packages/dshx/dist/cli/bin.js dev up --name strobe-bench
+pnpm --dir tooling/dshx run build
+umask 077
+bench_tmp=$(mktemp -d "${TMPDIR:-/tmp}/dsh-strobe.XXXXXXXX")
+export DSHX_DEV_STATE_ROOT="$bench_tmp/dsh"
+dshx() { node tooling/dshx/packages/dshx/dist/cli/bin.js "$@"; }
+dshx dev up --name strobe-bench > "$bench_tmp/startup.log" 2>&1
+dshx dev doctor --name strobe-bench
+node tooling/dshx/bench/strobe/seed-fixtures.mjs
 ```
 
-`up` without `--plugin` builds and loads the full owned bundle set. Wait for `dshx dev doctor --name strobe-bench` to pass. The bench `prepare` hook creates two short synthetic Sessions and one scratch-only Session with a 500 KB synthetic user message containing `strobe large history marker`; it uses no provider credentials and does not copy live Session data.
+`up` builds and loads the full owned bundle set. Wait for `doctor` to pass.
+The seeder uses a separate, headless Playwright browser. It creates two short
+synthetic Sessions and one Session with a roughly 500 KB synthetic user
+message, without provider credentials or live Session data. Seed once per
+scratch instance, not once per Strobe block.
 
-`dshx dev up` keeps its authenticated launch URL in a mode-600 state file at `$TMPDIR/dshx-dev/strobe-bench/state.json`. Supply that URL as `STROBE_BENCH_URL` through private shell environment only; do not echo, log, or save it. The bench `prepare` hook seeds synthetic sessions. If Strobe's browser cannot connect on this macOS setup, seed through the scratch browser instead with `node tooling/dshx/bench/strobe/seed-fixtures.mjs` and use the existing probes below.
+The project-selection regression test needs Chromium but no running DSH:
+`node --test tooling/dshx/bench/strobe/select-project.test.mjs`.
 
-## Run
+## Run Strobe
 
-Use the workspace-pinned `@hona/strobe` CLI. The authenticated URL stays in the environment, never in the process arguments. Use paired A/A runs to check same-build noise and collect timing results:
+Strobe's runner needs Bun on `PATH`. The [pinned Strobe 0.6.0 runner](https://github.com/anomalyco/strobe/blob/v0.6.0/sdk/bench/src/runner.ts#L154-L164)
+attempts a second CDP connection through Playwright before running a target's
+`prepare` hook. In the original macOS run, that attachment timed out even
+though Strobe had already started Chromium. The DSH driver now seeds out of
+process and uses Strobe's own browser driver, with no `prepare` hook. The smoke
+check takes one sample per case; do not report those samples as a timing baseline.
 
 ```sh
-STROBE_BENCH_URL="${STROBE_BENCH_URL:?set scratch URL privately}" pnpm --dir tooling/dshx exec strobe bench bench/strobe/dsh-web.bench.ts --head . --aa --filter 'page-load-interactive,thread-switch,new-thread-composer,large-thread-open'
+strobe() { XDG_DATA_HOME="$bench_tmp/strobe" pnpm --dir tooling/dshx exec strobe "$@"; }
+strobe bench bench/strobe/dsh-web.bench.ts --head . --check --filter page-load-interactive > "$bench_tmp/check-one.log" 2>&1
+strobe bench bench/strobe/dsh-web.bench.ts --head . --check > "$bench_tmp/check-all.log" 2>&1
 ```
 
-Use `bench --check` only to validate the driver. If CPU/layout attribution is needed, collect it separately with `record --bench ... --probes attribution`; those samples perturb timing and must not be mixed with timing results. Use the existing `host-lag.mjs` and `switch-probe.mjs` against the same scratch URL for Host event-loop, request, DOM, long-task, and WebSocket evidence that strobe does not replace.
+Keep raw logs and Strobe artifacts in the private temp directory: they may
+contain the authenticated launch URL. Do not print or share that URL. If
+Strobe fails to start Chromium itself, try setting `STROBE_BROWSER` to the
+absolute path of an installed **full** Chrome/Chromium executable, not the
+Playwright headless shell, and retry the one-case check.
 
-### macOS CDP status (2026-11-04)
-
-The pinned Strobe 0.6.0 `bench --check` attempt failed 0/4 cases before their hooks: every fresh Chromium CDP connection timed out in `prepare: overCDP` after 30 seconds. Do not treat that run as a timing result. Until Strobe's macOS CDP connection works, use the fallback probes above; retry `bench --check` first before collecting timings.
-
-The primary metrics are per-case `phase.*` wall times. Thread switch and large history readiness are reported only after the composer/history DOM is visible; the screenshot/frame metrics are deliberately omitted on macOS because this project run skips additional Screen Recording or Accessibility grants.
-
-Always clean up the DSH and strobe afterward:
+Once all four checks pass, wait until the machine is quiet (on the 10-core test
+Mac, one-minute load below 12, no builds or E2E runs). Collect paired A/A
+results on the same build to estimate noise, with no attribution runs:
 
 ```sh
-node tooling/dshx/packages/dshx/dist/cli/bin.js dev down --name strobe-bench
-pnpm --dir tooling/dshx exec strobe leave --yes
+uptime
+strobe bench bench/strobe/dsh-web.bench.ts --head . --aa --pairs 6 --why never > "$bench_tmp/aa.log" 2>&1
+uptime
+```
+
+Report the four `phase.*` wall times and their A/A spread. See the
+[macOS baseline](../../../../docs/performance.md#scratch-dsh-strobe-baseline-2026-11-23).
+These are scratch measurements, not comparisons against live DSH. Use `record --bench ...
+--probes attribution` separately if CPU/layout attribution is needed. For Host
+event-loop, request, DOM, long-task and WebSocket evidence that Strobe does not
+replace, run the existing `host-lag.mjs` and `switch-probe.mjs` probes against
+the same scratch URL. No Screen Recording or Accessibility permissions are
+needed for these phases.
+
+## Fallback without Strobe's browser
+
+After preparing the same scratch fixture, run all four cases with Playwright
+(or pass a single case name):
+
+```sh
+node tooling/dshx/bench/strobe/run-playwright.mjs
+```
+
+This runs the same actions and readiness checks and prints the median and range
+of five iterations. It does not collect Strobe traces or provide paired A/A
+statistics. Label the results as Playwright timings; don't mix them with
+Strobe's timing baseline.
+
+When done, shut down only the scratch instance. Keep or remove the private
+temp directory according to whether you still need its evidence.
+
+```sh
+dshx dev down --name strobe-bench
 ```
