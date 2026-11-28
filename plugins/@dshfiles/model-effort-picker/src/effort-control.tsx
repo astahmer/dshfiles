@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ModelPickerModel } from './model-picker-model.js'
 import { InfoHint } from './picker-atoms.js'
@@ -8,11 +8,62 @@ interface Effort {
   readonly name: string
 }
 
+/** One segment: a level, or the provider's default (`id` undefined). */
+interface Segment {
+  readonly id: string | undefined
+  readonly label: string
+  readonly name: string
+}
+
+/** How long arrowing has to rest on a level before it applies (round 3 R6). */
+export const EFFORT_SETTLE_MS = 600
+
 /**
- * Council picker round 1, C1: reasoning effort as a discrete choice. One radio per level the model supports, with short
- * labels, 28 px tall (44 px on touch); the chosen level is named in the heading. "Provider default" is its own option
- * under the levels, so an effort the thread left to the provider never reads as the first level. Arrow keys move
- * between levels (one tab stop). A model without levels shows nothing.
+ * Round 3 R6: arrowing through the levels previews each one and applies only the level it settles on (after
+ * EFFORT_SETTLE_MS, or at once on Enter, Space or leaving the group), so walking from Off to Max does not commit every
+ * level in between. A click applies at once. `schedule` is injectable so the rule is testable without a DOM.
+ */
+export const createEffortCommitter = (input: {
+  readonly commit: (effort: string | undefined) => void
+  readonly schedule: (run: () => void, ms: number) => () => void
+}) => {
+  let pending: { readonly value: string | undefined } | null = null
+  let cancel: (() => void) | null = null
+  const clear = (): void => {
+    cancel?.()
+    cancel = null
+  }
+  const flush = (): void => {
+    clear()
+    if (pending === null) return
+    const { value } = pending
+    pending = null
+    input.commit(value)
+  }
+  return {
+    /** An arrow key landed on `value`: show it, apply it once arrowing rests. */
+    preview: (value: string | undefined): void => {
+      clear()
+      pending = { value }
+      cancel = input.schedule(flush, EFFORT_SETTLE_MS)
+    },
+    /** A click, Enter or Space: apply now. */
+    commitNow: (value: string | undefined): void => {
+      clear()
+      pending = null
+      input.commit(value)
+    },
+    /** Focus left the group: apply what was previewed. */
+    flush,
+    dispose: clear,
+  }
+}
+
+/**
+ * Council picker round 1, C1, and round 3, R6: reasoning effort as one radio group that always has a checked option. The
+ * first segment is "Auto" (named "Provider default"), then one per level the model supports with short labels, 28 px tall
+ * (44 px on touch, four to a row when the levels would not fit). The heading names the state ("Provider default" or the
+ * level). A model without levels shows nothing.
  */
 export const EffortControl = (props: {
   readonly efforts: readonly Effort[]
@@ -22,75 +73,97 @@ export const EffortControl = (props: {
 }) => {
   const group = useRef<HTMLDivElement>(null)
   const headingId = useId()
+  const [preview, setPreview] = useState<{ readonly value: string | undefined } | null>(null)
+  const onChange = useRef(props.onChange)
+  onChange.current = props.onChange
+  const committer = useMemo(
+    () =>
+      createEffortCommitter({
+        commit: value => {
+          setPreview(null)
+          onChange.current(value)
+        },
+        schedule: (run, ms) => {
+          const timer = setTimeout(run, ms)
+          return () => clearTimeout(timer)
+        },
+      }),
+    [],
+  )
+  useEffect(() => () => committer.dispose(), [committer])
   if (props.efforts.length === 0) return null
-  const selectedIndex = props.efforts.findIndex(effort => effort.id === props.selected)
-  const heading = selectedIndex < 0 ? 'Provider default' : (props.efforts[selectedIndex]?.name ?? 'Provider default')
 
-  const move = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
+  const segments: readonly Segment[] = [
+    { id: undefined, label: 'Auto', name: 'Provider default' },
+    ...props.efforts.map(effort => ({ id: effort.id, label: ModelPickerModel.effortShortLabel(effort), name: effort.name })),
+  ]
+  const shown = preview === null ? props.selected : preview.value
+  const found = segments.findIndex(segment => segment.id === shown)
+  const checkedIndex = found < 0 ? 0 : found
+  const heading = segments[checkedIndex]?.name ?? 'Provider default'
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      committer.commitNow(segments[index]?.id)
+      return
+    }
     const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
-    const edge = event.key === 'Home' ? 0 : event.key === 'End' ? props.efforts.length - 1 : undefined
+    const edge = event.key === 'Home' ? 0 : event.key === 'End' ? segments.length - 1 : undefined
     if (step === 0 && edge === undefined) return
     event.preventDefault()
-    const next = edge ?? Math.min(props.efforts.length - 1, Math.max(0, index + step))
-    const effort = props.efforts[next]
-    if (effort === undefined) return
-    props.onChange(effort.id)
+    const next = edge ?? Math.min(segments.length - 1, Math.max(0, index + step))
+    const segment = segments[next]
+    if (segment === undefined) return
+    setPreview({ value: segment.id })
+    committer.preview(segment.id)
     group.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
   }
 
   return (
     <section aria-label="Reasoning effort" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1.5" data-model-effort>
-      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2">
-        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
-          <h3 className="dshx:truncate dshx:text-xs dshx:font-medium" id={headingId}>
-            Reasoning effort · <span className="dshx:font-normal dshx:text-muted-foreground">{heading}</span>
-          </h3>
-          <InfoHint description="Higher effort lets the model think for longer before it answers." label="About reasoning effort" />
-        </span>
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+        <h3 className="dshx:truncate dshx:text-xs dshx:font-medium" id={headingId}>
+          Reasoning effort · <span className="dshx:font-normal dshx:text-muted-foreground">{heading}</span>
+        </h3>
+        <InfoHint description="Higher effort lets the model think for longer before it answers." label="About reasoning effort" />
       </div>
       <div
         aria-labelledby={headingId}
-        className="dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:pointer-coarse:grid-cols-[repeat(auto-fit,minmax(2.75rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5"
+        className={cn(
+          'dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5',
+          segments.length > 6 ? 'dshx:pointer-coarse:grid-cols-4' : 'dshx:pointer-coarse:grid-cols-[repeat(auto-fit,minmax(2.75rem,1fr))]',
+        )}
         data-model-effort-options
+        onBlur={event => {
+          if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) committer.flush()
+        }}
         ref={group}
         role="radiogroup"
       >
-        {props.efforts.map((effort, index) => {
-          const checked = index === selectedIndex
+        {segments.map((segment, index) => {
+          const checked = index === checkedIndex
           return (
             <button
               aria-checked={checked}
-              aria-label={effort.name}
+              aria-label={segment.name}
               className={cn(
                 'dshx:h-7 dshx:min-w-0 dshx:rounded-md dshx:px-1 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                 checked && 'dshx:segment-thumb dshx:font-selected dshx:text-foreground',
               )}
+              data-model-effort-default={segment.id === undefined || undefined}
               data-model-effort-option
-              key={effort.id}
-              onClick={() => props.onChange(effort.id)}
-              onKeyDown={event => move(event, index)}
+              key={segment.id ?? '(provider default)'}
+              onClick={() => committer.commitNow(segment.id)}
+              onKeyDown={event => onKeyDown(event, index)}
               role="radio"
-              tabIndex={checked || (selectedIndex < 0 && index === 0) ? 0 : -1}
+              tabIndex={checked ? 0 : -1}
               type="button"
             >
-              {ModelPickerModel.effortShortLabel(effort)}
+              {segment.label}
             </button>
           )
         })}
-      </div>
-      <div className="dshx:flex dshx:justify-end">
-        <button
-          aria-pressed={selectedIndex < 0}
-          className={cn(
-            'dshx:h-7 dshx:shrink-0 dshx:rounded-md dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
-            selectedIndex < 0 && 'dshx:font-selected dshx:text-foreground',
-          )}
-          data-model-effort-default
-          onClick={() => props.onChange(undefined)}
-          type="button"
-        >
-          Provider default
-        </button>
       </div>
     </section>
   )

@@ -93,6 +93,8 @@ When('the reasoning-effort slider is adjusted one step', async ({ page }: { page
   await levels.nth(start).focus()
   await page.keyboard.press(direction)
   await expect(levels.nth(targetValue)).toHaveAttribute('aria-checked', 'true')
+  // Arrowing previews; Enter applies the level at once (otherwise it applies once arrowing rests).
+  await page.keyboard.press('Enter')
   pickerSelectionByPage.set(page, { model: selection.model, effort: targetEffort })
 })
 
@@ -224,7 +226,8 @@ When('a supported legacy Codex model is selected without validating a new connec
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
   const effort = reasoningEffort(page)
   // Council picker C1: the provider default is its own option beside the heading, the levels a radio group below it.
-  await expect(effort.getByRole('button', { name: 'Provider default', exact: true })).toBeVisible()
+  // Council picker round 3 R6: the provider default is the group's first radio ("Auto").
+  await expect(effort.getByRole('radio', { name: 'Provider default', exact: true })).toBeVisible()
   await expect(effort.getByRole('radiogroup')).toBeVisible()
   pickerSelectionByPage.set(page, {
     model: (await trigger.innerText()).trim(),
