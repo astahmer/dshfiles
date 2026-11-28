@@ -180,7 +180,7 @@ export const ModelRow = (props: {
       </span>
       <button
         aria-label={`Details for ${name}`}
-        className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+        className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
         data-model-details-trigger
         onClick={props.onInspect}
         type="button"

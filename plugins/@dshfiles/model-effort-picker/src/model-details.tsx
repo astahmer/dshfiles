@@ -96,11 +96,11 @@ export const ModelDetails = (props: {
 
   return (
     <section aria-label="Model details" className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-model-details-draft={draft || undefined}>
-      <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5">
+      <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:@max-pane-compact:min-h-12 dshx:@max-pane-compact:items-center">
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
           className={cn(
-            'dshx:hidden dshx:size-6 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:@max-pane-compact:flex',
+            'dshx:hidden dshx:size-6 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:@max-pane-compact:flex',
             draft && 'dshx:flex',
           )}
           data-model-details-back
@@ -134,7 +134,7 @@ export const ModelDetails = (props: {
           : null}
         <button
           aria-label="Close model picker"
-          className="dshx:flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+          className="dshx:flex dshx:size-5 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
           onClick={props.onClose}
           type="button"
         >
@@ -142,7 +142,7 @@ export const ModelDetails = (props: {
         </button>
       </header>
 
-      <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto" data-model-details-body>
+      <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip]" data-model-details-body>
         <div className="dshx:mt-2 dshx:flex dshx:items-start dshx:gap-2">
           <p className="dshx:shrink-0 dshx:pt-1 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">Account</p>
           <div aria-label="Available accounts" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-1" data-model-account-chips>

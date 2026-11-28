@@ -320,7 +320,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             sideOffset={8}
           >
             <div
-              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch"
+              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
               data-model-picker-surface
               onKeyDownCapture={event => {
                 if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
@@ -333,7 +333,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 aria-label="Choose a model"
                 className={cn(
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
-                  'dshx:@max-pane-compact:w-full',
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
@@ -368,7 +368,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   </Kbd>
                 </label>
                 <ScrollArea
-                  className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block!"
+                  className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
                   data-model-picker-scroll
                 >
                   <div
@@ -455,7 +455,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               <div
                 className={cn(
                   'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
-                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0',
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
                 data-model-inspector
